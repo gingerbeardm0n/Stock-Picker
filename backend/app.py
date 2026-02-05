@@ -97,8 +97,8 @@ def trigger_scan():
         return jsonify({'error': 'Scan already in progress'}), 429
 
     try:
-        # Get optional symbol list from request
-        data = request.get_json() or {}
+        # Get optional symbol list from request (silent=True to handle empty body)
+        data = request.get_json(silent=True) or {}
         symbols = data.get('symbols', None)
 
         scanning_in_progress = True
