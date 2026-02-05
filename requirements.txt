@@ -1,0 +1,7 @@
+flask
+flask-cors
+alpaca-py
+requests
+python-dotenv
+websockets
+pytz
