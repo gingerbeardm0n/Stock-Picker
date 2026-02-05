@@ -66,6 +66,18 @@ def index():
     """Serve the main dashboard"""
     return render_template('index.html')
 
+@app.route('/style.css')
+def serve_css():
+    """Serve CSS file"""
+    from flask import send_from_directory
+    return send_from_directory('../frontend', 'style.css')
+
+@app.route('/app.js')
+def serve_js():
+    """Serve JavaScript file"""
+    from flask import send_from_directory
+    return send_from_directory('../frontend', 'app.js')
+
 @app.route('/api/scan', methods=['GET'])
 def get_scan_results():
     """Get current scan results"""
