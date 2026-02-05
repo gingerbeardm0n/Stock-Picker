@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Momentum Trading Scanner</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Momentum Trading Scanner</h1>
+            <p class="subtitle">Ross Cameron Style Day Trading Watchlist</p>
+        </header>
+
+        <div class="controls">
+            <button id="scanBtn" class="btn btn-primary">Run Scan Now</button>
+            <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
+            <div class="status">
+                <span id="statusText">Ready</span>
+                <span id="lastScan" class="last-scan"></span>
+            </div>
+        </div>
+
+        <div class="criteria-panel">
+            <h3>Scanner Criteria</h3>
+            <div class="criteria-grid">
+                <div class="criteria-item">
+                    <label>Price Range:</label>
+                    <span id="priceRange">$1.00 - $10.00</span>
+                </div>
+                <div class="criteria-item">
+                    <label>Min Premarket Volume:</label>
+                    <span id="minVolume">100,000</span>
+                </div>
+                <div class="criteria-item">
+                    <label>Min Premarket Gain:</label>
+                    <span id="minGain">10%</span>
+                </div>
+                <div class="criteria-item">
+                    <label>Min Relative Volume:</label>
+                    <span id="minRelVol">2.0x</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-summary">
+            <h2>Watchlist (<span id="resultCount">0</span> stocks)</h2>
+        </div>
+
+        <div id="resultsContainer" class="results-container">
+            <div class="no-results">
+                <p>Click "Run Scan Now" to find momentum stocks</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
