@@ -15,46 +15,64 @@ class MomentumScanner:
     def scan_stock(self, symbol):
         """Scan a single stock against criteria"""
         try:
+            logger.info(f"🔍 Scanning {symbol}...")
+
             # Get snapshot
             snapshot_data = self.data_feed.get_snapshot([symbol])
 
             if not snapshot_data or symbol not in snapshot_data:
+                logger.warning(f"  ❌ {symbol}: No snapshot data available")
                 return None
 
             snapshot = snapshot_data[symbol]
 
             # Check price range
             current_price = snapshot.latest_trade.price
+            logger.info(f"  💰 {symbol}: Price ${current_price:.2f}")
+
             if current_price < self.criteria['min_price'] or current_price > self.criteria['max_price']:
+                logger.info(f"  ❌ {symbol}: Price ${current_price:.2f} outside range ${self.criteria['min_price']}-${self.criteria['max_price']}")
                 return None
 
             # Get pre-market data
             premarket = self.data_feed.get_premarket_data(symbol)
             if not premarket:
+                logger.warning(f"  ❌ {symbol}: No premarket data available")
                 return None
+
+            logger.info(f"  📊 {symbol}: Premarket gain {premarket['gain_pct']:.2f}%, volume {premarket['volume']:,}")
 
             # Check pre-market volume
             if premarket['volume'] < self.criteria['min_premarket_volume']:
+                logger.info(f"  ❌ {symbol}: Premarket volume {premarket['volume']:,} < {self.criteria['min_premarket_volume']:,}")
                 return None
 
             # Check pre-market gain
             if premarket['gain_pct'] < self.criteria['min_premarket_gain_pct']:
+                logger.info(f"  ❌ {symbol}: Premarket gain {premarket['gain_pct']:.2f}% < {self.criteria['min_premarket_gain_pct']}%")
                 return None
 
             # Get average volume
             avg_volume = self.data_feed.get_average_volume(symbol)
             if not avg_volume:
+                logger.warning(f"  ❌ {symbol}: Could not calculate average volume")
                 return None
+
+            logger.info(f"  📈 {symbol}: Avg volume {int(avg_volume):,}")
 
             # Check average volume range
             if avg_volume < self.criteria['min_avg_volume'] or avg_volume > self.criteria['max_avg_volume']:
+                logger.info(f"  ❌ {symbol}: Avg volume {int(avg_volume):,} outside range {self.criteria['min_avg_volume']:,}-{self.criteria['max_avg_volume']:,}")
                 return None
 
             # Calculate relative volume
             current_volume = snapshot.latest_trade.volume if hasattr(snapshot.latest_trade, 'volume') else premarket['volume']
             relative_volume = current_volume / avg_volume if avg_volume > 0 else 0
 
+            logger.info(f"  📊 {symbol}: Relative volume {relative_volume:.2f}x")
+
             if relative_volume < self.criteria['min_relative_volume']:
+                logger.info(f"  ❌ {symbol}: Relative volume {relative_volume:.2f}x < {self.criteria['min_relative_volume']}x")
                 return None
 
             # Check for news/catalyst

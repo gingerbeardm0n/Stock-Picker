@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 class AlpacaDataFeed:
     def __init__(self):
+        logger.info(f"🔑 Initializing Alpaca API with key: {Config.ALPACA_API_KEY[:8]}...{Config.ALPACA_API_KEY[-4:]}")
         self.data_client = StockHistoricalDataClient(
             Config.ALPACA_API_KEY,
             Config.ALPACA_SECRET_KEY
@@ -20,6 +21,7 @@ class AlpacaDataFeed:
             Config.ALPACA_SECRET_KEY,
             paper=True
         )
+        logger.info("✅ Alpaca API clients initialized")
 
     def get_active_stocks(self):
         """Get list of active, tradable stocks"""
@@ -41,9 +43,10 @@ class AlpacaDataFeed:
         try:
             request = StockSnapshotRequest(symbol_or_symbols=symbols)
             snapshots = self.data_client.get_stock_snapshot(request)
+            logger.debug(f"✅ Got snapshot for {symbols}")
             return snapshots
         except Exception as e:
-            logger.error(f"Error getting snapshots: {e}")
+            logger.error(f"❌ Error getting snapshots for {symbols}: {type(e).__name__}: {e}")
             return {}
 
     def get_premarket_data(self, symbol):
