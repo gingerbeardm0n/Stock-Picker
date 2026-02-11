@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Momentum Trading Scanner</title>
     <link rel="stylesheet" href="style.css">
+    <!-- AG Grid CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.3/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.3/styles/ag-theme-alpine.css">
 </head>
 <body>
     <div class="container">
@@ -16,6 +19,12 @@
         <div class="controls">
             <button id="scanBtn" class="btn btn-primary">Run Scan Now</button>
             <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
+            <button id="debugScanBtn" class="btn btn-test">🔍 Debug 100 Stocks</button>
+            <div class="test-mode">
+                <input type="datetime-local" id="testDateTime" class="test-input-datetime">
+                <button id="set925Btn" class="btn btn-test" style="padding: 8px 12px; font-size: 13px;">⏰ 9:25 AM</button>
+                <button id="testScanBtn" class="btn btn-test">Test Historical</button>
+            </div>
             <div class="status">
                 <span id="statusText">Ready</span>
                 <span id="lastScan" class="last-scan"></span>
@@ -24,37 +33,79 @@
 
         <div class="criteria-panel">
             <h3>Scanner Criteria</h3>
-            <div class="criteria-grid">
+            <form id="criteriaForm" class="criteria-grid">
                 <div class="criteria-item">
-                    <label>Price Range:</label>
-                    <span id="priceRange">$1.00 - $10.00</span>
+                    <label for="minPrice">Min Price ($)</label>
+                    <input type="number" id="minPrice" step="0.01" min="0" value="1.00">
                 </div>
                 <div class="criteria-item">
-                    <label>Min Premarket Volume:</label>
-                    <span id="minVolume">100,000</span>
+                    <label for="maxPrice">Max Price ($)</label>
+                    <input type="number" id="maxPrice" step="0.01" min="0" value="10.00">
                 </div>
                 <div class="criteria-item">
-                    <label>Min Premarket Gain:</label>
-                    <span id="minGain">10%</span>
+                    <label for="minPremarketVolume">Min PM Volume</label>
+                    <input type="number" id="minPremarketVolume" step="1000" min="0" value="100000">
                 </div>
                 <div class="criteria-item">
-                    <label>Min Relative Volume:</label>
-                    <span id="minRelVol">2.0x</span>
+                    <label for="minPremarketGain">Min PM Gain (%)</label>
+                    <input type="number" id="minPremarketGain" step="0.5" min="0" value="10.0">
                 </div>
+                <div class="criteria-item">
+                    <label for="minRelativeVolume">Min Rel. Volume (x)</label>
+                    <input type="number" id="minRelativeVolume" step="0.5" min="0" value="2.0">
+                </div>
+                <div class="criteria-item criteria-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">Apply & Scan</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="progressContainer" class="progress-container" style="display: none;">
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill" style="width: 0%"></div>
             </div>
+            <span id="progressText" class="progress-text">Starting scan...</span>
         </div>
 
         <div class="results-summary">
-            <h2>Watchlist (<span id="resultCount">0</span> stocks)</h2>
+            <h2>Market Scan Results (<span id="resultCount">0</span> stocks)</h2>
         </div>
 
-        <div id="resultsContainer" class="results-container">
-            <div class="no-results">
-                <p>Click "Run Scan Now" to find momentum stocks</p>
+        <!-- AG Grid Container -->
+        <div id="stockGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
+
+        <div id="debugSection" class="debug-section" style="display: none;">
+            <div class="debug-header">
+                <h2>🔍 Debug View - Raw Calculated Values</h2>
+                <p class="debug-subtitle">Showing all 100 test stocks with calculated metrics</p>
+            </div>
+            <div class="debug-summary">
+                <span class="debug-stat"><strong>Passed:</strong> <span id="debugPassed">0</span></span>
+                <span class="debug-stat"><strong>Failed:</strong> <span id="debugFailed">0</span></span>
+            </div>
+            <div class="debug-table-container">
+                <table id="debugTable" class="debug-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Price</th>
+                            <th>PM Gain %</th>
+                            <th>PM Vol (Today)</th>
+                            <th>Avg PM Vol</th>
+                            <th>Relative Vol</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="debugTableBody">
+                        <tr><td colspan="7" class="loading">Loading debug data...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
+    <!-- AG Grid JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.3/dist/ag-grid-community.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
