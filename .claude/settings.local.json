@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo view:*)",
+      "WebFetch(domain:alpaca.markets)",
+      "WebFetch(domain:docs.alpaca.markets)",
+      "Bash(python test_yfinance.py:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(claude mcp list:*)",
+      "Bash(python:*)"
+    ]
+  }
+}

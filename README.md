@@ -1,4 +1,5 @@
 # 🚀 Momentum Stock Scanner
+<!-- Claude Code was here! This line confirms live file access is working. -->
 
 A Python-based stock scanner with a web dashboard that identifies day trading opportunities based on Ross Cameron's momentum trading strategy.
 
