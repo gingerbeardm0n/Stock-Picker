@@ -9,7 +9,7 @@ from scanner import MomentumScanner
 import logging
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -205,6 +205,69 @@ def debug_scan():
     except Exception as e:
         logger.error(f"Error in debug scan: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/scan/database', methods=['POST'])
+def scan_database():
+    """
+    Scan stocks from database (Live or Backtest mode)
+    - No date parameter = Live mode (scan latest data)
+    - With date = Backtest mode (scan historical date)
+    """
+    global scan_results, last_scan_time, scanning_in_progress
+
+    if scanning_in_progress:
+        return jsonify({'error': 'Scan already in progress'}), 429
+
+    try:
+        sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+        from database.backtest_scanner import backtest_single_day, CRITERIA
+        from datetime import datetime as dt
+
+        data = request.get_json(silent=True) or {}
+        date_str = data.get('date', None)  # Format: "YYYY-MM-DD"
+
+        scanning_in_progress = True
+
+        # Determine scan date
+        if date_str:
+            # Backtest mode - specific historical date
+            scan_date = dt.strptime(date_str, '%Y-%m-%d').date()
+            mode = "Backtest"
+            logger.info(f"Running backtest scan for {date_str}")
+        else:
+            # Live mode - most recent date in database
+            from database.query_helpers import StockDataDB
+            with StockDataDB() as db:
+                trading_days = db.get_trading_days(
+                    dt.now().date() - timedelta(days=30),
+                    dt.now().date()
+                )
+                scan_date = trading_days[-1] if trading_days else dt.now().date()
+            mode = "Live"
+            logger.info(f"Running live scan (latest DB data: {scan_date})")
+
+        # Run backtest (which queries database)
+        results_data = backtest_single_day(scan_date, max_stocks=None)
+
+        # Convert to format expected by frontend
+        scan_results = results_data['passed']
+        last_scan_time = datetime.now()
+        scanning_in_progress = False
+
+        return jsonify({
+            'success': True,
+            'results': scan_results,
+            'count': len(scan_results),
+            'mode': mode,
+            'scan_date': scan_date.isoformat(),
+            'criteria': CRITERIA
+        })
+
+    except Exception as e:
+        scanning_in_progress = False
+        logger.error(f"Error in database scan: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/scan/test', methods=['POST'])
 def test_scan_historical():

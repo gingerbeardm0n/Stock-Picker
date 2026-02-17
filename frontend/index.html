@@ -17,14 +17,22 @@
         </header>
 
         <div class="controls">
-            <button id="scanBtn" class="btn btn-primary">Run Scan Now</button>
-            <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
-            <button id="debugScanBtn" class="btn btn-test">🔍 Debug 100 Stocks</button>
-            <div class="test-mode">
-                <input type="datetime-local" id="testDateTime" class="test-input-datetime">
-                <button id="set925Btn" class="btn btn-test" style="padding: 8px 12px; font-size: 13px;">⏰ 9:25 AM</button>
-                <button id="testScanBtn" class="btn btn-test">Test Historical</button>
+            <!-- Mode Toggle -->
+            <div class="mode-toggle">
+                <button id="liveMode" class="mode-btn active">📊 Live Mode</button>
+                <button id="backtestMode" class="mode-btn">📈 Backtest</button>
             </div>
+
+            <!-- Date Picker (only visible in backtest mode) -->
+            <div id="backtestDatePicker" class="backtest-controls" style="display: none;">
+                <label for="backtestDate">Backtest Date:</label>
+                <input type="date" id="backtestDate" class="backtest-date-input">
+            </div>
+
+            <!-- Main Scan Button -->
+            <button id="scanBtn" class="btn btn-primary">Scan Now</button>
+
+            <!-- Status -->
             <div class="status">
                 <span id="statusText">Ready</span>
                 <span id="lastScan" class="last-scan"></span>
@@ -36,11 +44,11 @@
             <form id="criteriaForm" class="criteria-grid">
                 <div class="criteria-item">
                     <label for="minPrice">Min Price ($)</label>
-                    <input type="number" id="minPrice" step="0.01" min="0" value="1.00">
+                    <input type="number" id="minPrice" step="1" min="0" value="1.00">
                 </div>
                 <div class="criteria-item">
                     <label for="maxPrice">Max Price ($)</label>
-                    <input type="number" id="maxPrice" step="0.01" min="0" value="10.00">
+                    <input type="number" id="maxPrice" step="1" min="0" value="10.00">
                 </div>
                 <div class="criteria-item">
                     <label for="minPremarketVolume">Min PM Volume</label>
@@ -73,35 +81,6 @@
 
         <!-- AG Grid Container -->
         <div id="stockGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
-
-        <div id="debugSection" class="debug-section" style="display: none;">
-            <div class="debug-header">
-                <h2>🔍 Debug View - Raw Calculated Values</h2>
-                <p class="debug-subtitle">Showing all 100 test stocks with calculated metrics</p>
-            </div>
-            <div class="debug-summary">
-                <span class="debug-stat"><strong>Passed:</strong> <span id="debugPassed">0</span></span>
-                <span class="debug-stat"><strong>Failed:</strong> <span id="debugFailed">0</span></span>
-            </div>
-            <div class="debug-table-container">
-                <table id="debugTable" class="debug-table">
-                    <thead>
-                        <tr>
-                            <th>Symbol</th>
-                            <th>Price</th>
-                            <th>PM Gain %</th>
-                            <th>PM Vol (Today)</th>
-                            <th>Avg PM Vol</th>
-                            <th>Relative Vol</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="debugTableBody">
-                        <tr><td colspan="7" class="loading">Loading debug data...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
     </div>
 
     <!-- AG Grid JavaScript -->

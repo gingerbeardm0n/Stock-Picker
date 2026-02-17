@@ -553,3 +553,91 @@ header h1 {
 .debug-table tbody tr:last-child {
     border-bottom: none;
 }
+
+/* ============================================================================
+   MODE TOGGLE (Live/Backtest)
+   ============================================================================ */
+
+.mode-toggle {
+    display: flex;
+    gap: 0;
+    background: #f7fafc;
+    border-radius: 8px;
+    padding: 4px;
+    border: 2px solid #e2e8f0;
+}
+
+.mode-btn {
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.mode-btn:hover {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.mode-btn.active {
+    background: #667eea;
+    color: white;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+/* Backtest Controls */
+.backtest-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: #fef3c7;
+    border: 2px solid #fbbf24;
+    border-radius: 8px;
+}
+
+.backtest-controls label {
+    font-weight: 600;
+    color: #78350f;
+    font-size: 14px;
+}
+
+.backtest-date-input {
+    padding: 8px 12px;
+    border: 2px solid #fbbf24;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #78350f;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.backtest-date-input:hover {
+    border-color: #f59e0b;
+}
+
+.backtest-date-input:focus {
+    outline: none;
+    border-color: #d97706;
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2);
+}
+
+/* Status message styling */
+.status-loading {
+    color: #2563eb !important;
+}
+
+.status-success {
+    color: #16a34a !important;
+}
+
+.status-error {
+    color: #dc2626 !important;
+}

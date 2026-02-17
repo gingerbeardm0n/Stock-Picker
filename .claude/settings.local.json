@@ -8,7 +8,8 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(claude mcp list:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(frontend/style.css:*)"
     ]
   }
 }
