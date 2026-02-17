@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from database.query_helpers import StockDataDB, get_backtest_data
+from backend.news_fetcher import NewsFetcher
 from datetime import datetime, timedelta
 import pytz
 import logging
@@ -169,6 +170,23 @@ def backtest_single_day(date, max_stocks=None):
             except Exception as e:
                 logger.warning(f"  [WARN] {symbol}: {e}")
                 failed.append({'symbol': symbol, 'reason': f"Error: {e}"})
+
+        # Fetch news for all passing stocks
+        if passed:
+            logger.info(f"Fetching news for {len(passed)} passing stocks...")
+            try:
+                news_fetcher = NewsFetcher()
+                for stock in passed:
+                    has_cat, articles = news_fetcher.has_catalyst(stock['symbol'], as_of_date=date)
+                    stock['has_catalyst'] = has_cat
+                    stock['news'] = articles[:3]  # Top 3 headlines
+                    stock['news_count'] = len(articles)
+            except Exception as e:
+                logger.warning(f"News fetch failed: {e} - continuing without news")
+                for stock in passed:
+                    stock['has_catalyst'] = None
+                    stock['news'] = []
+                    stock['news_count'] = 0
 
         # Sort by relative volume (highest first)
         passed.sort(key=lambda x: x['relative_volume'], reverse=True)

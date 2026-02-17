@@ -46,6 +46,36 @@ const columnDefs = [
         sortable: true,
         valueFormatter: params => params.value?.toLocaleString() || '0',
         width: 150
+    },
+    {
+        headerName: 'Catalyst',
+        field: 'has_catalyst',
+        sortable: true,
+        width: 100,
+        valueFormatter: params => {
+            if (params.value === null || params.value === undefined) return '—';
+            return params.value ? `✅ ${params.data.news_count}` : '❌';
+        },
+        cellStyle: params => {
+            if (params.value === true) return { color: '#22543d', fontWeight: 'bold' };
+            if (params.value === false) return { color: '#999' };
+            return {};
+        }
+    },
+    {
+        headerName: 'Top Headline',
+        field: 'news',
+        flex: 1,
+        minWidth: 300,
+        valueFormatter: params => {
+            if (!params.value || params.value.length === 0) return '—';
+            return params.value[0].headline;
+        },
+        cellStyle: { fontSize: '12px', color: '#444' },
+        tooltipValueGetter: params => {
+            if (!params.value || params.value.length === 0) return '';
+            return params.value.map((a, i) => `${i+1}. ${a.headline}`).join('\n');
+        }
     }
 ];
 
@@ -60,14 +90,53 @@ const gridOptions = {
     animateRows: true,
     pagination: true,
     paginationPageSize: 50,
-    domLayout: 'normal'
+    domLayout: 'normal',
+    onRowClicked: params => openNewsModal(params.data)
 };
+
+function openNewsModal(stock) {
+    document.getElementById('modalSymbol').textContent =
+        `${stock.symbol}  —  $${stock.price?.toFixed(2)}`;
+
+    const articles = stock.news || [];
+    const container = document.getElementById('modalArticles');
+
+    if (articles.length === 0) {
+        container.innerHTML = '<p class="no-news">No news found for this stock in the past 48 hours.</p>';
+    } else {
+        container.innerHTML = articles.map(a => {
+            const date = a.created_at ? new Date(a.created_at).toLocaleString() : '';
+            const summary = a.summary?.trim() || '';
+            const tag = a.is_specific
+                ? `<span class="article-tag specific">Direct</span>`
+                : `<span class="article-tag roundup">Roundup (${a.symbol_count} stocks)</span>`;
+            return `
+                <div class="article ${a.is_specific ? '' : 'article-roundup'}">
+                    <div class="article-meta">${tag} &nbsp;${a.source?.toUpperCase() || 'NEWS'} &nbsp;·&nbsp; ${date}</div>
+                    <div class="article-headline">${a.headline}</div>
+                    ${summary ? `<div class="article-summary">${summary}</div>` : ''}
+                    ${a.url ? `<a class="article-link" href="${a.url}" target="_blank">Read full article →</a>` : ''}
+                </div>`;
+        }).join('');
+    }
+
+    document.getElementById('newsModal').style.display = 'flex';
+}
+
+function closeNewsModal() {
+    document.getElementById('newsModal').style.display = 'none';
+}
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize AG Grid
     const gridDiv = document.getElementById('stockGrid');
     gridApi = agGrid.createGrid(gridDiv, gridOptions);
+
+    // Close modal when clicking overlay background
+    document.getElementById('newsModal').addEventListener('click', e => {
+        if (e.target.id === 'newsModal') closeNewsModal();
+    });
 
     // Set up event listeners
     setupEventListeners();
