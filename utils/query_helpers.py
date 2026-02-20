@@ -194,7 +194,9 @@ class StockDataDB:
                 low,
                 close,
                 volume,
-                vwap
+                vwap,
+                EXTRACT(HOUR   FROM time AT TIME ZONE 'America/New_York')::int AS hour,
+                EXTRACT(MINUTE FROM time AT TIME ZONE 'America/New_York')::int AS minute
             FROM stock_candles_1m
             WHERE symbol = ANY(%s)
               AND time::date = %s::date
@@ -316,6 +318,102 @@ class StockDataDB:
             return 0.0
 
 
+    def get_avg_volume_at_time_batch(self, symbols, as_of_date, current_hour, current_minute, lookback_days=20):
+        """
+        For each symbol, calculate the average volume from market open (4am ET)
+        up to current_hour:current_minute, averaged over the past lookback_days.
+
+        This is the correct denominator for Ross Cameron's relative volume:
+            rel_vol = volume_so_far_today / avg_volume_at_this_time_historically
+
+        Args:
+            symbols:         List of stock tickers
+            as_of_date:      The date being scanned (today or backtest date)
+            current_hour:    ET hour of the scan (e.g. 9 for 9am)
+            current_minute:  ET minute of the scan (e.g. 25 for 9:25am)
+            lookback_days:   How many historical days to average over
+
+        Returns:
+            Dict of {symbol: avg_volume_float}
+        """
+        cursor = self.conn.cursor()
+
+        query = """
+            SELECT
+                symbol,
+                AVG(day_vol)::float AS avg_vol_at_time
+            FROM (
+                SELECT
+                    symbol,
+                    time::date AS trade_date,
+                    SUM(volume) AS day_vol
+                FROM stock_candles_1m
+                WHERE symbol = ANY(%s)
+                  AND time::date >= %s::date - INTERVAL '%s days'
+                  AND time::date < %s::date
+                  AND (
+                      EXTRACT(HOUR   FROM time AT TIME ZONE 'America/New_York') > 4
+                      OR (
+                          EXTRACT(HOUR   FROM time AT TIME ZONE 'America/New_York') = 4
+                          AND EXTRACT(MINUTE FROM time AT TIME ZONE 'America/New_York') >= 0
+                      )
+                  )
+                  AND (
+                      EXTRACT(HOUR   FROM time AT TIME ZONE 'America/New_York') < %s
+                      OR (
+                          EXTRACT(HOUR   FROM time AT TIME ZONE 'America/New_York') = %s
+                          AND EXTRACT(MINUTE FROM time AT TIME ZONE 'America/New_York') <= %s
+                      )
+                  )
+                GROUP BY symbol, time::date
+            ) daily_vols
+            GROUP BY symbol
+        """
+
+        cursor.execute(query, [
+            symbols,
+            as_of_date, lookback_days, as_of_date,
+            current_hour, current_hour, current_minute
+        ])
+        rows = cursor.fetchall()
+        cursor.close()
+
+        return {row[0]: float(row[1]) for row in rows}
+
+    # ========================================================================
+    # FUNDAMENTALS QUERIES (Float + Market Cap)
+    # ========================================================================
+
+    def get_fundamentals_batch(self, symbols):
+        """
+        Get float and market cap for a list of symbols from stock_fundamentals table.
+
+        Returns:
+            Dict of {symbol: {'float_shares': int, 'market_cap': int, 'company_name': str}}
+            Only includes symbols that have data in the table.
+        """
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+
+        query = """
+            SELECT symbol, float_shares, market_cap, company_name, industry
+            FROM stock_fundamentals
+            WHERE symbol = ANY(%s)
+        """
+
+        cursor.execute(query, [symbols])
+        results = cursor.fetchall()
+        cursor.close()
+
+        return {
+            row['symbol']: {
+                'float_shares': row['float_shares'],
+                'market_cap':   row['market_cap'],
+                'company_name': row['company_name'],
+                'industry':     row['industry'],
+            }
+            for row in results
+        }
+
     # ========================================================================
     # UTILITY QUERIES
     # ========================================================================
@@ -323,21 +421,27 @@ class StockDataDB:
     def get_trading_days(self, start_date, end_date):
         """
         Get list of trading days (days with data) between dates.
+        Checks both 1m and 1d tables so live-collected data is found
+        even before daily bars are written.
 
         Returns:
             List of dates
         """
         cursor = self.conn.cursor()
 
+        # Union both tables - 1m catches today's live data, 1d catches backfilled history
         query = """
-            SELECT DISTINCT time::date AS trade_date
-            FROM stock_candles_1d
-            WHERE time >= %s::date
-              AND time <= %s::date
+            SELECT DISTINCT trade_date FROM (
+                SELECT time::date AS trade_date FROM stock_candles_1m
+                WHERE time >= %s::date AND time <= %s::date
+                UNION
+                SELECT time::date AS trade_date FROM stock_candles_1d
+                WHERE time >= %s::date AND time <= %s::date
+            ) combined
             ORDER BY trade_date
         """
 
-        cursor.execute(query, [start_date, end_date])
+        cursor.execute(query, [start_date, end_date, start_date, end_date])
         results = cursor.fetchall()
         cursor.close()
 
@@ -346,6 +450,8 @@ class StockDataDB:
     def get_symbols_with_data(self, date):
         """
         Get list of symbols that have data for a specific date.
+        Checks both 1m and 1d tables so today's live data is found
+        even before daily bars are written.
 
         Returns:
             List of symbols
@@ -353,13 +459,17 @@ class StockDataDB:
         cursor = self.conn.cursor()
 
         query = """
-            SELECT DISTINCT symbol
-            FROM stock_candles_1d
-            WHERE time::date = %s::date
+            SELECT DISTINCT symbol FROM (
+                SELECT DISTINCT symbol FROM stock_candles_1d
+                WHERE time::date = %s::date
+                UNION
+                SELECT DISTINCT symbol FROM stock_candles_1m
+                WHERE time::date = %s::date
+            ) combined
             ORDER BY symbol
         """
 
-        cursor.execute(query, [date])
+        cursor.execute(query, [date, date])
         results = cursor.fetchall()
         cursor.close()
 

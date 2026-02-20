@@ -165,7 +165,7 @@ def update_criteria():
 
         valid_keys = {'min_price', 'max_price', 'min_premarket_volume',
                       'min_premarket_gain_pct', 'min_relative_volume',
-                      'min_avg_volume', 'max_avg_volume', 'max_float'}
+                      'max_float', 'max_market_cap', 'max_spread'}
         filtered = {k: float(v) for k, v in data.items() if k in valid_keys}
 
         Config.SCANNER_CRITERIA.update(filtered)
@@ -213,27 +213,59 @@ def scan_database():
     - No date parameter = Live mode (scan latest data)
     - With date = Backtest mode (scan historical date)
     """
-    global scan_results, last_scan_time, scanning_in_progress
+    global scan_results, last_scan_time, scanning_in_progress, scan_progress
 
     if scanning_in_progress:
         return jsonify({'error': 'Scan already in progress'}), 429
 
     try:
         sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-        from database.backtest_scanner import backtest_single_day, CRITERIA
+        import database.backtest_scanner as backtest_scanner
+        from database.backtest_scanner import backtest_single_day
         from datetime import datetime as dt
+        from config import Config
 
         data = request.get_json(silent=True) or {}
         date_str = data.get('date', None)  # Format: "YYYY-MM-DD"
+        time_str = data.get('time', None)  # Format: "HH:MM"
 
         scanning_in_progress = True
+        scan_progress = {'stage': 1, 'message': 'Initializing scan...', 'percent': 2}
 
-        # Determine scan date
+        def db_progress_cb(stage, message, pct):
+            global scan_progress
+            scan_progress = {'stage': stage, 'message': message, 'percent': pct}
+
+        # Sync UI criteria into the backtest scanner's CRITERIA dict.
+        # The UI sends keys like min_premarket_volume / min_premarket_gain_pct
+        # that need to be mapped to backtest_scanner key names.
+        ui_criteria = Config.SCANNER_CRITERIA
+        key_map = {
+            'min_price':            'min_price',
+            'max_price':            'max_price',
+            'min_premarket_volume': 'min_morning_volume',  # UI name → scanner name
+            'min_premarket_gain_pct': 'min_premarket_gain',
+            'min_relative_volume':  'min_relative_volume',
+            'max_float':            'max_float',
+            'max_market_cap':       'max_market_cap',
+            'max_spread':           'max_spread',
+        }
+        for ui_key, scanner_key in key_map.items():
+            if ui_key in ui_criteria:
+                backtest_scanner.CRITERIA[scanner_key] = ui_criteria[ui_key]
+
+        logger.info(f"Effective CRITERIA: {backtest_scanner.CRITERIA}")
+
+        # Determine scan date and time
         if date_str:
             # Backtest mode - specific historical date
             scan_date = dt.strptime(date_str, '%Y-%m-%d').date()
+            scan_time = None
+            if time_str:
+                scan_time = dt.strptime(time_str, '%H:%M').time()
             mode = "Backtest"
-            logger.info(f"Running backtest scan for {date_str}")
+            time_display = f" @ {time_str}" if time_str else ""
+            logger.info(f"Running backtest scan for {date_str}{time_display}")
         else:
             # Live mode - most recent date in database
             from database.query_helpers import StockDataDB
@@ -242,12 +274,36 @@ def scan_database():
                     dt.now().date() - timedelta(days=30),
                     dt.now().date()
                 )
-                scan_date = trading_days[-1] if trading_days else dt.now().date()
+                if not trading_days:
+                    scanning_in_progress = False
+                    scan_progress = {'stage': 0, 'message': 'No data in database yet. Is the collector running?', 'percent': 0}
+                    return jsonify({
+                        'success': False,
+                        'error': 'No data in database yet. Start the collector (python database/collect_data.py) and wait a few minutes.',
+                        'count': 0,
+                        'results': []
+                    }), 200
+                scan_date = trading_days[-1]
+            scan_time = None
             mode = "Live"
             logger.info(f"Running live scan (latest DB data: {scan_date})")
 
+        db_progress_cb(1, f"Starting {mode} scan for {scan_date}...", 5)
+
         # Run backtest (which queries database)
-        results_data = backtest_single_day(scan_date, max_stocks=None)
+        results_data = backtest_single_day(scan_date, max_stocks=None, scan_time=scan_time,
+                                           progress_callback=db_progress_cb)
+
+        # Check if scan returned an error (e.g. no data for that date)
+        if 'error' in results_data and not results_data['passed']:
+            scanning_in_progress = False
+            scan_progress = {'stage': 0, 'message': results_data['error'], 'percent': 0}
+            return jsonify({
+                'success': False,
+                'error': results_data['error'],
+                'count': 0,
+                'results': []
+            }), 200
 
         # Convert to format expected by frontend
         scan_results = results_data['passed']
@@ -260,7 +316,7 @@ def scan_database():
             'count': len(scan_results),
             'mode': mode,
             'scan_date': scan_date.isoformat(),
-            'criteria': CRITERIA
+            'criteria': backtest_scanner.CRITERIA
         })
 
     except Exception as e:

@@ -23,14 +23,20 @@
                 <button id="backtestMode" class="mode-btn">📈 Backtest</button>
             </div>
 
-            <!-- Date Picker (only visible in backtest mode) -->
+            <!-- Date & Time Picker (only visible in backtest mode) -->
             <div id="backtestDatePicker" class="backtest-controls" style="display: none;">
-                <label for="backtestDate">Backtest Date:</label>
+                <label for="backtestDate">Date:</label>
                 <input type="date" id="backtestDate" class="backtest-date-input">
+                <label for="backtestTime">Time (ET):</label>
+                <input type="time" id="backtestTime" class="backtest-time-input" value="09:00">
             </div>
 
             <!-- Main Scan Button -->
             <button id="scanBtn" class="btn btn-primary">Scan Now</button>
+
+            <!-- Auto-refresh Toggle -->
+            <button id="autoRefreshBtn" class="btn btn-secondary">⏱ Auto: Off</button>
+            <span id="autoRefreshCountdown" class="countdown-text"></span>
 
             <!-- Status -->
             <div class="status">
@@ -40,32 +46,35 @@
         </div>
 
         <div class="criteria-panel">
-            <h3>Scanner Criteria</h3>
-            <form id="criteriaForm" class="criteria-grid">
-                <div class="criteria-item">
-                    <label for="minPrice">Min Price ($)</label>
-                    <input type="number" id="minPrice" step="1" min="0" value="1.00">
-                </div>
-                <div class="criteria-item">
-                    <label for="maxPrice">Max Price ($)</label>
-                    <input type="number" id="maxPrice" step="1" min="0" value="10.00">
-                </div>
-                <div class="criteria-item">
-                    <label for="minPremarketVolume">Min PM Volume</label>
-                    <input type="number" id="minPremarketVolume" step="1000" min="0" value="100000">
-                </div>
-                <div class="criteria-item">
-                    <label for="minPremarketGain">Min PM Gain (%)</label>
-                    <input type="number" id="minPremarketGain" step="0.5" min="0" value="10.0">
-                </div>
-                <div class="criteria-item">
-                    <label for="minRelativeVolume">Min Rel. Volume (x)</label>
-                    <input type="number" id="minRelativeVolume" step="0.5" min="0" value="2.0">
-                </div>
-                <div class="criteria-item criteria-actions">
-                    <button type="submit" class="btn btn-primary btn-sm">Apply & Scan</button>
-                </div>
-            </form>
+            <div class="criteria-header">
+                <h3>Scanner Criteria</h3>
+                <form id="criteriaForm" class="criteria-grid">
+                    <div class="criteria-item">
+                        <label for="minPrice"><input type="checkbox" id="enableMinPrice" checked> Min Price ($)</label>
+                        <input type="number" id="minPrice" step="1" min="0" value="2.00">
+                    </div>
+                    <div class="criteria-item">
+                        <label for="maxPrice"><input type="checkbox" id="enableMaxPrice" checked> Max Price ($)</label>
+                        <input type="number" id="maxPrice" step="1" min="0" value="20.00">
+                    </div>
+                    <div class="criteria-item">
+                        <label for="minPremarketVolume"><input type="checkbox" id="enableMinPMVolume" checked> Min PM Volume</label>
+                        <input type="number" id="minPremarketVolume" step="1000" min="0" value="100000">
+                    </div>
+                    <div class="criteria-item">
+                        <label for="minPremarketGain"><input type="checkbox" id="enableMinPMGain" checked> Min PM Gain (%)</label>
+                        <input type="number" id="minPremarketGain" step="0.5" value="10.0">
+                    </div>
+                    <div class="criteria-item">
+                        <label for="minRelativeVolume"><input type="checkbox" id="enableMinRelVol" checked> Min Rel. Volume (x)</label>
+                        <input type="number" id="minRelativeVolume" step="0.5" min="0" value="5.0">
+                    </div>
+                    <div class="criteria-item">
+                        <label for="maxFloat"><input type="checkbox" id="enableMaxFloat" checked> Max Float (M)</label>
+                        <input type="number" id="maxFloat" step="1" min="1" value="20">
+                    </div>
+                </form>
+            </div>
         </div>
 
         <div id="progressContainer" class="progress-container" style="display: none;">

@@ -61,10 +61,8 @@ class MomentumScanner:
 
             logger.info(f"  📈 {symbol}: Avg volume {int(avg_volume):,}")
 
-            # Check average volume range
-            if avg_volume < self.criteria['min_avg_volume'] or avg_volume > self.criteria['max_avg_volume']:
-                logger.info(f"  ❌ {symbol}: Avg volume {int(avg_volume):,} outside range {self.criteria['min_avg_volume']:,}-{self.criteria['max_avg_volume']:,}")
-                return None
+            # NOTE: We don't filter on average volume anymore.
+            # Low average volume + high current volume = strong momentum signal.
 
             # Calculate relative volume
             current_volume = snapshot.latest_trade.volume if hasattr(snapshot.latest_trade, 'volume') else premarket['volume']
@@ -213,22 +211,18 @@ class MomentumScanner:
             volume_data = {}
             volume_qualified = []
             no_vol_data = 0
-            failed_vol_range = 0
 
             for symbol in qualified_symbols:
                 if symbol in daily_bars and len(daily_bars[symbol]) > 0:
                     bars = daily_bars[symbol]
                     avg_vol = sum(bar.volume for bar in bars) / len(bars)
-                    if self.criteria['min_avg_volume'] <= avg_vol <= self.criteria['max_avg_volume']:
-                        volume_data[symbol] = avg_vol
-                        volume_qualified.append(symbol)
-                    else:
-                        failed_vol_range += 1
+                    volume_data[symbol] = avg_vol
+                    volume_qualified.append(symbol)
                 else:
                     no_vol_data += 1
 
             logger.info(f"  Got volume for {len(daily_bars):,} stocks, {no_vol_data:,} no data, "
-                       f"{failed_vol_range:,} outside range, {len(volume_qualified):,} passed")
+                       f"{len(volume_qualified):,} passed")
             report(3, f"✓ {len(volume_qualified):,} stocks passed avg volume filter ({stage_time:.1f}s)", 60)
 
             if not volume_qualified:

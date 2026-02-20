@@ -10,16 +10,19 @@ class Config:
     ALPACA_BASE_URL = 'https://api.alpaca.markets'  # Live trading (data access)
     ALPACA_PAPER_TRADING = False  # Set to True if using paper trading keys
 
-    # Scanner criteria (Ross Cameron style)
+    # Finnhub API key (free tier — get at finnhub.io, used for float + market cap)
+    FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', '')
+
+    # Scanner criteria — Ross Cameron's 5 Pillars (v2 Page 4-5)
     SCANNER_CRITERIA = {
-        'min_price': 1.0,
-        'max_price': 10.0,
+        'min_price': 2.0,               # Ross v2 p4: $2-$20 sweet spot
+        'max_price': 20.0,
         'min_premarket_volume': 100000,  # Absolute PM shares (4am-9:30am)
-        'min_premarket_gain_pct': 10.0,  # PM gain percentage
-        'min_relative_volume': 2.0,  # Ross Cameron: 2x min (5x preferred)
-        'max_float': 50000000,  # 50M shares (not enforced yet)
-        'min_avg_volume': 100000,  # Min 20-day avg daily volume
-        'max_avg_volume': 5000000  # Max 20-day avg daily volume
+        'min_premarket_gain_pct': 10.0,  # Ross v2 p4: up 10%+ from prior close
+        'min_relative_volume': 5.0,      # Ross v2 p4: 5x min, 10x+ preferred
+        'max_float': 20000000,           # Ross v2 p4: <20M shares (Pillar 4)
+        'max_market_cap': 500000000,     # Ross v2 p5: <$500M small/micro-cap
+        'max_spread': 0.15              # Ross v2 p9: <10-15 cents spread
     }
 
     # Update frequency

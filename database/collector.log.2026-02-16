@@ -1,0 +1,27 @@
+2026-02-16 23:01:40 [INFO    ] ======================================================================
+2026-02-16 23:01:40 [INFO    ]   STOCK DATA COLLECTOR - STARTING
+2026-02-16 23:01:40 [INFO    ] ======================================================================
+2026-02-16 23:01:40 [INFO    ]   Database : localhost:5432/stockdata
+2026-02-16 23:01:40 [INFO    ]   Log file : C:\Repositories\Stock-Picker\database\collector.log
+2026-02-16 23:01:40 [INFO    ]   Hours    : 4:00 - 20:00 ET
+2026-02-16 23:01:40 [INFO    ]   Interval : every 60s
+2026-02-16 23:01:40 [INFO    ]   Batch    : 500 symbols/call
+2026-02-16 23:01:40 [INFO    ] ======================================================================
+2026-02-16 23:01:40 [INFO    ] Loaded 4,004 symbols from stocks_1_to_20.txt
+2026-02-16 23:01:40 [INFO    ] [23:01] Outside market hours. Waiting for 4:00 ET. (session total: 0 bars)
+2026-02-16 23:16:40 [INFO    ] [23:16] Outside market hours. Waiting for 4:00 ET. (session total: 0 bars)
+2026-02-16 23:29:47 [INFO    ] 
+[STOPPED] Collector stopped by user (Ctrl+C)
+2026-02-16 23:29:51 [INFO    ] ======================================================================
+2026-02-16 23:29:51 [INFO    ]   STOCK DATA COLLECTOR - STARTING
+2026-02-16 23:29:51 [INFO    ] ======================================================================
+2026-02-16 23:29:51 [INFO    ]   Database : localhost:5432/stockdata
+2026-02-16 23:29:51 [INFO    ]   Log file : C:\Repositories\Stock-Picker\database\collector.log
+2026-02-16 23:29:51 [INFO    ]   Hours    : 4:00 - 20:00 ET
+2026-02-16 23:29:51 [INFO    ]   Interval : every 60s
+2026-02-16 23:29:51 [INFO    ]   Batch    : 500 symbols/call
+2026-02-16 23:29:51 [INFO    ] ======================================================================
+2026-02-16 23:29:51 [INFO    ] Loaded 4,004 symbols from stocks_1_to_20.txt
+2026-02-16 23:29:51 [INFO    ] [23:29] Outside market hours. Waiting for 4:00 ET. (session total: 0 bars)
+2026-02-16 23:44:52 [INFO    ] [23:44] Outside market hours. Waiting for 4:00 ET. (session total: 0 bars)
+2026-02-16 23:59:52 [INFO    ] [23:59] Outside market hours. Waiting for 4:00 ET. (session total: 0 bars)

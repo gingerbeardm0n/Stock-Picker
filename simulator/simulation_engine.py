@@ -23,7 +23,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from database.query_helpers import StockDataDB
+from utils.query_helpers import StockDataDB
 from datetime import datetime, timedelta
 import pytz
 from collections import defaultdict

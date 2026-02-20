@@ -4,6 +4,54 @@
 let gridApi = null;
 let currentMode = 'live'; // 'live' or 'backtest'
 
+// Auto-refresh state
+let autoRefreshEnabled = false;
+let autoRefreshInterval = null;
+let autoRefreshCountdownInterval = null;
+const AUTO_REFRESH_SECONDS = 60;
+
+function toggleAutoRefresh() {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    const btn = document.getElementById('autoRefreshBtn');
+    const countdown = document.getElementById('autoRefreshCountdown');
+
+    if (autoRefreshEnabled) {
+        btn.textContent = '⏱ Auto: On';
+        btn.classList.add('active');
+
+        // Run immediately, then every 60s
+        runScan();
+        startAutoRefreshCountdown();
+        autoRefreshInterval = setInterval(() => {
+            runScan();
+            startAutoRefreshCountdown();
+        }, AUTO_REFRESH_SECONDS * 1000);
+    } else {
+        btn.textContent = '⏱ Auto: Off';
+        btn.classList.remove('active');
+        countdown.textContent = '';
+        clearInterval(autoRefreshInterval);
+        clearInterval(autoRefreshCountdownInterval);
+        autoRefreshInterval = null;
+    }
+}
+
+function startAutoRefreshCountdown() {
+    const countdown = document.getElementById('autoRefreshCountdown');
+    let remaining = AUTO_REFRESH_SECONDS;
+    clearInterval(autoRefreshCountdownInterval);
+
+    autoRefreshCountdownInterval = setInterval(() => {
+        remaining--;
+        if (remaining > 0) {
+            countdown.textContent = `next in ${remaining}s`;
+        } else {
+            clearInterval(autoRefreshCountdownInterval);
+            countdown.textContent = 'scanning...';
+        }
+    }, 1000);
+}
+
 // AG Grid column definitions
 const columnDefs = [
     {
@@ -22,6 +70,51 @@ const columnDefs = [
         width: 100
     },
     {
+        headerName: '% Change',
+        field: 'pct_change',
+        sortable: true,
+        valueFormatter: params => {
+            if (params.value == null) return '—';
+            const sign = params.value >= 0 ? '+' : '';
+            return `${sign}${params.value.toFixed(1)}%`;
+        },
+        cellStyle: params => {
+            if (params.value == null) return {};
+            if (params.value >= 20) return { backgroundColor: '#22543d', color: '#fff', fontWeight: 'bold' };
+            if (params.value >= 10) return { backgroundColor: '#c6f6d5', color: '#22543d', fontWeight: 'bold' };
+            if (params.value > 0)  return { color: '#276749' };
+            if (params.value < 0)  return { color: '#c53030' };
+            return {};
+        },
+        width: 115
+    },
+    {
+        headerName: 'Float',
+        field: 'float_shares',
+        sortable: true,
+        valueFormatter: params => {
+            if (params.value == null) return '—';
+            return `${(params.value / 1e6).toFixed(1)}M`;
+        },
+        cellStyle: params => {
+            if (params.value == null) return { color: '#999' };
+            if (params.value < 5e6)  return { color: '#22543d', fontWeight: 'bold' };
+            if (params.value < 10e6) return { color: '#276749' };
+            return {};
+        },
+        width: 95
+    },
+    {
+        headerName: 'Mkt Cap',
+        field: 'market_cap',
+        sortable: true,
+        valueFormatter: params => {
+            if (params.value == null) return '—';
+            return `$${(params.value / 1e6).toFixed(0)}M`;
+        },
+        width: 105
+    },
+    {
         headerName: 'Rel Vol',
         field: 'relative_volume',
         sortable: true,
@@ -34,11 +127,18 @@ const columnDefs = [
         width: 110
     },
     {
-        headerName: 'Morning Vol',
+        headerName: 'Pre-Mkt Vol',
+        field: 'premarket_volume',
+        sortable: true,
+        valueFormatter: params => params.value?.toLocaleString() || '0',
+        width: 130
+    },
+    {
+        headerName: 'Mkt Vol',
         field: 'morning_volume',
         sortable: true,
         valueFormatter: params => params.value?.toLocaleString() || '0',
-        width: 140
+        width: 120
     },
     {
         headerName: 'Avg Vol (20d)',
@@ -46,6 +146,21 @@ const columnDefs = [
         sortable: true,
         valueFormatter: params => params.value?.toLocaleString() || '0',
         width: 150
+    },
+    {
+        headerName: 'Spread',
+        field: 'spread',
+        sortable: true,
+        valueFormatter: params => {
+            if (params.value == null) return '—';
+            return `$${params.value.toFixed(2)}`;
+        },
+        cellStyle: params => {
+            if (params.value == null) return { color: '#999' };
+            if (params.value > 0.15) return { color: '#c53030', fontWeight: 'bold' };
+            return { color: '#276749' };
+        },
+        width: 95
     },
     {
         headerName: 'Catalyst',
@@ -158,9 +273,14 @@ function setupEventListeners() {
         switchMode('backtest');
     });
 
-    // Main scan button
+    // Main scan button — always saves current filter state before scanning
     document.getElementById('scanBtn').addEventListener('click', () => {
-        runScan();
+        saveCriteria();
+    });
+
+    // Auto-refresh toggle
+    document.getElementById('autoRefreshBtn').addEventListener('click', () => {
+        toggleAutoRefresh();
     });
 
     // Criteria form
@@ -205,57 +325,86 @@ function setDefaultBacktestDate() {
 async function runScan() {
     const scanBtn = document.getElementById('scanBtn');
     const originalText = scanBtn.textContent;
+    let progressPoller = null;
+
+    // Poll /api/scan/progress every 2s and update status bar while scan runs
+    function startProgressPolling() {
+        progressPoller = setInterval(async () => {
+            try {
+                const r = await fetch('/api/scan/progress');
+                const p = await r.json();
+                if (p.scanning && p.progress && p.progress.message) {
+                    const pct = p.progress.percent > 0 ? ` (${p.progress.percent}%)` : '';
+                    updateStatus(`⏳ ${p.progress.message}${pct}`, 'loading');
+                }
+            } catch (_) { /* ignore poll errors */ }
+        }, 2000);
+    }
+
+    function stopProgressPolling() {
+        if (progressPoller) {
+            clearInterval(progressPoller);
+            progressPoller = null;
+        }
+    }
 
     try {
         scanBtn.disabled = true;
         scanBtn.textContent = 'Scanning...';
-        updateStatus('Scanning database...', 'loading');
+        updateStatus('⏳ Connecting to database...', 'loading');
 
         // Prepare request body
         const requestBody = {};
 
         if (currentMode === 'backtest') {
             const dateInput = document.getElementById('backtestDate');
+            const timeInput = document.getElementById('backtestTime');
             if (!dateInput.value) {
                 alert('Please select a date for backtesting');
                 return;
             }
             requestBody.date = dateInput.value;
+            if (timeInput.value) {
+                requestBody.time = timeInput.value;  // HH:MM format
+            }
         }
 
-        // Call database scan endpoint
+        // Start polling for progress updates before the blocking fetch
+        startProgressPolling();
+
+        // Call database scan endpoint (blocking — may take 10-60s)
         const response = await fetch('/api/scan/database', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody)
         });
 
+        stopProgressPolling();
         const data = await response.json();
 
         if (data.success) {
             // Update grid with results
             gridApi.setGridOption('rowData', data.results);
 
-            // Update UI
             document.getElementById('resultCount').textContent = data.count;
-
             const modeStr = data.mode === 'Live' ? 'Latest data' : `Historical: ${data.scan_date}`;
             updateStatus(`✅ Found ${data.count} stocks (${modeStr})`, 'success');
 
-            // Update last scan time
             const now = new Date().toLocaleTimeString();
             document.getElementById('lastScan').textContent = `Last scan: ${now}`;
         } else {
-            throw new Error(data.error || 'Scan failed');
+            // Non-exception error (e.g. no data in DB yet) — show clearly, no alert
+            updateStatus(`⚠️ ${data.error || 'Scan returned no results'}`, 'error');
+            console.warn('Scan returned error:', data.error);
         }
 
     } catch (error) {
+        stopProgressPolling();
         console.error('Scan error:', error);
         updateStatus(`❌ Error: ${error.message}`, 'error');
         alert(`Scan failed: ${error.message}`);
     } finally {
+        stopProgressPolling();
         scanBtn.disabled = false;
         scanBtn.textContent = originalText;
     }
@@ -267,11 +416,12 @@ async function loadCriteria() {
         const criteria = await response.json();
 
         // Populate form fields
-        document.getElementById('minPrice').value = criteria.min_price || 1;
-        document.getElementById('maxPrice').value = criteria.max_price || 10;
+        document.getElementById('minPrice').value = criteria.min_price || 2;
+        document.getElementById('maxPrice').value = criteria.max_price || 20;
         document.getElementById('minPremarketVolume').value = criteria.min_premarket_volume || 100000;
-        document.getElementById('minPremarketGain').value = criteria.min_premarket_gain_pct || 10;
-        document.getElementById('minRelativeVolume').value = criteria.min_relative_volume || 2;
+        document.getElementById('minPremarketGain').value = criteria.min_premarket_gain_pct ?? 10;
+        document.getElementById('minRelativeVolume').value = criteria.min_relative_volume || 5;
+        document.getElementById('maxFloat').value = (criteria.max_float || 20000000) / 1e6;
 
     } catch (error) {
         console.error('Error loading criteria:', error);
@@ -280,13 +430,33 @@ async function loadCriteria() {
 
 async function saveCriteria() {
     try {
-        const criteria = {
-            min_price: parseFloat(document.getElementById('minPrice').value),
-            max_price: parseFloat(document.getElementById('maxPrice').value),
-            min_premarket_volume: parseInt(document.getElementById('minPremarketVolume').value),
-            min_premarket_gain_pct: parseFloat(document.getElementById('minPremarketGain').value),
-            min_relative_volume: parseFloat(document.getElementById('minRelativeVolume').value)
-        };
+        const criteria = {};
+
+        // Add all criteria, but use pass-through values for disabled filters
+        // (pass-through = a value that won't filter anything out)
+        criteria.min_price = document.getElementById('enableMinPrice').checked
+            ? parseFloat(document.getElementById('minPrice').value)
+            : 0;  // Pass-through: accept all prices >= 0
+
+        criteria.max_price = document.getElementById('enableMaxPrice').checked
+            ? parseFloat(document.getElementById('maxPrice').value)
+            : 999999;  // Pass-through: accept all prices
+
+        criteria.min_premarket_volume = document.getElementById('enableMinPMVolume').checked
+            ? parseInt(document.getElementById('minPremarketVolume').value)
+            : 0;  // Pass-through: accept any volume
+
+        criteria.min_premarket_gain_pct = document.getElementById('enableMinPMGain').checked
+            ? parseFloat(document.getElementById('minPremarketGain').value)
+            : -999;  // Pass-through: accept any gain (even negative)
+
+        criteria.min_relative_volume = document.getElementById('enableMinRelVol').checked
+            ? parseFloat(document.getElementById('minRelativeVolume').value)
+            : 0;  // Pass-through: accept any relative volume
+
+        criteria.max_float = document.getElementById('enableMaxFloat').checked
+            ? parseFloat(document.getElementById('maxFloat').value) * 1e6
+            : 999999999999;  // Pass-through: accept any float
 
         const response = await fetch('/api/criteria', {
             method: 'POST',

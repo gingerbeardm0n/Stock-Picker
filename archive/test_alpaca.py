@@ -13,7 +13,7 @@ load_dotenv()
 
 api_key = os.getenv('ALPACA_API_KEY')
 secret_key = os.getenv('ALPACA_SECRET_KEY')
-
+``
 print("=" * 60)
 print("ALPACA API TEST")
 print("=" * 60)

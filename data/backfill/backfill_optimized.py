@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
 Optimized Historical Data Backfill with Time-Window Filtering
-Reduces data volume by 70% using strategic timeframe selection:
-- Minute bars: 9am-12pm only (core trading window for Ross Cameron strategy)
+Collects the data needed for accurate Ross Cameron relative volume calculation:
+- Minute bars: 4am-12pm (premarket + full morning session)
 - Hour bars: All day 4am-8pm (premarket + afternoon + after-hours)
 - Daily bars: 60 days for volume calculations
 
 For 4,000 stocks:
-- Storage: ~1.5 GB (vs 4.9 GB full minute data)
-- Time: ~8-10 hours (vs 33 hours)
-- Can expand to full minute data later without conflicts
+- Storage: ~3.5 GB (minute bars expanded to cover full premarket)
+- Time: ~15-20 hours (overnight run)
+- ON CONFLICT DO NOTHING: safe to re-run, won't duplicate existing 9am-12pm data
 """
 
 import sys
@@ -45,8 +45,8 @@ PROGRESS_FILE = os.path.join(os.path.dirname(__file__), 'backfill_optimized_prog
 
 # Trading hours in ET
 ET = pytz.timezone('US/Eastern')
-MINUTE_WINDOW_START = 9  # 9am ET
-MINUTE_WINDOW_END = 12   # 12pm ET (noon)
+MINUTE_WINDOW_START = 4   # 4am ET (premarket open)
+MINUTE_WINDOW_END   = 12  # 12pm ET (noon) — covers premarket + full morning session
 
 def load_progress():
     """Load progress from file"""
@@ -83,15 +83,15 @@ def load_symbols_from_file(filepath):
             return [line.strip() for line in f if line.strip()]
 
 def backfill_minute_bars_optimized(symbols, batch_num, total_batches, days_back, progress):
-    """Backfill minute bars for 9am-12pm window only using per-day datetime filtering"""
+    """Backfill minute bars for 4am-12pm window using per-day datetime filtering"""
 
-    window_key = f"minute_9to12_batch_{batch_num}"
+    window_key = f"minute_4to12_batch_{batch_num}"
     if window_key in progress['completed_windows']:
         logger.info(f"[SKIP] Batch {batch_num} already completed")
         return 0
 
     logger.info(f"\n{'='*70}")
-    logger.info(f"MINUTE BARS (9am-12pm) - Batch {batch_num}/{total_batches}")
+    logger.info(f"MINUTE BARS (4am-12pm) - Batch {batch_num}/{total_batches}")
     logger.info(f"{'='*70}")
     logger.info(f"Fetching {len(symbols)} symbols, {days_back} days (per-day API calls)")
 
@@ -107,15 +107,15 @@ def backfill_minute_bars_optimized(symbols, batch_num, total_batches, days_back,
     total_api_calls = 0
 
     try:
-        # Fetch each day separately with exact 9am-12pm time window
+        # Fetch each day separately with exact 4am-12pm time window
         for day_offset in range(days_back):
             current_date = datetime.now(ET).date() - timedelta(days=day_offset)
 
-            # Create datetime for 9:00 AM ET that day
-            start_dt = ET.localize(datetime.combine(current_date, datetime.min.time().replace(hour=9, minute=0)))
+            # Create datetime for 4:00 AM ET that day
+            start_dt = ET.localize(datetime.combine(current_date, datetime.min.time().replace(hour=MINUTE_WINDOW_START, minute=0)))
 
             # Create datetime for 12:00 PM ET that day
-            end_dt = ET.localize(datetime.combine(current_date, datetime.min.time().replace(hour=12, minute=0)))
+            end_dt = ET.localize(datetime.combine(current_date, datetime.min.time().replace(hour=MINUTE_WINDOW_END, minute=0)))
 
             # Skip weekends (Saturday=5, Sunday=6)
             if current_date.weekday() >= 5:
@@ -126,6 +126,14 @@ def backfill_minute_bars_optimized(symbols, batch_num, total_batches, days_back,
                 continue
 
             try:
+                # DEBUG: Log exactly what we're sending to the API
+                if day_offset == 0:  # Only log first day to avoid spam
+                    logger.info(f"  [DEBUG] Requesting data:")
+                    logger.info(f"    Start (EST): {start_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+                    logger.info(f"    Start (UTC): {start_dt.astimezone(pytz.utc).strftime('%Y-%m-%d %H:%M:%S %Z')}")
+                    logger.info(f"    End (EST):   {end_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+                    logger.info(f"    End (UTC):   {end_dt.astimezone(pytz.utc).strftime('%Y-%m-%d %H:%M:%S %Z')}")
+
                 request = StockBarsRequest(
                     symbol_or_symbols=symbols,
                     timeframe=TimeFrame.Minute,
@@ -176,7 +184,7 @@ def backfill_minute_bars_optimized(symbols, batch_num, total_batches, days_back,
 
             conn.commit()
             logger.info(f"[SUCCESS] Made {total_api_calls} API calls (per-day filtering)")
-            logger.info(f"          Inserted {len(all_values):,} candles into stock_candles_1m (ONLY 9am-12pm data fetched)")
+            logger.info(f"          Inserted {len(all_values):,} candles into stock_candles_1m (4am-12pm window)")
         else:
             logger.warning(f"[WARNING] No data collected")
 
@@ -433,35 +441,78 @@ def main():
             reset_progress()
             progress = load_progress()
 
+    # Ask for days back
+    print("\nHow many days back do you want to fetch?")
+    print("  1. 14 days (2 weeks) - Fast, current default")
+    print("  2. 30 days (~4 weeks)")
+    print("  3. 45 days (~6 weeks)")
+    print("  4. 60 days (~3 months)")
+    print("  5. Custom (enter days)")
+    days_choice = input("\nEnter choice (1-5): ").strip()
+
+    if days_choice == "1":
+        days_back_minute = 14
+        days_back_hour = 14
+        days_back_daily = 60
+    elif days_choice == "2":
+        days_back_minute = 30
+        days_back_hour = 30
+        days_back_daily = 60
+    elif days_choice == "3":
+        days_back_minute = 45
+        days_back_hour = 45
+        days_back_daily = 60
+    elif days_choice == "4":
+        days_back_minute = 60
+        days_back_hour = 60
+        days_back_daily = 60
+    else:
+        try:
+            days_back_minute = int(input("Days back for minute bars: ").strip())
+            days_back_hour = int(input("Days back for hour bars: ").strip())
+            days_back_daily = int(input("Days back for daily bars: ").strip())
+        except ValueError:
+            logger.error("Invalid input, using defaults")
+            days_back_minute = 14
+            days_back_hour = 14
+            days_back_daily = 60
+
+    logger.info(f"\nBackfill range: {days_back_minute} days (minute), {days_back_hour} days (hour), {days_back_daily} days (daily)")
+
     # Calculate batches
     total_batches = (len(symbols) - 1) // batch_size + 1
     logger.info(f"\nWill process {total_batches} batches of up to {batch_size} stocks each")
 
     # Estimate data volume
-    minute_candles = len(symbols) * 14 * 180  # 3 hours/day
-    hour_candles = len(symbols) * 14 * 16    # 16 hours/day
-    daily_candles = len(symbols) * 60
+    trading_days_multiplier = max(days_back_minute, days_back_hour) // 2  # ~50% of calendar days are trading days
+    minute_candles = len(symbols) * trading_days_multiplier * 480  # 8 hours/day (4am-12pm)
+    hour_candles = len(symbols) * trading_days_multiplier * 16    # 16 hours/day
+    daily_candles = len(symbols) * days_back_daily
 
     total_candles = minute_candles + hour_candles + daily_candles
     storage_gb = (total_candles * 100) / 1024 / 1024 / 1024  # ~100 bytes per candle
 
     # Calculate API calls (more accurate time estimate)
-    trading_days_14 = 10  # ~10 trading days in 14 calendar days
-    minute_api_calls = total_batches * trading_days_14  # Per-day filtering
-    other_api_calls = total_batches * 2  # Daily + Hour
-    total_api_calls = minute_api_calls + other_api_calls
-    estimated_minutes = (total_api_calls * 4) / 60  # ~4 seconds per API call
+    trading_days_minute = max(1, days_back_minute // 2)  # ~50% trading days
+    trading_days_hour = max(1, days_back_hour // 2)
+    minute_api_calls = total_batches * trading_days_minute  # Per-day filtering
+    hour_api_calls = total_batches  # Hour bars (one call per batch)
+    daily_api_calls = total_batches  # Daily bars (one call per batch)
+    total_api_calls = minute_api_calls + hour_api_calls + daily_api_calls
+    estimated_minutes = (total_api_calls * 10) / 60  # ~10 seconds per API call (larger responses)
 
     print(f"\nData Volume Estimates:")
-    print(f"  Minute bars (9am-12pm): {minute_candles:,} candles")
+    print(f"  Minute bars (4am-12pm): {minute_candles:,} candles")
     print(f"  Hour bars (all day):    {hour_candles:,} candles")
-    print(f"  Daily bars (60 days):   {daily_candles:,} candles")
+    print(f"  Daily bars ({days_back_daily} days): {daily_candles:,} candles")
     print(f"  Total:                  {total_candles:,} candles (~{storage_gb:.1f} GB)")
     print(f"\nAPI Call Estimates:")
-    print(f"  Minute bars (per-day):  {minute_api_calls} calls ({total_batches} batches × {trading_days_14} days)")
-    print(f"  Hour + Daily bars:      {other_api_calls} calls")
+    print(f"  Minute bars (per-day):  {minute_api_calls} calls ({total_batches} batches × {trading_days_minute} days)")
+    print(f"  Hour bars:              {hour_api_calls} calls")
+    print(f"  Daily bars:             {daily_api_calls} calls")
     print(f"  Total API calls:        {total_api_calls}")
     print(f"  Estimated time:         ~{estimated_minutes:.0f} minutes ({estimated_minutes/60:.1f} hours)")
+    print(f"  NOTE: ON CONFLICT DO NOTHING — new/existing data will be handled safely")
 
     proceed = input("\nProceed with backfill? (y/n): ").strip().lower()
     if proceed != 'y':
@@ -481,17 +532,17 @@ def main():
         logger.info(f"{'#'*70}")
 
         # Daily bars (fastest, do first)
-        inserted = backfill_daily_bars(batch, batch_num, total_batches, 60, progress)
+        inserted = backfill_daily_bars(batch, batch_num, total_batches, days_back_daily, progress)
         total_inserted += inserted
         time.sleep(1)
 
         # Hour bars
-        inserted = backfill_hour_bars(batch, batch_num, total_batches, 14, progress)
+        inserted = backfill_hour_bars(batch, batch_num, total_batches, days_back_hour, progress)
         total_inserted += inserted
         time.sleep(1)
 
-        # Minute bars (9am-12pm only)
-        inserted = backfill_minute_bars_optimized(batch, batch_num, total_batches, 14, progress)
+        # Minute bars (4am-12pm)
+        inserted = backfill_minute_bars_optimized(batch, batch_num, total_batches, days_back_minute, progress)
         total_inserted += inserted
         time.sleep(2)  # Longer delay for minute data
 
