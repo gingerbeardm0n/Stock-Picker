@@ -1,0 +1,99 @@
+{
+  "daily_reference_day": "2026-02-19",
+  "is_fully_complete": false,
+  "price_range": {
+    "max": 20.0,
+    "min": 1.0
+  },
+  "schema": "sandbox",
+  "stages": [
+    {
+      "complete_symbol_count": 4019,
+      "expected_bars_per_symbol": 1,
+      "fetched_bar_rows": 8044,
+      "missing_symbol_count": 3,
+      "missing_symbols_sample": [
+        "BESS",
+        "IFLN",
+        "ROC"
+      ],
+      "retries_used": 3,
+      "stage": "daily_previous_day",
+      "target_symbol_count": 4022
+    },
+    {
+      "complete_symbol_count": 255,
+      "expected_bars_per_symbol": 5,
+      "fetched_bar_rows": 18642,
+      "missing_symbol_count": 3767,
+      "missing_symbols_sample": [
+        "AACB",
+        "AACBU",
+        "AACIU",
+        "AACOU",
+        "AALG",
+        "AAME",
+        "AAPD",
+        "AARD",
+        "AAT",
+        "ABAT",
+        "ABEO",
+        "ABEV",
+        "ABNG",
+        "ABOS",
+        "ABR",
+        "ABR.PRD",
+        "ABR.PRE",
+        "ABTS",
+        "ABUS",
+        "ABVC",
+        "ABX",
+        "ACAAU",
+        "ACB",
+        "ACCL",
+        "ACCO"
+      ],
+      "retries_used": 3,
+      "stage": "hourly_target_day",
+      "target_symbol_count": 4022
+    },
+    {
+      "complete_symbol_count": 5,
+      "expected_bars_per_symbol": 240,
+      "fetched_bar_rows": 738968,
+      "missing_symbol_count": 4017,
+      "missing_symbols_sample": [
+        "AACB",
+        "AACBU",
+        "AACIU",
+        "AACOU",
+        "AAL",
+        "AALG",
+        "AAME",
+        "AAPD",
+        "AARD",
+        "AAT",
+        "ABAT",
+        "ABCL",
+        "ABEO",
+        "ABEV",
+        "ABNG",
+        "ABOS",
+        "ABR",
+        "ABR.PRD",
+        "ABR.PRE",
+        "ABSI",
+        "ABTS",
+        "ABUS",
+        "ABVC",
+        "ABVE",
+        "ABX"
+      ],
+      "retries_used": 3,
+      "stage": "minute_target_day",
+      "target_symbol_count": 4022
+    }
+  ],
+  "symbol_count": 4022,
+  "target_day": "2026-02-20"
+}

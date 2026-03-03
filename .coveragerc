@@ -1,0 +1,31 @@
+[run]
+branch = True
+source =
+    backend
+    data
+    maintenance
+    optimizer
+    services
+    simulator
+    trading
+    utils
+    database
+
+omit =
+    */__pycache__/*
+    */.venv/*
+    */venv/*
+    */tests/*
+    */archive/*
+
+[report]
+skip_empty = True
+show_missing = True
+precision = 1
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+
+[html]
+directory = coverage_html

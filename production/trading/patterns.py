@@ -1,0 +1,846 @@
+"""
+Chart Pattern Detectors
+========================
+Each function receives an ordered list of bars (oldest → newest, including the
+current bar as the last element) and an indicators dict, and returns a
+PatternSignal if the pattern is detected, or None if not.
+
+Bar dict format: {time, symbol, open, high, low, close, volume, ...}
+
+Pattern priority (Ross Cameron reliability ranking):
+    1. Bull Flag          ⭐⭐⭐⭐⭐
+    2. Micro Pullback     ⭐⭐⭐⭐
+    3. ABCD               ⭐⭐⭐⭐
+    4. Dip Buy (3 Tricks) ⭐⭐⭐
+    5. Flat Top Breakout  ⭐⭐⭐
+
+"Light volume" definition used throughout:
+    A bar is "light volume" if its volume < 50% of the mean of the 5 bars
+    immediately before it.
+"""
+
+from __future__ import annotations
+from trading.models import PatternSignal, EntryConfig
+from trading.indicators import average_volume, is_light_volume
+
+# Used when no config is passed (all callers work unchanged)
+_DEFAULTS = EntryConfig()
+
+
+def _is_green(bar: dict) -> bool:
+    return float(bar['close']) > float(bar['open'])
+
+
+def _is_red(bar: dict) -> bool:
+    return float(bar['close']) < float(bar['open'])
+
+
+def _close(bar: dict) -> float:
+    return float(bar['close'])
+
+
+def _open(bar: dict) -> float:
+    return float(bar['open'])
+
+
+def _high(bar: dict) -> float:
+    return float(bar['high'])
+
+
+def _low(bar: dict) -> float:
+    return float(bar['low'])
+
+
+def _vol(bar: dict) -> float:
+    return float(bar['volume'])
+
+
+# ── 1. Bull Flag ──────────────────────────────────────────────────────────────
+
+def detect_bull_flag(bars: list[dict], indicators: dict,
+                     config: EntryConfig | None = None) -> PatternSignal | None:
+    """
+    Bull Flag — Highest reliability pattern (5 stars).
+
+    Structure (reading bars right to left from current):
+        Current bar  : Green breakout, closes above flag resistance, high volume
+        Flag phase   : 2-3 red bars on light volume, none breaks flagpole low
+        Flagpole     : 1-3 strong green bars with high volume before the flag
+
+    Entry : Current bar close
+    Stop  : Flag low - stop_buffer
+    Target: Flagpole height projected from entry
+    """
+    cfg = config if config is not None else _DEFAULTS
+    if len(bars) < 6:
+        return None
+
+    current = bars[-1]
+
+    # Current bar must be green (breakout candle)
+    if not _is_green(current):
+        return None
+
+    # ── Find flag phase (2-3 red bars before current) ─────────────────────
+    # Try 3-bar flag first, then 2-bar flag
+    for flag_len in (3, 2):
+        flag_start = len(bars) - 1 - flag_len
+        if flag_start < 0:
+            continue
+
+        flag_bars = bars[flag_start: len(bars) - 1]
+
+        # All flag bars must be red
+        if not all(_is_red(b) for b in flag_bars):
+            continue
+
+        flag_high = max(_high(b) for b in flag_bars)
+        flag_low = min(_low(b) for b in flag_bars)
+
+        # Current bar must close ABOVE flag resistance (flag_high)
+        if _close(current) <= flag_high:
+            continue
+
+        # ── Find flagpole (1-3 green bars before flag) ────────────────────
+        pole_end = flag_start
+        for pole_len in (3, 2, 1):
+            pole_start = pole_end - pole_len
+            if pole_start < 0:
+                continue
+
+            pole_bars = bars[pole_start:pole_end]
+
+            # All pole bars must be green
+            if not all(_is_green(b) for b in pole_bars):
+                continue
+
+            # Pole bars should have above-average volume
+            # Use prior bars as reference (bars before the pole)
+            ref_bars = bars[:pole_start] if pole_start > 0 else pole_bars
+            avg_ref_vol = average_volume(ref_bars, lookback=5) if ref_bars else _vol(pole_bars[0])
+            pole_avg_vol = sum(_vol(b) for b in pole_bars) / len(pole_bars)
+
+            # Pole must have meaningful volume
+            if avg_ref_vol > 0 and pole_avg_vol < avg_ref_vol * cfg.bull_flag_pole_vol_min:
+                continue
+
+            pole_high = max(_high(b) for b in pole_bars)
+            pole_low = min(_low(b) for b in pole_bars)
+
+            # Flag low must be ABOVE pole low (support holding)
+            if flag_low < pole_low:
+                continue
+
+            # Flag bars must be on light volume relative to the pole
+            flag_light = all(
+                is_light_volume(b, pole_bars, threshold=cfg.bull_flag_light_vol)
+                for b in flag_bars
+            )
+            if not flag_light:
+                continue
+
+            # Volume on breakout must match or exceed pole average
+            if _vol(current) < pole_avg_vol * cfg.bull_flag_breakout_vol_min:
+                continue
+
+            # ── Build signal ───────────────────────────────────────────────
+            entry = _close(current)
+            stop = flag_low - cfg.stop_buffer
+            stop_dist = entry - stop
+            if stop_dist <= 0:
+                continue
+
+            flagpole_height = pole_high - pole_low
+            target1 = entry + stop_dist * 2
+            target2 = entry + stop_dist * 3
+
+            reasoning = (
+                f"Bull Flag: pole ${pole_low:.2f}→${pole_high:.2f} (+${flagpole_height:.2f}), "
+                f"flag ${flag_low:.2f}-${flag_high:.2f}, breakout ${entry:.2f}"
+            )
+            return PatternSignal(
+                pattern_type='BULL_FLAG',
+                confidence=5,
+                entry_price=entry,
+                stop_price=stop,
+                target1=target1,
+                target2=target2,
+                reasoning=reasoning,
+            )
+
+    return None
+
+
+# ── 2. Micro Pullback ─────────────────────────────────────────────────────────
+
+def detect_micro_pullback(bars: list[dict], indicators: dict,
+                          config: EntryConfig | None = None) -> PatternSignal | None:
+    """
+    Micro Pullback / First Candle to New High — 4 stars.
+
+    Structure:
+        Trend phase : 3+ green bars, higher closes (strong uptrend)
+        Pause phase : 1-2 bars with lower close on light volume (not a reversal)
+        Current bar : Green, closes ABOVE the high of the pause phase
+
+    Entry : Current bar close
+    Stop  : Lowest low of pause phase - stop_buffer
+    """
+    cfg = config if config is not None else _DEFAULTS
+    if len(bars) < 5:
+        return None
+
+    current = bars[-1]
+    if not _is_green(current):
+        return None
+
+    # Try 2-bar pause first, then 1-bar pause
+    for pause_len in (2, 1):
+        pause_start = len(bars) - 1 - pause_len
+        trend_end = pause_start
+        trend_start = max(0, trend_end - 4)
+
+        if trend_end <= trend_start:
+            continue
+
+        pause_bars = bars[pause_start:pause_start + pause_len]
+        trend_bars = bars[trend_start:trend_end]
+
+        if len(trend_bars) < 2:
+            continue
+
+        # Trend phase: majority green and higher closes
+        green_in_trend = sum(1 for b in trend_bars if _is_green(b))
+        if green_in_trend < len(trend_bars) * cfg.micro_pb_green_pct:
+            continue
+
+        # Trend must be going up (last close of trend > first close of trend)
+        if _close(trend_bars[-1]) <= _close(trend_bars[0]):
+            continue
+
+        # Pause phase: closes lower than trend end, light volume
+        if any(_close(b) >= _close(trend_bars[-1]) for b in pause_bars):
+            continue  # Not a pullback if close is still near trend high
+
+        # Pause must be on light volume
+        if not all(is_light_volume(b, trend_bars, threshold=cfg.micro_pb_light_vol)
+                   for b in pause_bars):
+            continue
+
+        # Pause must NOT break the most recent swing low of the trend
+        trend_swing_low = min(_low(b) for b in trend_bars)
+        pause_low = min(_low(b) for b in pause_bars)
+        if pause_low < trend_swing_low * cfg.micro_pb_swing_tol:
+            continue
+
+        # Current bar must close ABOVE the pause phase high
+        pause_high = max(_high(b) for b in pause_bars)
+        if _close(current) <= pause_high:
+            continue
+
+        # ── Build signal ───────────────────────────────────────────────────
+        entry = _close(current)
+        stop = pause_low - cfg.stop_buffer
+        stop_dist = entry - stop
+        if stop_dist <= 0:
+            continue
+
+        target1 = entry + stop_dist * 2
+        target2 = entry + stop_dist * 3
+
+        reasoning = (
+            f"Micro Pullback: trend ${_close(trend_bars[0]):.2f}→${_close(trend_bars[-1]):.2f}, "
+            f"pause low ${pause_low:.2f}, breakout ${entry:.2f}"
+        )
+        return PatternSignal(
+            pattern_type='MICRO_PULLBACK',
+            confidence=4,
+            entry_price=entry,
+            stop_price=stop,
+            target1=target1,
+            target2=target2,
+            reasoning=reasoning,
+        )
+
+    return None
+
+
+# ── 3. ABCD Pattern ───────────────────────────────────────────────────────────
+
+def detect_abcd_pattern(bars: list[dict],
+                        config: EntryConfig | None = None) -> PatternSignal | None:
+    """
+    ABCD Pattern — 4 stars.
+
+    Structure:
+        A : Swing high (peak of initial rally)
+        B : Swing low after A (first pullback, >= abcd_min_pullback_pct of A)
+        C : Rally high between B and now (C must be < A)
+        D : Current area — secondary dip that must NOT break B low
+        Entry: Current bar closes above C resistance
+
+    Entry : Current bar close
+    Stop  : B low - stop_buffer
+    Target: A high (or 2:1 R/R if A is very far)
+    """
+    cfg = config if config is not None else _DEFAULTS
+    if len(bars) < 15:
+        return None
+
+    current = bars[-1]
+    if not _is_green(current):
+        return None
+
+    # We scan a window of the last 20 bars (excluding current)
+    window = bars[-20:-1]
+    if len(window) < 10:
+        return None
+
+    n = len(window)
+
+    # Find A: highest high in the first half of the window
+    a_half = window[:n // 2]
+    a_idx = max(range(len(a_half)), key=lambda i: _high(a_half[i]))
+    a_high = _high(a_half[a_idx])
+    a_price = a_high
+
+    # Find B: lowest low AFTER A
+    after_a = window[a_idx + 1: n // 2 + 2]
+    if len(after_a) < 2:
+        return None
+    b_idx_rel = min(range(len(after_a)), key=lambda i: _low(after_a[i]))
+    b_bar = after_a[b_idx_rel]
+    b_low = _low(b_bar)
+
+    # B must represent a meaningful pullback
+    if (a_price - b_low) / a_price < cfg.abcd_min_pullback_pct:
+        return None
+
+    # B must be below A
+    if b_low >= a_high:
+        return None
+
+    # Find C: highest high AFTER B (in second half of window)
+    b_abs_idx = a_idx + 1 + b_idx_rel
+    after_b = window[b_abs_idx + 1:]
+    if len(after_b) < 2:
+        return None
+    c_idx_rel = max(range(len(after_b)), key=lambda i: _high(after_b[i]))
+    c_bar = after_b[c_idx_rel]
+    c_high = _high(c_bar)
+
+    # C must be BELOW A (if C >= A it's a new breakout, not ABCD)
+    if c_high >= a_high:
+        return None
+
+    # C must be ABOVE B (higher structure)
+    if c_high <= b_low:
+        return None
+
+    # D area: last 3 bars of window (after C)
+    c_abs_idx = b_abs_idx + 1 + c_idx_rel
+    d_bars = window[c_abs_idx + 1:] if c_abs_idx + 1 < len(window) else []
+    if not d_bars:
+        return None
+
+    d_low = min(_low(b) for b in d_bars)
+
+    # D must NOT break B low (this is the critical rule)
+    if d_low < b_low:
+        return None
+
+    # D should be on light volume (secondary dip should be weak selling)
+    c_bars_for_ref = after_b[:c_idx_rel + 1] if after_b else []
+    if c_bars_for_ref:
+        d_light = all(
+            is_light_volume(b, c_bars_for_ref, threshold=cfg.abcd_d_light_vol)
+            for b in d_bars
+        )
+        if not d_light:
+            return None
+
+    # Current bar must close ABOVE C resistance
+    if _close(current) <= c_high:
+        return None
+
+    # ── Build signal ──────────────────────────────────────────────────────
+    entry = _close(current)
+    stop = b_low - cfg.stop_buffer
+    stop_dist = entry - stop
+    if stop_dist <= 0:
+        return None
+
+    # Target = A high if within reason (< 3:1 R/R distance), else 2:1
+    if (a_price - entry) >= stop_dist * 2:
+        target1 = entry + stop_dist * 2
+        target2 = a_price
+    else:
+        target1 = entry + stop_dist * 2
+        target2 = entry + stop_dist * 3
+
+    reasoning = (
+        f"ABCD: A=${a_price:.2f}, B=${b_low:.2f}, C=${c_high:.2f}, "
+        f"D=${d_low:.2f}, breakout ${entry:.2f}, stop ${stop:.2f}"
+    )
+    return PatternSignal(
+        pattern_type='ABCD',
+        confidence=4,
+        entry_price=entry,
+        stop_price=stop,
+        target1=target1,
+        target2=target2,
+        reasoning=reasoning,
+    )
+
+
+# ── 4. Dip Buy (3 Tricks) ─────────────────────────────────────────────────────
+
+def detect_dip_buy(bars: list[dict], indicators: dict,
+                   config: EntryConfig | None = None) -> PatternSignal | None:
+    """
+    Dip Buy using Ross Cameron's 3 Tricks — 3 stars.
+
+    Requires valid EMA-9 and MACD in indicators dict (needs 26+ bars history).
+
+    The 3 Tricks:
+        1. Price above 9 EMA
+        2. MACD histogram positive (green bars)
+        3. Light volume on the pullback candles
+
+    Current bar: green (first green after the pullback = entry)
+
+    Entry : Current bar close
+    Stop  : Lowest low of last 3 bars - stop_buffer
+    Note  : This is the "requires skill" pattern — use only when all 3 are confirmed.
+    """
+    cfg = config if config is not None else _DEFAULTS
+    if len(bars) < 8:
+        return None
+
+    ema9 = indicators.get('ema9')
+    macd_histogram = indicators.get('macd_histogram')
+
+    # Both indicators must be valid
+    if ema9 is None or macd_histogram is None:
+        return None
+
+    current = bars[-1]
+
+    # Current bar must be green
+    if not _is_green(current):
+        return None
+
+    current_price = _close(current)
+
+    # Trick 1: Price above 9 EMA
+    if current_price <= ema9:
+        return None
+
+    # Trick 2: MACD histogram positive
+    if macd_histogram <= 0:
+        return None
+
+    # Trick 3: Light volume on last 2-3 pullback bars
+    pullback_bars = bars[-4:-1]  # 3 bars before current
+    if len(pullback_bars) < 2:
+        return None
+
+    ref_bars = bars[-10:-4]  # reference: 6 bars before pullback
+    if len(ref_bars) < 3:
+        return None
+
+    # Pullback bars should show lower closes (actual dip)
+    if not any(_close(b) < _close(bars[-4]) for b in pullback_bars[1:]):
+        return None  # No actual dip happened
+
+    # Pullback must be on light volume
+    if not all(is_light_volume(b, ref_bars, threshold=cfg.dip_buy_light_vol)
+               for b in pullback_bars):
+        return None
+
+    # ── Build signal ──────────────────────────────────────────────────────
+    entry = current_price
+    dip_low = min(_low(b) for b in pullback_bars + [current])
+    stop = dip_low - cfg.stop_buffer
+    stop_dist = entry - stop
+    if stop_dist <= 0:
+        return None
+
+    target1 = entry + stop_dist * 2
+    target2 = entry + stop_dist * 3
+
+    reasoning = (
+        f"Dip Buy (3 Tricks): price ${current_price:.2f} > EMA9 ${ema9:.2f}, "
+        f"MACD hist {macd_histogram:.4f}, light vol pullback to ${dip_low:.2f}"
+    )
+    return PatternSignal(
+        pattern_type='DIP_BUY',
+        confidence=3,
+        entry_price=entry,
+        stop_price=stop,
+        target1=target1,
+        target2=target2,
+        reasoning=reasoning,
+    )
+
+
+# ── 5. Flat Top Breakout ──────────────────────────────────────────────────────
+
+def detect_flat_top_breakout(bars: list[dict],
+                             config: EntryConfig | None = None) -> PatternSignal | None:
+    """
+    Flat Top Breakout — 3 stars.
+
+    Structure:
+        Consolidation: 2-3 bars touch the same resistance (highs within $flat_top_resistance_tol)
+                       Volume equal or decreasing on each touch
+        Current bar  : Closes ABOVE the flat top with volume spike
+
+    Entry : Current bar close
+    Stop  : Lowest low of consolidation zone - stop_buffer
+    """
+    cfg = config if config is not None else _DEFAULTS
+    if len(bars) < 8:
+        return None
+
+    current = bars[-1]
+    if not _is_green(current):
+        return None
+
+    # Look at last 10 bars (excluding current) for consolidation
+    window = bars[-11:-1]
+    if len(window) < 5:
+        return None
+
+    # Find the flat-top resistance level
+    best_resistance = None
+    best_touches: list[dict] = []
+
+    for i in range(len(window) - 1):
+        candidate_level = _high(window[i])
+        touches = [
+            b for b in window[i:]
+            if abs(_high(b) - candidate_level) <= cfg.flat_top_resistance_tol
+        ]
+        if len(touches) >= 2 and len(touches) > len(best_touches):
+            best_touches = touches
+            best_resistance = candidate_level
+
+    if not best_touches or best_resistance is None or len(best_touches) < 2:
+        return None
+
+    # Volume must be equal or decreasing across successive touches
+    touch_volumes = [_vol(b) for b in best_touches]
+    # Allow one increase but not a steady climb
+    increases = sum(
+        1 for a, b in zip(touch_volumes, touch_volumes[1:])
+        if b > a * cfg.flat_top_vol_increase_tol
+    )
+    if increases >= len(touch_volumes) - 1:
+        return None  # Volume is uniformly increasing = not a flat top (breakout already)
+
+    # Current bar must close ABOVE the flat top resistance
+    if _close(current) <= best_resistance:
+        return None
+
+    # Volume on breakout must exceed the max volume of consolidation touches
+    max_consol_vol = max(touch_volumes)
+    if _vol(current) <= max_consol_vol:
+        return None
+
+    # ── Build signal ──────────────────────────────────────────────────────
+    entry = _close(current)
+    consol_low = min(_low(b) for b in window)
+    stop = consol_low - cfg.stop_buffer
+    stop_dist = entry - stop
+    if stop_dist <= 0:
+        return None
+
+    target1 = entry + stop_dist * 2
+    target2 = entry + stop_dist * 3
+
+    reasoning = (
+        f"Flat Top Breakout: resistance ${best_resistance:.2f} "
+        f"({len(best_touches)} touches), breakout ${entry:.2f}, "
+        f"vol {_vol(current):,.0f} > consol max {max_consol_vol:,.0f}"
+    )
+    return PatternSignal(
+        pattern_type='FLAT_TOP',
+        confidence=3,
+        entry_price=entry,
+        stop_price=stop,
+        target1=target1,
+        target2=target2,
+        reasoning=reasoning,
+    )
+
+
+# ── Diagnostic: explain why each pattern rejected ─────────────────────────────
+
+def explain_pattern_rejection(
+    bars: list[dict],
+    indicators: dict,
+    config: EntryConfig | None = None,
+) -> dict[str, str]:
+    """
+    Diagnostic-only function. Runs the same logic as each detect_* function
+    but instead of returning None silently, returns the FIRST failing check
+    name for every pattern.
+
+    Returns a dict:
+        {
+            'BULL_FLAG':      'flag_bars_not_all_red',
+            'MICRO_PULLBACK': 'pause_heavy_volume',
+            'ABCD':           'c_above_a',
+            'DIP_BUY':        'no_ema_indicator',
+            'FLAT_TOP':       'breakout_vol_too_low',
+        }
+    'PASS' means the pattern would have fired (detect_* returned a signal).
+    """
+    cfg = config if config is not None else _DEFAULTS
+
+    results: dict[str, str] = {}
+
+    # ── BULL FLAG ──────────────────────────────────────────────────────────────
+    def _explain_bull_flag() -> str:
+        if len(bars) < 6:
+            return f'too_few_bars({len(bars)}<6)'
+        current = bars[-1]
+        if not _is_green(current):
+            return f'current_not_green(close={_close(current):.2f} open={_open(current):.2f})'
+
+        for flag_len in (3, 2):
+            flag_start = len(bars) - 1 - flag_len
+            if flag_start < 0:
+                continue
+            flag_bars = bars[flag_start: len(bars) - 1]
+            if not all(_is_red(b) for b in flag_bars):
+                non_red = [i for i, b in enumerate(flag_bars) if not _is_red(b)]
+                return f'flag_bars_not_all_red(flag_len={flag_len}, non_red_indices={non_red})'
+            flag_high = max(_high(b) for b in flag_bars)
+            flag_low = min(_low(b) for b in flag_bars)
+            if _close(current) <= flag_high:
+                return f'current_not_above_flag_high(close={_close(current):.2f} flag_high={flag_high:.2f})'
+
+            pole_end = flag_start
+            for pole_len in (3, 2, 1):
+                pole_start = pole_end - pole_len
+                if pole_start < 0:
+                    continue
+                pole_bars = bars[pole_start:pole_end]
+                if not all(_is_green(b) for b in pole_bars):
+                    non_green = [i for i, b in enumerate(pole_bars) if not _is_green(b)]
+                    return f'pole_bars_not_all_green(pole_len={pole_len}, non_green_indices={non_green})'
+                ref_bars = bars[:pole_start] if pole_start > 0 else pole_bars
+                avg_ref_vol = average_volume(ref_bars, lookback=5) if ref_bars else _vol(pole_bars[0])
+                pole_avg_vol = sum(_vol(b) for b in pole_bars) / len(pole_bars)
+                if avg_ref_vol > 0 and pole_avg_vol < avg_ref_vol * cfg.bull_flag_pole_vol_min:
+                    return (f'pole_low_volume(pole_avg={pole_avg_vol:.0f} '
+                            f'ref_avg={avg_ref_vol:.0f} '
+                            f'need={avg_ref_vol * cfg.bull_flag_pole_vol_min:.0f})')
+                pole_high = max(_high(b) for b in pole_bars)
+                pole_low = min(_low(b) for b in pole_bars)
+                if flag_low < pole_low:
+                    return f'flag_below_pole_low(flag_low={flag_low:.2f} pole_low={pole_low:.2f})'
+                flag_light = all(
+                    is_light_volume(b, pole_bars, threshold=cfg.bull_flag_light_vol)
+                    for b in flag_bars
+                )
+                if not flag_light:
+                    vols = [(_vol(b), average_volume(pole_bars, lookback=len(pole_bars))) for b in flag_bars]
+                    return f'flag_heavy_volume(bar_vols={[v[0] for v in vols]}, pole_avg={vols[0][1]:.0f}, threshold={cfg.bull_flag_light_vol})'
+                if _vol(current) < pole_avg_vol * cfg.bull_flag_breakout_vol_min:
+                    return (f'breakout_low_volume(current_vol={_vol(current):.0f} '
+                            f'need={pole_avg_vol * cfg.bull_flag_breakout_vol_min:.0f})')
+                # If we get here, detect_bull_flag would have returned a signal
+                return 'PASS'
+            return f'no_valid_pole_found(flag_len={flag_len})'
+        return 'no_valid_flag_found'
+
+    results['BULL_FLAG'] = _explain_bull_flag()
+
+    # ── MICRO PULLBACK ─────────────────────────────────────────────────────────
+    def _explain_micro_pullback() -> str:
+        if len(bars) < 5:
+            return f'too_few_bars({len(bars)}<5)'
+        current = bars[-1]
+        if not _is_green(current):
+            return f'current_not_green(close={_close(current):.2f} open={_open(current):.2f})'
+
+        for pause_len in (2, 1):
+            pause_start = len(bars) - 1 - pause_len
+            trend_end = pause_start
+            trend_start = max(0, trend_end - 4)
+            if trend_end <= trend_start:
+                continue
+            pause_bars = bars[pause_start:pause_start + pause_len]
+            trend_bars = bars[trend_start:trend_end]
+            if len(trend_bars) < 2:
+                continue
+            green_in_trend = sum(1 for b in trend_bars if _is_green(b))
+            if green_in_trend < len(trend_bars) * cfg.micro_pb_green_pct:
+                return (f'trend_not_majority_green(green={green_in_trend}/{len(trend_bars)} '
+                        f'need={cfg.micro_pb_green_pct*100:.0f}%)')
+            if _close(trend_bars[-1]) <= _close(trend_bars[0]):
+                return (f'trend_not_rising(first_close={_close(trend_bars[0]):.2f} '
+                        f'last_close={_close(trend_bars[-1]):.2f})')
+            if any(_close(b) >= _close(trend_bars[-1]) for b in pause_bars):
+                return (f'pause_close_too_high(pause_closes={[_close(b) for b in pause_bars]}, '
+                        f'trend_end_close={_close(trend_bars[-1]):.2f})')
+            if not all(is_light_volume(b, trend_bars, threshold=cfg.micro_pb_light_vol)
+                       for b in pause_bars):
+                pause_vols = [_vol(b) for b in pause_bars]
+                ref_avg = average_volume(trend_bars, lookback=len(trend_bars))
+                return (f'pause_heavy_volume(pause_vols={pause_vols}, '
+                        f'trend_avg={ref_avg:.0f}, threshold={cfg.micro_pb_light_vol})')
+            trend_swing_low = min(_low(b) for b in trend_bars)
+            pause_low = min(_low(b) for b in pause_bars)
+            if pause_low < trend_swing_low * cfg.micro_pb_swing_tol:
+                return (f'pause_breaks_swing_low(pause_low={pause_low:.2f} '
+                        f'swing_low={trend_swing_low:.2f} tol={cfg.micro_pb_swing_tol})')
+            pause_high = max(_high(b) for b in pause_bars)
+            if _close(current) <= pause_high:
+                return f'current_not_above_pause_high(close={_close(current):.2f} pause_high={pause_high:.2f})'
+            return 'PASS'
+        return 'no_valid_pause_found'
+
+    results['MICRO_PULLBACK'] = _explain_micro_pullback()
+
+    # ── ABCD ───────────────────────────────────────────────────────────────────
+    def _explain_abcd() -> str:
+        if len(bars) < 15:
+            return f'too_few_bars({len(bars)}<15)'
+        current = bars[-1]
+        if not _is_green(current):
+            return f'current_not_green(close={_close(current):.2f} open={_open(current):.2f})'
+        window = bars[-20:-1]
+        if len(window) < 10:
+            return f'window_too_small({len(window)}<10)'
+        n = len(window)
+        a_half = window[:n // 2]
+        a_idx = max(range(len(a_half)), key=lambda i: _high(a_half[i]))
+        a_high = _high(a_half[a_idx])
+        after_a = window[a_idx + 1: n // 2 + 2]
+        if len(after_a) < 2:
+            return f'no_bars_after_a(after_a_len={len(after_a)})'
+        b_idx_rel = min(range(len(after_a)), key=lambda i: _low(after_a[i]))
+        b_bar = after_a[b_idx_rel]
+        b_low = _low(b_bar)
+        if (a_high - b_low) / a_high < cfg.abcd_min_pullback_pct:
+            return (f'pullback_too_small(a={a_high:.2f} b={b_low:.2f} '
+                    f'pullback={(a_high-b_low)/a_high*100:.1f}% '
+                    f'need={cfg.abcd_min_pullback_pct*100:.0f}%)')
+        if b_low >= a_high:
+            return f'b_not_below_a(b={b_low:.2f} a={a_high:.2f})'
+        b_abs_idx = a_idx + 1 + b_idx_rel
+        after_b = window[b_abs_idx + 1:]
+        if len(after_b) < 2:
+            return f'no_bars_after_b(after_b_len={len(after_b)})'
+        c_idx_rel = max(range(len(after_b)), key=lambda i: _high(after_b[i]))
+        c_bar = after_b[c_idx_rel]
+        c_high = _high(c_bar)
+        if c_high >= a_high:
+            return f'c_above_a(c={c_high:.2f} a={a_high:.2f})'
+        if c_high <= b_low:
+            return f'c_not_above_b(c={c_high:.2f} b={b_low:.2f})'
+        c_abs_idx = b_abs_idx + 1 + c_idx_rel
+        d_bars = window[c_abs_idx + 1:] if c_abs_idx + 1 < len(window) else []
+        if not d_bars:
+            return f'no_d_bars(c_abs_idx={c_abs_idx} window_len={len(window)})'
+        d_low = min(_low(b) for b in d_bars)
+        if d_low < b_low:
+            return f'd_breaks_b_low(d_low={d_low:.2f} b_low={b_low:.2f})'
+        c_bars_for_ref = after_b[:c_idx_rel + 1] if after_b else []
+        if c_bars_for_ref:
+            d_light = all(
+                is_light_volume(b, c_bars_for_ref, threshold=cfg.abcd_d_light_vol)
+                for b in d_bars
+            )
+            if not d_light:
+                d_vols = [_vol(b) for b in d_bars]
+                ref_avg = average_volume(c_bars_for_ref, lookback=len(c_bars_for_ref))
+                return (f'd_heavy_volume(d_vols={d_vols}, '
+                        f'c_avg={ref_avg:.0f}, threshold={cfg.abcd_d_light_vol})')
+        if _close(current) <= c_high:
+            return f'current_not_above_c(close={_close(current):.2f} c_high={c_high:.2f})'
+        return 'PASS'
+
+    results['ABCD'] = _explain_abcd()
+
+    # ── DIP BUY ────────────────────────────────────────────────────────────────
+    def _explain_dip_buy() -> str:
+        if len(bars) < 8:
+            return f'too_few_bars({len(bars)}<8)'
+        ema9 = indicators.get('ema9')
+        macd_histogram = indicators.get('macd_histogram')
+        if ema9 is None:
+            return 'no_ema_indicator'
+        if macd_histogram is None:
+            return 'no_macd_indicator'
+        current = bars[-1]
+        if not _is_green(current):
+            return f'current_not_green(close={_close(current):.2f} open={_open(current):.2f})'
+        current_price = _close(current)
+        if current_price <= ema9:
+            return f'price_below_ema9(price={current_price:.2f} ema9={ema9:.2f})'
+        if macd_histogram <= 0:
+            return f'macd_negative(histogram={macd_histogram:.4f})'
+        pullback_bars = bars[-4:-1]
+        if len(pullback_bars) < 2:
+            return f'too_few_pullback_bars({len(pullback_bars)}<2)'
+        ref_bars = bars[-10:-4]
+        if len(ref_bars) < 3:
+            return f'too_few_ref_bars({len(ref_bars)}<3)'
+        if not any(_close(b) < _close(bars[-4]) for b in pullback_bars[1:]):
+            return f'no_actual_dip(pullback_closes={[_close(b) for b in pullback_bars]})'
+        if not all(is_light_volume(b, ref_bars, threshold=cfg.dip_buy_light_vol)
+                   for b in pullback_bars):
+            pb_vols = [_vol(b) for b in pullback_bars]
+            ref_avg = average_volume(ref_bars, lookback=len(ref_bars))
+            return (f'pullback_heavy_volume(vols={pb_vols}, '
+                    f'ref_avg={ref_avg:.0f}, threshold={cfg.dip_buy_light_vol})')
+        return 'PASS'
+
+    results['DIP_BUY'] = _explain_dip_buy()
+
+    # ── FLAT TOP ───────────────────────────────────────────────────────────────
+    def _explain_flat_top() -> str:
+        if len(bars) < 8:
+            return f'too_few_bars({len(bars)}<8)'
+        current = bars[-1]
+        if not _is_green(current):
+            return f'current_not_green(close={_close(current):.2f} open={_open(current):.2f})'
+        window = bars[-11:-1]
+        if len(window) < 5:
+            return f'window_too_small({len(window)}<5)'
+        best_resistance = None
+        best_touches: list[dict] = []
+        for i in range(len(window) - 1):
+            candidate_level = _high(window[i])
+            touches = [
+                b for b in window[i:]
+                if abs(_high(b) - candidate_level) <= cfg.flat_top_resistance_tol
+            ]
+            if len(touches) >= 2 and len(touches) > len(best_touches):
+                best_touches = touches
+                best_resistance = candidate_level
+        if not best_touches or best_resistance is None or len(best_touches) < 2:
+            all_highs = [_high(b) for b in window]
+            return f'no_resistance_level(window_highs={[round(h,2) for h in all_highs]}, tol={cfg.flat_top_resistance_tol})'
+        touch_volumes = [_vol(b) for b in best_touches]
+        increases = sum(
+            1 for a, b in zip(touch_volumes, touch_volumes[1:])
+            if b > a * cfg.flat_top_vol_increase_tol
+        )
+        if increases >= len(touch_volumes) - 1:
+            return f'volume_uniformly_increasing(touches={len(best_touches)}, vol_increases={increases})'
+        if _close(current) <= best_resistance:
+            return f'current_not_above_resistance(close={_close(current):.2f} resistance={best_resistance:.2f})'
+        max_consol_vol = max(touch_volumes)
+        if _vol(current) <= max_consol_vol:
+            return f'breakout_vol_too_low(current_vol={_vol(current):.0f} max_consol_vol={max_consol_vol:.0f})'
+        return 'PASS'
+
+    results['FLAT_TOP'] = _explain_flat_top()
+
+    return results

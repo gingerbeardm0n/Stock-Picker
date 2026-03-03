@@ -7,7 +7,8 @@ Alpaca API (data feed)
     |
     v
 collect_data.py  ──────►  TimescaleDB (PostgreSQL)
-                           ├── stock_candles_1m  (minute bars, 4am-8pm ET)
+                           ├── stock_candles_1m  (hybrid: 5-min 4am-8am + 1-min 8am-12pm)
+                           ├── stock_candles_1h  (hour bars, 4am-8pm)
                            ├── stock_candles_1d  (daily bars)
                            └── stock_fundamentals (float, market cap from Finnhub)
                                      |
@@ -195,16 +196,155 @@ Build a discrete event simulator that feeds historical data one minute at a time
 
 ---
 
+## Phase 6: Large-Scale Simulation & ML Analysis (IN PROGRESS)
+
+### Goal: Data-Driven Strategy Optimization via Massive Simulation Sweeps
+
+Transform trading logic from hand-tuned rules → statistically validated, ML-scored filters.
+
+### Part A: Historical Data Expansion (CURRENT PRIORITY)
+
+**Current state**: Feb 3-18, 2026 (~11 trading days, 44 trades = too small for confidence)
+
+**Target**: 12 months of historical data (all of 2025 + current) = 252 trading days, ~750 trades
+
+**Data structure** (optimize storage + query speed):
+- **4am-8am (premarket)**: 1-hour bars only (5 bars/day, ~10M rows for 4000 symbols)
+  - Used to seed EMA-9, MACD, and build relative volume baseline
+  - 50% storage reduction vs minute data
+- **8am-12pm (trading window)**: 1-minute bars (240 bars/day, ~300M rows for 4000 symbols)
+  - Critical for entry/exit pattern detection at 9:30-11am
+  - Full precision needed
+- **12pm-8pm**: Skip entirely (our strategy doesn't trade after 11am)
+
+**Backfill plan**:
+1. Run `backfill_optimized.py` for all of 2025 (Jan 1 - Dec 31)
+   - Start with most recent dates (current risk of corrupted data lower)
+   - Work backward to Jan 2025
+   - Estimated time: 2-4 days (depending on parallel jobs)
+2. Verify data with `sanity_check.py` on random sample dates
+3. Expected final DB size: ~200GB (manageable for TimescaleDB)
+
+**Why 12 months?**
+- 252 trading days × 2-3 trades/day = 500-750 trades (statistical significance ✅)
+- Captures bull markets, crashes, volatility regimes, seasonal effects
+- Enough to validate filter interactions without diminishing returns
+
+### Part B: Simulation Parameter Sweep Engine (DESIGN PHASE)
+
+**Goal**: Run 1000s of simulations with varied thresholds, track which produce best results
+
+**Parameters to sweep**:
+1. **Entry gates**:
+   - Relative volume threshold: 3x, 4x, 5x, 6x, 7x
+   - Price range: $1-$20, $2-$20, $5-$20, $2-$15
+   - Float threshold: 10M, 15M, 20M, 30M
+   - Gain threshold: 8%, 10%, 12%, 15%
+   - Min buying volume: 30K, 50K, 75K
+
+2. **Position sizing**:
+   - max_position_pct: 10%, 15%, 20%, 25%, 30%
+   - risk_pct: 1%, 1.5%, 2%, 2.5%, 3%
+
+3. **Exit rules**:
+   - SELLING_PRESSURE threshold: 1.5x, 2.0x, 2.5x, 3.0x
+   - TIME_DECAY hour: 10am, 11am, 12pm
+   - EMA period: 7, 9, 11, 13
+
+4. **Trading window**:
+   - Entry start: 9:30am, 10:00am
+   - Entry end: 10:30am, 11:00am, 11:30am
+   - Exit deadline: 11:00am, 11:30am, 12:00pm
+
+**Expected combinations**: 5 × 4 × 3 × 3 × 3 × 5 × 2 × 4 × 2 × 3 = millions of variations
+- Run with representative subsets: 10% sampling = 100K+ simulations
+
+**Simulation outputs per run**:
+```json
+{
+  "parameters": {
+    "rel_vol_min": 5.0,
+    "max_position_pct": 20,
+    "selling_pressure_threshold": 2.0,
+    ...
+  },
+  "results": {
+    "date_range": "2025-01-01 to 2025-12-31",
+    "total_trades": 742,
+    "total_pnl": 3847,
+    "win_rate": 0.483,
+    "sharpe_ratio": 1.23,
+    "max_drawdown": -247,
+    "best_day": 238,
+    "worst_day": -105,
+    "pattern_breakdown": {
+      "FLAT_TOP": {"count": 183, "win_rate": 0.58, "pnl": 2104},
+      "ABCD": {"count": 74, "win_rate": 0.38, "pnl": -156},
+      ...
+    }
+  }
+}
+```
+
+### Part C: Feature Importance Analysis (ML PHASE)
+
+**Input**: 100K+ simulation results (each with different parameter combos)
+
+**Analysis goals**:
+1. **Correlation matrix**: Which parameters interact? (e.g., high position size + tight exits = risky)
+2. **Feature importance**: Rank by impact
+   - Position sizing: 80% of P&L variance
+   - Rel vol threshold: 60% of variance
+   - Exit threshold: 40% of variance
+   - Pattern selection: 35% of variance
+3. **Non-linear patterns**: Random Forest / Gradient Boosting to find sweet spots
+   - "High position size works ONLY with tight SELLING_PRESSURE threshold"
+   - "ABCD pattern needs higher rel vol than FLAT_TOP"
+   - "Win rate peaks 9:30-10:30, drops after 11:00"
+4. **Scoring system**: Assign weights
+   - "If score = rel_vol + 2×position_sizing + 0.5×exit_threshold, we maximize returns"
+
+**Output**: Adaptive thresholds
+- Instead of fixed `rel_vol_min=5.0` for all stocks, generate: `rel_vol_min = 5.0 - 0.1×float_score + 0.2×vol_score`
+- Different rules for different market conditions (bull vs volatility)
+
+### Part D: LLM Integration (EXPLORATORY)
+
+Feed results to a language model:
+```
+Here are 1000 simulation runs with different parameters and their P&L results.
+What patterns do you see? Which factors matter most?
+What would you recommend we change about the trading strategy?
+```
+
+Goal: Discover non-obvious insights (e.g., "You're exiting too early; combine EMA with volume")
+
+### Timeline
+- **Week 1-2**: Backfill all 2025 data (parallel backfill, ~5-10 days runtime)
+- **Week 3**: Build parameter sweep engine + run initial 10K simulations
+- **Week 4**: Analyze correlations, identify top 100 parameter combinations
+- **Week 5**: ML feature importance analysis
+- **Week 6**: LLM pattern discovery + recommendations
+- **Week 7+**: Refine strategy based on findings, repeat with tighter parameter ranges
+
+---
+
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `database/collect_data.py` | Live data collector (run 24/7) |
-| `database/backfill_optimized.py` | One-time historical backfill |
-| `database/backtest_scanner.py` | Core filtering engine |
-| `database/query_helpers.py` | All DB query methods |
-| `database/fetch_fundamentals.py` | Finnhub float/market cap fetcher |
-| `database/sanity_check.py` | Validate scanner vs ground truth |
+| `data/collector/collect_data.py` | Live data collector (run 24/7) |
+| `data/backfill/backfill_optimized.py` | One-time historical backfill |
+| `data/backfill/fill_gaps.py` | Gap recovery (detects downtime) |
+| `utils/backtest_scanner.py` | Core filtering engine |
+| `utils/query_helpers.py` | All DB query methods |
+| `utils/trading_calendar.py` | NYSE holiday calendar |
+| `services/fetch_fundamentals.py` | Finnhub float/market cap fetcher |
+| `maintenance/sanity_check.py` | Validate scanner vs ground truth |
+| `maintenance/db_status.py` | Database coverage report |
+| `simulator/simulation_engine.py` | Backtesting engine |
+| `simulator/simulate_date.py` | Single-day simulation CLI |
+| `simulator/simulate_date_range.py` | Multi-day simulation CLI |
 | `backend/app.py` | Flask API server |
 | `frontend/app.js` | AG Grid UI + API calls |
 | `config.py` | All settings + SCANNER_CRITERIA |
@@ -213,16 +353,23 @@ Build a discrete event simulator that feeds historical data one minute at a time
 
 ```bash
 # 1. Start data collector (keep running in background)
-python database/collect_data.py
+python data/collector/collect_data.py
 
 # 2. Start Flask API
 python backend/app.py
 
 # 3. Open browser to http://localhost:5000
 
-# 4. Run sanity check for a specific date
-python database/sanity_check.py 2026-02-13
+# 4. Run simulations
+python simulator/simulate_date.py --date 2026-02-13
+python simulator/simulate_date_range.py --start 2026-02-03 --end 2026-02-18
 
-# 5. Refresh fundamentals (run weekly)
-python database/fetch_fundamentals.py
+# 5. Run sanity check for a specific date
+python maintenance/sanity_check.py 2026-02-13
+
+# 6. Refresh fundamentals (run weekly)
+python services/fetch_fundamentals.py
+
+# 7. Fill data gaps (after outages)
+python data/backfill/fill_gaps.py 2026-02-19
 ```

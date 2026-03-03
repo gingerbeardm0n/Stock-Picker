@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker ps:*)",
+      "Bash(python3:*)",
+      "Bash(venv/Scripts/python:*)",
+      "Bash(venv/Scripts/pytest:*)",
+      "Bash(/c/Repositories/Stock-Picker/.venv/Scripts/python -c \" import optuna.importance help\\(optuna.importance.get_param_importances\\) \")",
+      "Bash(/c/Repositories/Stock-Picker/.venv/Scripts/python -c \" import optuna.importance help\\(optuna.importance.FanovaImportanceEvaluator\\) \")",
+      "Bash(/c/Repositories/Stock-Picker/.venv/Scripts/python -c \" from optuna.importance import PedAnovaImportanceEvaluator help\\(PedAnovaImportanceEvaluator\\) \")",
+      "Bash(tasklist /FI \"IMAGENAME eq python.exe\")",
+      "Bash(sqlite3 optimizer/robust_results.db \".schema\")",
+      "Bash(./venv/Scripts/python:*)",
+      "Bash(du -sh analysis/*)"
     ]
   }
 }

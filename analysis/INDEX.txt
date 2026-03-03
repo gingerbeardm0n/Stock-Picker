@@ -1,0 +1,163 @@
+================================================================================
+                  MARKET REGIME ANALYSIS - FILE INDEX
+                              Feb 28, 2026
+================================================================================
+
+QUICK START
+================================================================================
+1. Start with: analysis/README.md (markdown overview)
+2. Read: analysis/REGIME_DETECTION_REPORT.txt (actionable findings)
+3. Deep dive: analysis/MARKET_REGIME_ANALYSIS_SUMMARY.txt (comprehensive)
+4. Explore data: analysis/daily_signals.csv (raw data for visualization)
+
+================================================================================
+                            ALL FILES
+================================================================================
+
+DOCUMENTATION
+--------------
+
+  README.md (Markdown format)
+    - Quick overview of findings
+    - File descriptions
+    - Key findings table
+    - Value analysis
+    - How to use this analysis
+    - Next steps
+    - Q&A section
+
+  REGIME_DETECTION_REPORT.txt (221 lines)
+    - Executive summary
+    - Detailed findings by signal
+    - Top predictive signals by lookback window
+    - 5 actionable recommendations
+    - Implementation path with expected value
+    --> START HERE for implementation guidance
+
+  MARKET_REGIME_ANALYSIS_SUMMARY.txt (462 lines)
+    - Complete comprehensive analysis
+    - Critical findings (5 key insights)
+    - Detailed regime profiles with statistics
+    - Current accuracy of simple detection (43%)
+    - 5-phase implementation roadmap (cost/effort estimates)
+    - Value analysis (theoretical max vs realistic)
+    - Key insights for trader
+    - Follow-up questions
+    --> READ THIS for deep understanding
+
+  INDEX.txt (this file)
+    - Quick reference guide to all files
+
+
+DATA FILES
+----------
+
+  daily_signals.csv (279 rows, 14 columns)
+    Key columns:
+      - date: trading day
+      - regime: actual regime (BREAKOUT, PULLBACK, REVERSAL, UNKNOWN)
+      - num_trades: total trades that day
+      - num_unique_symbols: count of distinct symbols
+      - avg_entry_price: average entry price
+      - avg_price_move_pct: average % move (exit - entry) / entry
+      - avg_hold_minutes: average hold time
+      - win_rate_pct: % of winning trades
+      - total_pnl: sum of daily P&L
+      - avg_pnl_per_trade: average P&L per trade
+      - dominant_pattern: most common pattern
+
+    Use for: Visualizations, trend analysis, custom analysis
+
+  daily_signals_with_detection.csv (279 rows, 18 columns)
+    Extends daily_signals.csv with:
+      - num_trades_ma30: 30-day moving average
+      - num_unique_symbols_ma30: 30-day moving average
+      - regime_detected: detected regime using simple rules
+      - (plus rolling averages at windows 1,3,5,15,30 for all signals)
+
+    Use for: Evaluating detection accuracy
+
+  correlation_summary.csv (40 rows, 5 columns)
+    Shows Pearson correlation of each signal vs regime type
+    Columns: window, signal, pearson_r, abs_pearson, strength, direction
+
+    Strongest signals:
+      1. num_unique_symbols at 30-day: r=0.5090 (STRONG)
+      2. num_trades at 30-day: r=0.3529 (MODERATE)
+
+    Use for: Understanding which signals predict regime
+
+  regime_profiles.csv (4 rows)
+    Summary statistics for each regime (BREAKOUT, PULLBACK, REVERSAL, UNKNOWN)
+    Shows average: trades/day, symbols, price move, win rate, daily P&L
+
+    Use for: Quick reference of regime characteristics
+
+
+SCRIPTS
+-------
+
+  generate_report.py (Python 3)
+    Regenerates the text reports
+    Run with: python analysis/generate_report.py
+
+
+================================================================================
+                        KEY STATISTICS
+================================================================================
+
+Total trading days: 278 (Jan 2, 2025 - Feb 17, 2026)
+
+Regime distribution:
+  BREAKOUT: 166 days (60%) - high candidate diversity
+  PULLBACK: 85 days (31%) - fewer candidates
+  REVERSAL: 19 days (7%) - moderate activity
+  UNKNOWN: 8 days (3%) - insufficient data
+
+Best predictive signal:
+  Number of unique symbols (30-day average)
+  Correlation: r = 0.5090
+  Threshold: > 10 = BREAKOUT, < 9 = PULLBACK
+
+Simple detection accuracy:
+  Overall: 43.2% (120/278 correct)
+  PULLBACK: 68% (best)
+  BREAKOUT: 37%
+
+Value of regime detection:
+  Current (single config): $1,276
+  Theoretical max: $9,044
+  Realistic (70% accuracy): +$3,100 to $3,900
+  Conservative (50% accuracy): +$1,550 to $2,300
+
+
+================================================================================
+                        RECOMMENDED USAGE
+================================================================================
+
+FOR TRADER:
+  1. Read README.md (quick overview)
+  2. Read REGIME_DETECTION_REPORT.txt (actionable)
+  3. Get symbols_ma30 into your dashboard
+  4. Check weekly and adjust trading config
+
+FOR DEVELOPER:
+  1. Review README.md and REGIME_DETECTION_REPORT.txt
+  2. Implement: 30-day rolling average calculation
+  3. Display: current regime, prior week signals
+  4. Test: detection accuracy on current data
+
+FOR ANALYST:
+  1. Explore daily_signals.csv with pandas/Excel
+  2. Create visualizations (symbols chart with regime shading)
+  3. Analyze transition periods (when did regimes actually change?)
+  4. Test alternative detection thresholds
+
+FOR QUANT:
+  1. Read MARKET_REGIME_ANALYSIS_SUMMARY.txt (full technical analysis)
+  2. Review correlation results across all lookback windows
+  3. Build ML models (logistic regression, decision trees)
+  4. Backtest regime-switching strategy
+
+
+================================================================================

@@ -1,0 +1,4 @@
+Regime,Days,Avg Trades/Day,Avg Symbols,Avg Price,Avg Move %,Avg Hold Min,Avg Win %,Daily P&L Avg
+BREAKOUT,166,100,12,$6.4,+0.2%,21,58%,$425
+PULLBACK,85,64,9,$6.3,-0.9%,20,57%,$110
+REVERSAL,19,72,10,$7.3,-0.2%,22,63%,$189

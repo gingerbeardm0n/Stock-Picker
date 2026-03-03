@@ -7,3 +7,8 @@ python-dotenv
 websockets
 pytz
 psycopg2-binary
+pytest
+coverage
+optuna
+tqdm
+numpy

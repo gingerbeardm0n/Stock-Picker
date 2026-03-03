@@ -1,0 +1,51 @@
+rows=100
+
+unique_symbols=89
+
+unique_days=20
+
+max_run_gain_pct stats:
+
+count    100.000000
+mean      55.863011
+std       32.067388
+min       16.191363
+10%       23.566337
+25%       34.687315
+50%       46.358970
+75%       67.463797
+90%      112.282079
+max      167.226891
+
+run_minutes stats:
+
+count    100.000000
+mean       3.160000
+std        2.087577
+min        1.000000
+10%        1.000000
+25%        2.000000
+50%        3.000000
+75%        4.000000
+90%        6.000000
+max       11.000000
+
+day_gain_pct_929plus_non_null_pct=94.0%
+
+rel_vol_30d_929plus_non_null_pct=0.0%
+
+float_shares_non_null_pct=97.0%
+
+top10_max_run_gain:
+
+trade_date symbol  max_run_gain_pct  run_minutes
+2026-01-15   CJMB        167.226891            2
+2026-01-28   GOAI        159.865255            6
+2026-01-12   LYRA        127.272727            4
+2026-01-13   BCTX        125.000000            4
+2026-01-16   ACCL        119.346049            2
+2026-01-20    TWG        119.166667            2
+2026-01-29   ZSTK        119.142857            5
+2026-01-26   BATL        117.857143            1
+2026-01-28    GRI        115.913978            2
+2026-01-16   LCFY        113.235294            1
