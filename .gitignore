@@ -226,3 +226,9 @@ production/logs/
 # Haiku batch extraction outputs (temporary)
 Ross Cameron Day Trading Videos/haiku_output_*.txt
 Ross Cameron Day Trading Videos/*_merged.txt
+
+# Raw transcripts — 1,799 files / 36 MB, keep locally, don't bloat git
+Ross Cameron Day Trading Videos/Text transcriptions/
+
+# Local Claude workspace config
+Ross Cameron Day Trading Videos/.claude/

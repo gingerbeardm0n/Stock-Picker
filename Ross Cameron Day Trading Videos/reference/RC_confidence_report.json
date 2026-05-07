@@ -1,0 +1,654 @@
+{
+  "meta": {
+    "total_transcripts_analyzed": 1796,
+    "transcripts_folder": "Text transcriptions",
+    "note": "mention_count = number of transcripts containing at least one keyword associated with this rule. mention_pct = mention_count / total."
+  },
+  "rules": [
+    {
+      "rule_id": "SCRN-001",
+      "rule_key": "SCRN-001_news_catalyst",
+      "rule_name": "News Catalyst",
+      "pilot_confidence": 5,
+      "mention_count": 1353,
+      "mention_pct": 75.3,
+      "sample_files": [
+        "$1 Million Dollar Challenge Complete! Ross's Trade Recap.txt",
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt"
+      ]
+    },
+    {
+      "rule_id": "TIMING-002",
+      "rule_key": "TIMING-002_opening_range",
+      "rule_name": "Opening Range",
+      "pilot_confidence": 5,
+      "mention_count": 1217,
+      "mention_pct": 67.8,
+      "sample_files": [
+        "$1 Million Dollar Challenge Complete! Ross's Trade Recap.txt",
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt"
+      ]
+    },
+    {
+      "rule_id": "SCRN-003",
+      "rule_key": "SCRN-003_float",
+      "rule_name": "Float",
+      "pilot_confidence": 5,
+      "mention_count": 1175,
+      "mention_pct": 65.4,
+      "sample_files": [
+        "$1 Million Dollar Challenge Complete! Ross's Trade Recap.txt",
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt"
+      ]
+    },
+    {
+      "rule_id": "TIMING-001",
+      "rule_key": "TIMING-001_premarket_watch",
+      "rule_name": "Premarket Watch",
+      "pilot_confidence": 5,
+      "mention_count": 1173,
+      "mention_pct": 65.3,
+      "sample_files": [
+        "$1 Million Dollar Challenge Complete! Ross's Trade Recap.txt",
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt"
+      ]
+    },
+    {
+      "rule_id": "MKTCOND-002",
+      "rule_key": "MKTCOND-002_leading_gapper",
+      "rule_name": "Leading Gapper",
+      "pilot_confidence": 5,
+      "mention_count": 1055,
+      "mention_pct": 58.7,
+      "sample_files": [
+        "$1 Million Dollar Challenge Complete! Ross's Trade Recap.txt",
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$3,052.23 on my WORST day of the week! It must be a Bull Market!.txt"
+      ]
+    },
+    {
+      "rule_id": "SCRN-004",
+      "rule_key": "SCRN-004_price_range",
+      "rule_name": "Price Range",
+      "pilot_confidence": 5,
+      "mention_count": 1046,
+      "mention_pct": 58.2,
+      "sample_files": [
+        "$1 Million Dollar Challenge Complete! Ross's Trade Recap.txt",
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$3,052.23 on my WORST day of the week! It must be a Bull Market!.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt"
+      ]
+    },
+    {
+      "rule_id": "ENTR-003",
+      "rule_key": "ENTR-003_dollar_levels",
+      "rule_name": "Dollar Levels",
+      "pilot_confidence": 5,
+      "mention_count": 1017,
+      "mention_pct": 56.6,
+      "sample_files": [
+        "$1 Million Dollar Challenge Complete! Ross's Trade Recap.txt",
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$3,052.23 on my WORST day of the week! It must be a Bull Market!.txt"
+      ]
+    },
+    {
+      "rule_id": "ENTR-004",
+      "rule_key": "ENTR-004_micro_pullback",
+      "rule_name": "Micro Pullback",
+      "pilot_confidence": 5,
+      "mention_count": 975,
+      "mention_pct": 54.3,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$500 in the AM Day Trading Ross' Monday Recap.txt"
+      ]
+    },
+    {
+      "rule_id": "SCRN-005",
+      "rule_key": "SCRN-005_daily_chart_room",
+      "rule_name": "Daily Chart Room",
+      "pilot_confidence": 5,
+      "mention_count": 855,
+      "mention_pct": 47.6,
+      "sample_files": [
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$3.6K on The 36th Trading Day! Ross' Trade Recap.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt",
+        "$4K Green Day! Ross' Trade Recap.txt",
+        "$55K in One Month! Momentum Day Trading FOR THE WIN!.txt"
+      ]
+    },
+    {
+      "rule_id": "TIMING-003",
+      "rule_key": "TIMING-003_midday_dead",
+      "rule_name": "Midday Dead",
+      "pilot_confidence": 4,
+      "mention_count": 843,
+      "mention_pct": 46.9,
+      "sample_files": [
+        "$1 Million Dollar Challenge Complete! Ross's Trade Recap.txt",
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$3,052.23 on my WORST day of the week! It must be a Bull Market!.txt"
+      ]
+    },
+    {
+      "rule_id": "ENTR-002",
+      "rule_key": "ENTR-002_fcnh",
+      "rule_name": "Fcnh",
+      "pilot_confidence": 5,
+      "mention_count": 833,
+      "mention_pct": 46.4,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$3,052.23 on my WORST day of the week! It must be a Bull Market!.txt"
+      ]
+    },
+    {
+      "rule_id": "STOP-003",
+      "rule_key": "STOP-003_fifty_pct_daily_stop",
+      "rule_name": "Fifty Pct Daily Stop",
+      "pilot_confidence": 5,
+      "mention_count": 815,
+      "mention_pct": 45.4,
+      "sample_files": [
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt",
+        "$47k in 4 Days! Ross's Trade Recap.txt"
+      ]
+    },
+    {
+      "rule_id": "PROF-005",
+      "rule_key": "PROF-005_cold_market",
+      "rule_name": "Cold Market",
+      "pilot_confidence": 5,
+      "mention_count": 711,
+      "mention_pct": 39.6,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$5K Green Day! Ross' Trade Recap.txt",
+        "$7K on My 7th Green Day! Ross' Trade Recap [jcIM467dXns].txt"
+      ]
+    },
+    {
+      "rule_id": "PROF-001",
+      "rule_key": "PROF-001_dont_cap_green",
+      "rule_name": "Dont Cap Green",
+      "pilot_confidence": 5,
+      "mention_count": 670,
+      "mention_pct": 37.3,
+      "sample_files": [
+        "$1 Million Dollar Challenge Complete! Ross's Trade Recap.txt",
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$3,234.38 in 1hr on the 35th Day of 2018!.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt"
+      ]
+    },
+    {
+      "rule_id": "PROF-003",
+      "rule_key": "PROF-003_daily_goals",
+      "rule_name": "Daily Goals",
+      "pilot_confidence": 5,
+      "mention_count": 624,
+      "mention_pct": 34.7,
+      "sample_files": [
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt"
+      ]
+    },
+    {
+      "rule_id": "ENTR-009",
+      "rule_key": "ENTR-009_topping_tails",
+      "rule_name": "Topping Tails",
+      "pilot_confidence": 5,
+      "mention_count": 578,
+      "mention_pct": 32.2,
+      "sample_files": [
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$3.6K on The 36th Trading Day! Ross' Trade Recap.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt"
+      ]
+    },
+    {
+      "rule_id": "PROF-004",
+      "rule_key": "PROF-004_size_up_hot",
+      "rule_name": "Size Up Hot",
+      "pilot_confidence": 5,
+      "mention_count": 567,
+      "mention_pct": 31.6,
+      "sample_files": [
+        "$1 Million Dollar Challenge Complete! Ross's Trade Recap.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$3.6K on The 36th Trading Day! Ross' Trade Recap.txt"
+      ]
+    },
+    {
+      "rule_id": "MKTCOND-004",
+      "rule_key": "MKTCOND-004_overall_market",
+      "rule_name": "Overall Market",
+      "pilot_confidence": 4,
+      "mention_count": 526,
+      "mention_pct": 29.3,
+      "sample_files": [
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$7.8k After Digging Out of a Hole Ross's Trade Recap.txt",
+        "$AIMD +50% LIVE Day Trading Morning Show with Ross.txt",
+        "$APE IPO.txt",
+        "$BEAT +40% LIVE Day Trading Morning Show with Ross Cameron.txt"
+      ]
+    },
+    {
+      "rule_id": "MKTCOND-005",
+      "rule_key": "MKTCOND-005_seasonal",
+      "rule_name": "Seasonal",
+      "pilot_confidence": 4,
+      "mention_count": 502,
+      "mention_pct": 28.0,
+      "sample_files": [
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$3,052.23 on my WORST day of the week! It must be a Bull Market!.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt"
+      ]
+    },
+    {
+      "rule_id": "SCRN-006",
+      "rule_key": "SCRN-006_reverse_splits",
+      "rule_name": "Reverse Splits",
+      "pilot_confidence": 5,
+      "mention_count": 494,
+      "mention_pct": 27.5,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$500 in the AM Day Trading Ross' Monday Recap.txt",
+        "$5K Green Day! Ross' Trade Recap.txt",
+        "$ATXI +40% - LIVE Day Trading Morning Show.txt"
+      ]
+    },
+    {
+      "rule_id": "TIMING-006",
+      "rule_key": "TIMING-006_power_hour",
+      "rule_name": "Power Hour",
+      "pilot_confidence": 3,
+      "mention_count": 489,
+      "mention_pct": 27.2,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$3,234.38 in 1hr on the 35th Day of 2018!.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt"
+      ]
+    },
+    {
+      "rule_id": "MKTCOND-001",
+      "rule_key": "MKTCOND-001_cold_hot_framework",
+      "rule_name": "Cold Hot Framework",
+      "pilot_confidence": 5,
+      "mention_count": 476,
+      "mention_pct": 26.5,
+      "sample_files": [
+        "$3,052.23 on my WORST day of the week! It must be a Bull Market!.txt",
+        "$56K in 10 Days! Ross' Trade Recap.txt",
+        "$7K on My 7th Green Day! Ross' Trade Recap [jcIM467dXns].txt",
+        "$ASLN +200% Ross's Trade Recap.txt",
+        "$BMR +1,500% and then 4 other stocks ripped 200%+++.txt"
+      ]
+    },
+    {
+      "rule_id": "SCRN-009",
+      "rule_key": "SCRN-009_short_interest",
+      "rule_name": "Short Interest",
+      "pilot_confidence": 4,
+      "mention_count": 451,
+      "mention_pct": 25.1,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt",
+        "$55K in One Month! Momentum Day Trading FOR THE WIN!.txt",
+        "$AIMD +50% LIVE Day Trading Morning Show with Ross.txt"
+      ]
+    },
+    {
+      "rule_id": "STOP-007",
+      "rule_key": "STOP-007_position_stop",
+      "rule_name": "Position Stop",
+      "pilot_confidence": 5,
+      "mention_count": 446,
+      "mention_pct": 24.8,
+      "sample_files": [
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$3,052.23 on my WORST day of the week! It must be a Bull Market!.txt",
+        "$4K Green Day! Ross' Trade Recap.txt",
+        "$7K on My 7th Green Day! Ross' Trade Recap [jcIM467dXns].txt",
+        "$AMAM +50% on the daily breakout.txt"
+      ]
+    },
+    {
+      "rule_id": "ENTR-005",
+      "rule_key": "ENTR-005_vwap",
+      "rule_name": "Vwap",
+      "pilot_confidence": 5,
+      "mention_count": 360,
+      "mention_pct": 20.0,
+      "sample_files": [
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$3.6K on The 36th Trading Day! Ross' Trade Recap.txt",
+        "$AGFY +128% on News.txt",
+        "$BCAN +193% Day Trading Morning Show with Ross.txt"
+      ]
+    },
+    {
+      "rule_id": "STOP-004",
+      "rule_key": "STOP-004_thirty_pct_soft_stop",
+      "rule_name": "Thirty Pct Soft Stop",
+      "pilot_confidence": 4,
+      "mention_count": 358,
+      "mention_pct": 19.9,
+      "sample_files": [
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt",
+        "$BBAI +337% Gapper with News.txt",
+        "$DCFC +$12k Day Trading Recap by Ross Cameron.txt",
+        "$EVAX +58% LIVE Day Trading Morning Show with Ross.txt",
+        "$IMMX +50% Day Trading Recap by Ross Cameron.txt"
+      ]
+    },
+    {
+      "rule_id": "SCRN-002",
+      "rule_key": "SCRN-002_relative_volume",
+      "rule_name": "Relative Volume",
+      "pilot_confidence": 5,
+      "mention_count": 319,
+      "mention_pct": 17.8,
+      "sample_files": [
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$56K in 10 Days! Ross' Trade Recap.txt",
+        "$AGFY +128% on News.txt"
+      ]
+    },
+    {
+      "rule_id": "PROF-002",
+      "rule_key": "PROF-002_scale_out",
+      "rule_name": "Scale Out",
+      "pilot_confidence": 5,
+      "mention_count": 311,
+      "mention_pct": 17.3,
+      "sample_files": [
+        "$57,918.23 day trading in just TWO days! WHAT !.txt",
+        "$AMAM +50% on the daily breakout.txt",
+        "$CYN +15% Day Trading Recap by Ross Cameron.txt",
+        "$HOTH +125%.txt",
+        "$IMMX +50% Day Trading Recap by Ross Cameron.txt"
+      ]
+    },
+    {
+      "rule_id": "STOP-006",
+      "rule_key": "STOP-006_halt_offering",
+      "rule_name": "Halt Offering",
+      "pilot_confidence": 4,
+      "mention_count": 310,
+      "mention_pct": 17.3,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt",
+        "$4K Green Day! Ross' Trade Recap.txt",
+        "$APE IPO.txt"
+      ]
+    },
+    {
+      "rule_id": "MKTCOND-003",
+      "rule_key": "MKTCOND-003_cheap_gappers",
+      "rule_name": "Cheap Gappers",
+      "pilot_confidence": 4,
+      "mention_count": 309,
+      "mention_pct": 17.2,
+      "sample_files": [
+        "$3,052.23 on my WORST day of the week! It must be a Bull Market!.txt",
+        "$3,234.38 in 1hr on the 35th Day of 2018!.txt",
+        "$57,918.23 day trading in just TWO days! WHAT !.txt",
+        "$7K on My 7th Green Day! Ross' Trade Recap [jcIM467dXns].txt",
+        "$ASLN +200% Ross's Trade Recap.txt"
+      ]
+    },
+    {
+      "rule_id": "SCRN-010",
+      "rule_key": "SCRN-010_front_back_side",
+      "rule_name": "Front Back Side",
+      "pilot_confidence": 5,
+      "mention_count": 306,
+      "mention_pct": 17.0,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$40,854.67 in 3 Hours Day Trading! Hot Market Cycle Activated.txt",
+        "$57,918.23 day trading in just TWO days! WHAT !.txt"
+      ]
+    },
+    {
+      "rule_id": "SCRN-007",
+      "rule_key": "SCRN-007_foreign_stocks",
+      "rule_name": "Foreign Stocks",
+      "pilot_confidence": 4,
+      "mention_count": 265,
+      "mention_pct": 14.8,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$4K Green Day! Ross' Trade Recap.txt",
+        "$AIMD +50% LIVE Day Trading Morning Show with Ross.txt"
+      ]
+    },
+    {
+      "rule_id": "PROF-006",
+      "rule_key": "PROF-006_start_small",
+      "rule_name": "Start Small",
+      "pilot_confidence": 5,
+      "mention_count": 263,
+      "mention_pct": 14.6,
+      "sample_files": [
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$57,918.23 day trading in just TWO days! WHAT !.txt",
+        "$BIAF +72% LIVE Day Trading Morning Show with Ross.txt",
+        "$DRUG Squeezes 587% and HALTS in the Recap.txt",
+        "$GFAI +10% on the day on continuation.txt"
+      ]
+    },
+    {
+      "rule_id": "SCRN-008",
+      "rule_key": "SCRN-008_sector_theme",
+      "rule_name": "Sector Theme",
+      "pilot_confidence": 4,
+      "mention_count": 253,
+      "mention_pct": 14.1,
+      "sample_files": [
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$47k in 4 Days! Ross's Trade Recap.txt",
+        "$56K in 10 Days! Ross' Trade Recap.txt",
+        "$EVAX +58% LIVE Day Trading Morning Show with Ross.txt"
+      ]
+    },
+    {
+      "rule_id": "ENTR-006",
+      "rule_key": "ENTR-006_bull_flag",
+      "rule_name": "Bull Flag",
+      "pilot_confidence": 4,
+      "mention_count": 221,
+      "mention_pct": 12.3,
+      "sample_files": [
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$3,234.38 in 1hr on the 35th Day of 2018!.txt",
+        "$55K in One Month! Momentum Day Trading FOR THE WIN!.txt",
+        "$7.8k After Digging Out of a Hole Ross's Trade Recap.txt",
+        "$BEAT +40% LIVE Day Trading Morning Show with Ross Cameron.txt"
+      ]
+    },
+    {
+      "rule_id": "ENTR-001",
+      "rule_key": "ENTR-001_macd_gate",
+      "rule_name": "Macd Gate",
+      "pilot_confidence": 5,
+      "mention_count": 211,
+      "mention_pct": 11.7,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$12,553.50 on Today's BIGGEST Intraday Squeeze.txt",
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$26,553.22 on a 100% Squeeze on Breaking News.txt",
+        "$AIMD +50% LIVE Day Trading Morning Show with Ross.txt"
+      ]
+    },
+    {
+      "rule_id": "TIMING-004",
+      "rule_key": "TIMING-004_no_trade_days",
+      "rule_name": "No Trade Days",
+      "pilot_confidence": 5,
+      "mention_count": 188,
+      "mention_pct": 10.5,
+      "sample_files": [
+        "$11,734.61 in 2hrs of Day Trading.txt",
+        "$AGFY +128% on News.txt",
+        "$CYN +15% Day Trading Recap by Ross Cameron.txt",
+        "$DPSI +150% Day Trading Recap by Ross Cameron.txt",
+        "$DRUG Squeezes 587% and HALTS in the Recap.txt"
+      ]
+    },
+    {
+      "rule_id": "TIMING-005",
+      "rule_key": "TIMING-005_session_length",
+      "rule_name": "Session Length",
+      "pilot_confidence": 4,
+      "mention_count": 187,
+      "mention_pct": 10.4,
+      "sample_files": [
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$23K in 3 Days of Trading! Ross' Trade Recap.txt",
+        "$7K on My 7th Green Day! Ross' Trade Recap.txt",
+        "$ALVR +50% Day Trading Recap By Ross Cameron.txt",
+        "$BCAN +193% Day Trading Morning Show with Ross.txt"
+      ]
+    },
+    {
+      "rule_id": "STOP-001",
+      "rule_key": "STOP-001_macd_hands_off",
+      "rule_name": "Macd Hands Off",
+      "pilot_confidence": 5,
+      "mention_count": 170,
+      "mention_pct": 9.5,
+      "sample_files": [
+        "$BAER +126% Gap and Go.txt",
+        "$BNSO +130% and $MEGL +100% to $250.txt",
+        "$DRUG Squeezes 587% and HALTS in the Recap.txt",
+        "$INDO $HUSA Energy Momentum.txt",
+        "$INDO to $19.63 - Energy Stocks Surging Live Day Trading Morning Show with Ross Cameron.txt"
+      ]
+    },
+    {
+      "rule_id": "ENTR-008",
+      "rule_key": "ENTR-008_double_bottom",
+      "rule_name": "Double Bottom",
+      "pilot_confidence": 4,
+      "mention_count": 147,
+      "mention_pct": 8.2,
+      "sample_files": [
+        "$18k in 30 minutes with this Day Trading Strategy.txt",
+        "$ALVR +50% Day Trading Recap By Ross Cameron.txt",
+        "$BCAN +193% Day Trading Morning Show with Ross.txt",
+        "$BEAT +40% LIVE Day Trading Morning Show with Ross Cameron.txt",
+        "$EVAX +130% on the Beaten Up Bottom Bounce Day Trading Setup.txt"
+      ]
+    },
+    {
+      "rule_id": "ENTR-007",
+      "rule_key": "ENTR-007_order_spoofing",
+      "rule_name": "Order Spoofing",
+      "pilot_confidence": 4,
+      "mention_count": 139,
+      "mention_pct": 7.7,
+      "sample_files": [
+        "$195 Million OVERNIGHT Fortune on a China Stock.txt",
+        "$BCAN +193% Day Trading Morning Show with Ross.txt",
+        "$CFRX Recent Reverse Split Gap and Go Setup.txt",
+        "$CTRV Winner! Ross' Trade Recap.txt",
+        "$DPSI +150% Day Trading Recap by Ross Cameron.txt"
+      ]
+    },
+    {
+      "rule_id": "STOP-005",
+      "rule_key": "STOP-005_fifty_pct_retrace",
+      "rule_name": "Fifty Pct Retrace",
+      "pilot_confidence": 4,
+      "mention_count": 96,
+      "mention_pct": 5.3,
+      "sample_files": [
+        "$LUCY +188%.txt",
+        "$WORX Short Squeeze +400% Ross's Trade Recap.txt",
+        "(NASDAQ VRPX) +240% Day Trading Recap by Ross Cameron.txt",
+        "+$29k on (NASDAQ CLOV) Recap by Ross Cameron.txt",
+        "+$33k on (NASDAQ PMCB & VRPX) Day Trading Recap by Ross Cameron.txt"
+      ]
+    },
+    {
+      "rule_id": "STOP-002",
+      "rule_key": "STOP-002_ema_cross",
+      "rule_name": "Ema Cross",
+      "pilot_confidence": 4,
+      "mention_count": 19,
+      "mention_pct": 1.1,
+      "sample_files": [
+        "$LVTX +145% LIVE Day Trading Morning Show with Ross.txt",
+        "+$56,789.66 Day Trading the MACD Crossover Setup.txt",
+        "2nd to Last Trading Day of The Year +$1,874 Ross' Trade Recap.txt",
+        "A Simple Price Action Scalping Strategy for Day Trading #stockmarket.txt",
+        "A Trading Curse or a State of Mind.txt"
+      ]
+    }
+  ]
+}
