@@ -201,7 +201,7 @@ def evaluate_exit(
 
     # ── 10. Selling pressure ───────────────────────────────────────────────────
     # Heavy selling on a profitable position = "give back half" risk.
-    if in_profit:
+    if cfg.enable_selling_pressure and in_profit:
         buying_vol, selling_vol = estimate_buy_sell_volume(
             current_bar['open'], current_bar['high'],
             current_bar['low'], current_bar['close'],

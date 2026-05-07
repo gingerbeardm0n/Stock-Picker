@@ -7,9 +7,10 @@ PatternSignal if the pattern is detected, or None if not.
 
 Bar dict format: {time, symbol, open, high, low, close, volume, ...}
 
-Pattern priority (Ross Cameron reliability ranking):
+Pattern priority (data-derived from 5,010 trades across 1,800 Ross Cameron sessions):
+    0. Gap and Go         ⭐⭐⭐⭐⭐  1,177 trades, 69% win rate  ← #1 by frequency
     1. Bull Flag          ⭐⭐⭐⭐⭐
-    2. Micro Pullback     ⭐⭐⭐⭐
+    2. Micro Pullback     ⭐⭐⭐⭐    387 trades, 70% win rate
     3. ABCD               ⭐⭐⭐⭐
     4. Dip Buy (3 Tricks) ⭐⭐⭐
     5. Flat Top Breakout  ⭐⭐⭐
@@ -53,6 +54,102 @@ def _low(bar: dict) -> float:
 
 def _vol(bar: dict) -> float:
     return float(bar['volume'])
+
+
+# ── 0. Gap and Go ─────────────────────────────────────────────────────────────
+
+def detect_gap_and_go(bars: list[dict], indicators: dict,
+                      config: EntryConfig | None = None) -> PatternSignal | None:
+    """
+    Gap and Go — Break of premarket high at the open.
+
+    Ross Cameron's highest-frequency pattern: 1,177 trades (23% of all trades),
+    69% win rate. Source: concept_gap_and_go.md built from 1,800 session analysis.
+
+    Prerequisites (checked before calling, in entry_engine Gate 2):
+        - Stock has gapped up 20%+ premarket on a catalyst (min_premarket_gain)
+        - High relative volume (min_relative_volume)
+
+    Pattern structure:
+        Premarket : Stock gaps up, establishes a premarket high
+        Open      : Price approaches/tests premarket high level
+        Entry     : Current 1m bar CLOSES above premarket high on volume spike
+
+    Note on MACD: NOT required for this pattern (96% of gap-and-go trades have
+    unknown/missing MACD state). Do NOT apply the blanket MACD gate to this pattern.
+
+    Args:
+        bars        : All bars so far (oldest → newest, includes premarket bars first).
+        indicators  : Must contain 'premarket_high' (float | None), computed by
+                      entry_engine._get_premarket_high() from bars before 9:30am ET.
+                      Also uses 'market_open_bar_count' (int | None) to limit
+                      how long after open gap-and-go is valid.
+        config      : EntryConfig with gap_and_go_* thresholds.
+
+    Entry : Current bar close
+    Stop  : Just below the premarket high that was broken (the level becomes support)
+    Target: 2:1 and 3:1 R/R from entry
+    """
+    cfg = config if config is not None else _DEFAULTS
+
+    if len(bars) < 2:
+        return None
+
+    # Need premarket_high from indicators (computed in entry_engine)
+    premarket_high = indicators.get('premarket_high')
+    if premarket_high is None or premarket_high <= 0:
+        return None
+
+    # Only valid within the first N bars after 9:30am open
+    # Prevents late-session false triggers as price naturally exceeds premarket levels
+    market_open_bar_count = indicators.get('market_open_bar_count')
+    if (market_open_bar_count is not None
+            and market_open_bar_count > cfg.gap_and_go_max_bars_since_open):
+        return None
+
+    current = bars[-1]
+
+    # Must be a green bar (momentum continuation)
+    if not _is_green(current):
+        return None
+
+    # Current bar must CLOSE above the premarket high (the break)
+    if _close(current) <= premarket_high:
+        return None
+
+    # Volume confirmation: breakout bar must exceed recent average volume
+    # Concept page spec: "volume on that candle > 1.5x average candle volume"
+    recent_bars = bars[-6:-1]  # up to 5 bars before current
+    if len(recent_bars) >= 3:
+        avg_vol = sum(_vol(b) for b in recent_bars) / len(recent_bars)
+        if avg_vol > 0 and _vol(current) < avg_vol * cfg.gap_and_go_breakout_vol_min:
+            return None
+
+    # ── Build signal ──────────────────────────────────────────────────────
+    entry = _close(current)
+    # Stop just below premarket high — the broken level becomes support
+    stop = premarket_high - cfg.stop_buffer
+    stop_dist = entry - stop
+    if stop_dist <= 0:
+        return None
+
+    target1 = entry + stop_dist * 2
+    target2 = entry + stop_dist * 3
+
+    reasoning = (
+        f"Gap and Go: premarket high ${premarket_high:.2f} broken, "
+        f"entry ${entry:.2f}, stop ${stop:.2f} (below PM high), "
+        f"vol {_vol(current):,.0f}"
+    )
+    return PatternSignal(
+        pattern_type='GAP_AND_GO',
+        confidence=5,
+        entry_price=entry,
+        stop_price=stop,
+        target1=target1,
+        target2=target2,
+        reasoning=reasoning,
+    )
 
 
 # ── 1. Bull Flag ──────────────────────────────────────────────────────────────

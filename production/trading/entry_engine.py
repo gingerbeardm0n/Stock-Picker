@@ -33,6 +33,7 @@ from trading.indicators import (
     estimate_buy_sell_volume,
 )
 from trading.patterns import (
+    detect_gap_and_go,
     detect_bull_flag,
     detect_micro_pullback,
     detect_abcd_pattern,
@@ -50,6 +51,66 @@ _ENTRY_DEFAULTS = EntryConfig()
 TRADING_START_HOUR = 9
 TRADING_START_MINUTE = 30   # 9:30 AM ET
 TRADING_END_HOUR = 11       # 11:00 AM ET (no new entries after 11)
+
+
+# ── Gap and Go helpers ────────────────────────────────────────────────────────
+
+def _get_premarket_high(bars: list[dict]) -> float | None:
+    """
+    Find the highest high across all bars timestamped before 9:30am ET.
+
+    Called once per evaluate_entry() call; result passed to detect_gap_and_go()
+    via the indicators dict as 'premarket_high'.
+
+    Handles multiple bar timestamp formats:
+        - datetime object (with or without tzinfo)
+        - ISO-format string ("2026-05-06T07:30:00-04:00")
+
+    Returns None if no premarket bars found (graceful degradation).
+    """
+    highs: list[float] = []
+    for bar in bars:
+        t = bar.get('time')
+        if t is None:
+            continue
+        try:
+            if hasattr(t, 'astimezone'):
+                et = t.astimezone(ET)
+            else:
+                et = datetime.fromisoformat(str(t)).astimezone(ET)
+            # Premarket: strictly before 9:30am ET
+            if et.hour < 9 or (et.hour == 9 and et.minute < 30):
+                highs.append(float(bar['high']))
+        except Exception:
+            continue
+    return max(highs) if highs else None
+
+
+def _count_market_open_bars(bars: list[dict]) -> int:
+    """
+    Count bars timestamped at or after 9:30am ET.
+
+    Used to restrict gap-and-go detection to the opening window only
+    (first N bars after open = highest-probability gap-and-go entries).
+    """
+    count = 0
+    for bar in bars:
+        t = bar.get('time')
+        if t is None:
+            continue
+        try:
+            if hasattr(t, 'astimezone'):
+                et = t.astimezone(ET)
+            else:
+                et = datetime.fromisoformat(str(t)).astimezone(ET)
+            at_or_after_open = (
+                et.hour > 9 or (et.hour == 9 and et.minute >= 30)
+            )
+            if at_or_after_open:
+                count += 1
+        except Exception:
+            continue
+    return count
 
 
 # ── Main Entry Point ───────────────────────────────────────────────────────────
@@ -109,11 +170,18 @@ def evaluate_entry(
     ema9 = get_current_ema(prices, period=9)
     macd_data = calculate_macd(prices)  # None if < 35 bars
 
+    # Compute gap-and-go prerequisites: premarket high and bars-since-open count
+    premarket_high = _get_premarket_high(all_bars_so_far)
+    market_open_bar_count = _count_market_open_bars(all_bars_so_far)
+
     indicators = {
         'ema9': ema9,
         'macd_histogram': macd_data['histogram'] if macd_data else None,
         'trending_up': is_trending_up(all_bars_so_far),
         'vol_up_dominates': volume_on_up_bars_dominates(all_bars_so_far),
+        # Gap-and-go specific: premarket high level and opening bar count
+        'premarket_high': premarket_high,
+        'market_open_bar_count': market_open_bar_count,
     }
 
     current_price = float(current_bar['close'])
@@ -122,7 +190,12 @@ def evaluate_entry(
     if ecfg.enable_ema9 and ema9 is not None and current_price < ema9:
         return None
 
-    # MACD histogram must be positive (requires 35+ bars to be valid)
+    # MACD histogram must be positive (requires 35+ bars to be valid).
+    # NOTE: This gate is disabled by default (enable_macd=False).
+    # If re-enabled, be aware it MUST NOT block gap-and-go — that pattern
+    # explicitly does not require MACD (96% of gap-and-go trades = unknown MACD
+    # state). See concept_gap_and_go.md. Patterns that require MACD (e.g.
+    # dip_buy) enforce it internally in their own detector.
     if ecfg.enable_macd and macd_data is not None and indicators['macd_histogram'] <= 0:
         return None
 
@@ -131,11 +204,13 @@ def evaluate_entry(
         return None
 
     # ── Gate 4: Pattern detection ─────────────────────────────────────────────
-    # Try patterns in priority order (highest reliability first)
+    # Try patterns in priority order (data-derived from 1,800 session analysis).
+    # Gap-and-go first: #1 by frequency (1,177 trades, 23% of all trades, 69% win rate).
     signal: PatternSignal | None = (
-        (detect_bull_flag(all_bars_so_far, indicators, ecfg) if ecfg.enable_bull_flag else None)       or
-        (detect_micro_pullback(all_bars_so_far, indicators, ecfg) if ecfg.enable_micro_pullback else None)  or
-        (detect_abcd_pattern(all_bars_so_far, ecfg) if ecfg.enable_abcd else None)                or
+        (detect_gap_and_go(all_bars_so_far, indicators, ecfg) if ecfg.enable_gap_and_go else None)   or
+        (detect_bull_flag(all_bars_so_far, indicators, ecfg) if ecfg.enable_bull_flag else None)     or
+        (detect_micro_pullback(all_bars_so_far, indicators, ecfg) if ecfg.enable_micro_pullback else None) or
+        (detect_abcd_pattern(all_bars_so_far, ecfg) if ecfg.enable_abcd else None)                  or
         (detect_dip_buy(all_bars_so_far, indicators, ecfg) if ecfg.enable_dip_buy else None)         or
         (detect_flat_top_breakout(all_bars_so_far, ecfg) if ecfg.enable_flat_top else None)
     )

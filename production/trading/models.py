@@ -25,7 +25,7 @@ class ScannerConfig:
 
     Defaults match the published strategy (min_relative_volume=5x, etc.).
     """
-    min_price: float = 2.0              # Pillar 1: minimum price
+    min_price: float = 1.0              # Pillar 1: minimum price
     max_price: float = 20.0             # Pillar 1: maximum price
     min_premarket_gain: float = 10.0    # Pillar 2: % gain vs prior close
     min_relative_volume: float = 5.0    # Pillar 3: rel-vol multiplier minimum
@@ -41,11 +41,11 @@ class ScannerConfig:
     enable_premarket_gain: bool = True
     enable_relative_volume: bool = True
     enable_buying_volume: bool = False
-    enable_float_filter: bool = True
+    enable_float_filter: bool = False   # Pillar 4 disabled — see distribution query after Finnhub refresh
     enable_market_cap_filter: bool = False
     enable_spread_filter: bool = False
-    enable_last_5min_volume: bool = True
-    enable_last_1min_volume: bool = True
+    enable_last_5min_volume: bool = False
+    enable_last_1min_volume: bool = False
 
 
 # ── Category B: Entry / Pattern thresholds ────────────────────────────────────
@@ -59,18 +59,25 @@ class EntryConfig:
     Defaults match the current hand-tuned implementation.
     """
     min_rr_ratio: float = 2.0           # Gate 5: minimum reward/risk to enter
-    stop_buffer: float = 0.02           # $ below pattern low for all stop prices
+    stop_buffer: float = 0.076          # $ below pattern low for all stop prices (Trial 193)
 
     # Gate toggles (feature selection)
-    enable_ema9: bool = True
-    enable_macd: bool = True
+    enable_ema9: bool = False
+    enable_macd: bool = False
     enable_trend: bool = True
     enable_rr: bool = True
-    enable_bull_flag: bool = True
+    enable_gap_and_go: bool = True      # Gap and Go — #1 pattern by frequency (1,177 trades, 69% win rate)
+    enable_bull_flag: bool = False      # Trial 193: disabled (micro_pullback+dip_buy+flat_top only)
     enable_micro_pullback: bool = True
-    enable_abcd: bool = True
+    enable_abcd: bool = False           # Trial 193: disabled
     enable_dip_buy: bool = True
     enable_flat_top: bool = True
+
+    # ── Gap and Go ─────────────────────────────────────────────────────────────
+    # Source: concept_gap_and_go.md — break of premarket high at open
+    # MACD is NOT required for this pattern (96% of trades = unknown MACD state)
+    gap_and_go_breakout_vol_min: float = 1.5   # Breakout bar >= 1.5x recent avg vol (concept page spec)
+    gap_and_go_max_bars_since_open: int = 15   # Only fire within first 15 mins of open (before 9:45am)
 
     # ── Bull Flag ──────────────────────────────────────────────────────────────
     bull_flag_light_vol: float = 0.70        # Flag bars: volume < X × pole avg
@@ -117,9 +124,9 @@ class ExitConfig:
     # ── Scaling targets ────────────────────────────────────────────────────────
     # Standard 2-level (default): 50% at T1, 25% at T2, remainder on soft signals
     # Advanced 3-level: 25% at T1, 25% at T2, 50% on trailing stop
-    target1_ratio: float = 2.0          # R/R for first profit target
+    target1_ratio: float = 2.19         # R/R for first profit target (Trial 193)
     target2_ratio: float = 3.0          # R/R for second profit target
-    target1_qty_pct: float = 0.50       # Fraction of original position to sell at T1
+    target1_qty_pct: float = 0.30       # Fraction of original position to sell at T1 (Trial 193)
     target2_qty_pct: float = 0.25       # Fraction of original position to sell at T2
     ema_cross_qty_pct: float = 0.25     # Fraction to sell on EMA-9 cross (soft exit)
 
@@ -127,7 +134,7 @@ class ExitConfig:
     # Applied to the remainder after T1 fires. 0.0 = disabled.
     # When enabled: trail_stop = highest_price_since_entry - trailing_stop_distance
     # Only activates after at least T1 has fired (some shares already sold).
-    trailing_stop_distance: float = 0.0  # $0.00 = disabled; $0.05 = 5-cent trailing
+    trailing_stop_distance: float = 0.262  # Trial 193: 26.2-cent trailing stop; 0.0 = disabled
 
     # ── Time decay ────────────────────────────────────────────────────────────
     time_decay_hour: int = 12            # Primary: exit profitable positions after 12 PM ET
@@ -138,6 +145,7 @@ class ExitConfig:
     early_time_decay_min_gain_pct: float = 5.0  # Skip early exit if unrealized > this %
 
     # ── Selling pressure ──────────────────────────────────────────────────────
+    enable_selling_pressure: bool = False  # Disabled — fires too early on small moves
     selling_pressure_ratio: float = 2.0  # Exit when selling_vol > buying_vol × ratio
     selling_pressure_qty_pct: float = 0.50  # Fraction to sell on pressure signal
 
@@ -166,7 +174,7 @@ class PatternSignal:
     A detected chart pattern with a specific entry setup.
     Returned by each pattern detector in patterns.py.
     """
-    pattern_type: str    # 'BULL_FLAG', 'MICRO_PULLBACK', 'ABCD', 'DIP_BUY', 'FLAT_TOP'
+    pattern_type: str    # 'GAP_AND_GO', 'BULL_FLAG', 'MICRO_PULLBACK', 'ABCD', 'DIP_BUY', 'FLAT_TOP'
     confidence: int      # 1-5 stars (matching strategy doc reliability rating)
     entry_price: float   # Suggested entry (current bar close)
     stop_price: float    # Pattern-specific stop loss (NOT just bar low - $0.01)
