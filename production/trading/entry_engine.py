@@ -34,6 +34,7 @@ from trading.indicators import (
 )
 from trading.patterns import (
     detect_gap_and_go,
+    detect_vwap_reclaim,
     detect_bull_flag,
     detect_micro_pullback,
     detect_abcd_pattern,
@@ -113,6 +114,53 @@ def _count_market_open_bars(bars: list[dict]) -> int:
     return count
 
 
+def _calculate_vwap(bars: list[dict]) -> float | None:
+    """
+    Calculate session VWAP from market-hours bars (9:30am ET onwards).
+
+    VWAP = sum(typical_price × volume) / sum(volume)
+    typical_price = (high + low + close) / 3
+
+    Only 9:30am+ bars contribute — premarket bars are excluded because
+    standard intraday VWAP resets at the open.
+
+    Returns None if no valid market-hours bars found (graceful degradation).
+    Called once per evaluate_entry(); result passed to detect_vwap_reclaim()
+    via indicators dict as 'vwap'.
+    """
+    total_tpv = 0.0   # sum of (typical_price × volume)
+    total_vol = 0.0
+    for bar in bars:
+        t = bar.get('time')
+        if t is None:
+            continue
+        try:
+            if hasattr(t, 'astimezone'):
+                et = t.astimezone(ET)
+            else:
+                et = datetime.fromisoformat(str(t)).astimezone(ET)
+            at_or_after_open = (
+                et.hour > 9 or (et.hour == 9 and et.minute >= 30)
+            )
+            if not at_or_after_open:
+                continue
+        except Exception:
+            continue
+        vol = float(bar.get('volume', 0) or 0)
+        if vol <= 0:
+            continue
+        high = float(bar['high'])
+        low = float(bar['low'])
+        close = float(bar['close'])
+        typical_price = (high + low + close) / 3.0
+        total_tpv += typical_price * vol
+        total_vol += vol
+
+    if total_vol <= 0:
+        return None
+    return total_tpv / total_vol
+
+
 # ── Main Entry Point ───────────────────────────────────────────────────────────
 
 def evaluate_entry(
@@ -170,18 +218,21 @@ def evaluate_entry(
     ema9 = get_current_ema(prices, period=9)
     macd_data = calculate_macd(prices)  # None if < 35 bars
 
-    # Compute gap-and-go prerequisites: premarket high and bars-since-open count
+    # Compute pattern prerequisites once (shared by gap-and-go and vwap-reclaim)
     premarket_high = _get_premarket_high(all_bars_so_far)
     market_open_bar_count = _count_market_open_bars(all_bars_so_far)
+    vwap = _calculate_vwap(all_bars_so_far)
 
     indicators = {
         'ema9': ema9,
         'macd_histogram': macd_data['histogram'] if macd_data else None,
         'trending_up': is_trending_up(all_bars_so_far),
         'vol_up_dominates': volume_on_up_bars_dominates(all_bars_so_far),
-        # Gap-and-go specific: premarket high level and opening bar count
+        # Gap-and-go: premarket high level and bar count since open
         'premarket_high': premarket_high,
         'market_open_bar_count': market_open_bar_count,
+        # VWAP reclaim: current session VWAP (market-hours bars only)
+        'vwap': vwap,
     }
 
     current_price = float(current_bar['close'])
@@ -207,8 +258,9 @@ def evaluate_entry(
     # Try patterns in priority order (data-derived from 1,800 session analysis).
     # Gap-and-go first: #1 by frequency (1,177 trades, 23% of all trades, 69% win rate).
     signal: PatternSignal | None = (
-        (detect_gap_and_go(all_bars_so_far, indicators, ecfg) if ecfg.enable_gap_and_go else None)   or
-        (detect_bull_flag(all_bars_so_far, indicators, ecfg) if ecfg.enable_bull_flag else None)     or
+        (detect_gap_and_go(all_bars_so_far, indicators, ecfg) if ecfg.enable_gap_and_go else None)     or
+        (detect_vwap_reclaim(all_bars_so_far, indicators, ecfg) if ecfg.enable_vwap_reclaim else None) or
+        (detect_bull_flag(all_bars_so_far, indicators, ecfg) if ecfg.enable_bull_flag else None)       or
         (detect_micro_pullback(all_bars_so_far, indicators, ecfg) if ecfg.enable_micro_pullback else None) or
         (detect_abcd_pattern(all_bars_so_far, ecfg) if ecfg.enable_abcd else None)                  or
         (detect_dip_buy(all_bars_so_far, indicators, ecfg) if ecfg.enable_dip_buy else None)         or

@@ -9,6 +9,7 @@ Bar dict format: {time, symbol, open, high, low, close, volume, ...}
 
 Pattern priority (data-derived from 5,010 trades across 1,800 Ross Cameron sessions):
     0. Gap and Go         ⭐⭐⭐⭐⭐  1,177 trades, 69% win rate  ← #1 by frequency
+    0b.VWAP Reclaim       ⭐⭐⭐⭐⭐   153 trades, 75% win rate  ← highest win rate
     1. Bull Flag          ⭐⭐⭐⭐⭐
     2. Micro Pullback     ⭐⭐⭐⭐    387 trades, 70% win rate
     3. ABCD               ⭐⭐⭐⭐
@@ -143,6 +144,98 @@ def detect_gap_and_go(bars: list[dict], indicators: dict,
     )
     return PatternSignal(
         pattern_type='GAP_AND_GO',
+        confidence=5,
+        entry_price=entry,
+        stop_price=stop,
+        target1=target1,
+        target2=target2,
+        reasoning=reasoning,
+    )
+
+
+# ── 0b. VWAP Reclaim ──────────────────────────────────────────────────────────
+
+def detect_vwap_reclaim(bars: list[dict], indicators: dict,
+                        config: EntryConfig | None = None) -> PatternSignal | None:
+    """
+    VWAP Reclaim — highest win rate of all patterns.
+
+    153 trades, 75% win rate. Source: concept_pattern_playbook.md section 6.
+
+    Setup: stock gapped up at open (gap-and-go or news pop), dipped back below
+    VWAP (sellers took control), then buyers step back in and price closes a
+    1-minute candle above VWAP on above-average volume.
+
+    Key distinction from dip-buy:
+        - dip-buy: price dips but stays above VWAP, bounces off EMA-9 / support
+        - vwap-reclaim: price actually breaks BELOW VWAP, then reclaims it
+
+    Note on MACD: Not required (2.6% of trades recorded MACD positive).
+    Note on time: Only valid before 11am. After 11am, VWAP reclaims lack
+    the morning momentum needed to sustain the move (concept page rule).
+
+    Args:
+        bars        : All bars so far (oldest → newest). Market-hours bars define VWAP.
+        indicators  : Must contain 'vwap' (float | None), computed by
+                      entry_engine._calculate_vwap() from 9:30am bars.
+        config      : EntryConfig with vwap_reclaim_* thresholds.
+
+    Entry : Current bar close (the reclaim candle close)
+    Stop  : Just below VWAP (close back below VWAP = signal invalidated)
+    Target: 2:1 and 3:1 R/R from entry
+    """
+    cfg = config if config is not None else _DEFAULTS
+
+    vwap = indicators.get('vwap')
+    if vwap is None or vwap <= 0:
+        return None
+
+    if len(bars) < cfg.vwap_reclaim_lookback + 1:
+        return None
+
+    current = bars[-1]
+
+    # Current bar must close ABOVE VWAP (the reclaim)
+    if _close(current) <= vwap:
+        return None
+
+    # Must be green bar (buyer momentum on reclaim)
+    if not _is_green(current):
+        return None
+
+    # Lookback window: bars BEFORE current bar
+    lookback_bars = bars[-(cfg.vwap_reclaim_lookback + 1):-1]
+
+    # Must have had at least N bars BELOW VWAP recently (confirming the dip happened)
+    # Uses close price as the relevant level (not high/low)
+    bars_below_vwap = sum(1 for b in lookback_bars if _close(b) < vwap)
+    if bars_below_vwap < cfg.vwap_reclaim_min_below:
+        return None
+
+    # Volume confirmation: reclaim bar should exceed recent average
+    if len(lookback_bars) >= 3:
+        avg_vol = sum(_vol(b) for b in lookback_bars) / len(lookback_bars)
+        if avg_vol > 0 and _vol(current) < avg_vol * cfg.vwap_reclaim_breakout_vol_min:
+            return None
+
+    # ── Build signal ──────────────────────────────────────────────────────
+    entry = _close(current)
+    # Stop just below VWAP — close back below = pattern invalidated
+    stop = vwap - cfg.stop_buffer
+    stop_dist = entry - stop
+    if stop_dist <= 0:
+        return None
+
+    target1 = entry + stop_dist * 2
+    target2 = entry + stop_dist * 3
+
+    reasoning = (
+        f"VWAP Reclaim: VWAP ${vwap:.2f} reclaimed after {bars_below_vwap} bar(s) below, "
+        f"entry ${entry:.2f}, stop ${stop:.2f} (below VWAP), "
+        f"vol {_vol(current):,.0f}"
+    )
+    return PatternSignal(
+        pattern_type='VWAP_RECLAIM',
         confidence=5,
         entry_price=entry,
         stop_price=stop,

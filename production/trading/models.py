@@ -67,6 +67,7 @@ class EntryConfig:
     enable_trend: bool = True
     enable_rr: bool = True
     enable_gap_and_go: bool = True      # Gap and Go — #1 pattern by frequency (1,177 trades, 69% win rate)
+    enable_vwap_reclaim: bool = True    # VWAP Reclaim — highest win rate (153 trades, 75% win rate)
     enable_bull_flag: bool = False      # Trial 193: disabled (micro_pullback+dip_buy+flat_top only)
     enable_micro_pullback: bool = True
     enable_abcd: bool = False           # Trial 193: disabled
@@ -78,6 +79,14 @@ class EntryConfig:
     # MACD is NOT required for this pattern (96% of trades = unknown MACD state)
     gap_and_go_breakout_vol_min: float = 1.5   # Breakout bar >= 1.5x recent avg vol (concept page spec)
     gap_and_go_max_bars_since_open: int = 15   # Only fire within first 15 mins of open (before 9:45am)
+
+    # ── VWAP Reclaim ───────────────────────────────────────────────────────────
+    # Source: concept_pattern_playbook.md section 6 — highest win rate of all patterns
+    # Stock dips below VWAP, then 1m candle closes above VWAP on volume.
+    # Stop: close back below VWAP. Valid before 11am only.
+    vwap_reclaim_lookback: int = 5          # Bars to look back for "was below VWAP"
+    vwap_reclaim_min_below: int = 1         # Min bars below VWAP required before reclaim
+    vwap_reclaim_breakout_vol_min: float = 1.2  # Reclaim bar >= 1.2x recent avg vol
 
     # ── Bull Flag ──────────────────────────────────────────────────────────────
     bull_flag_light_vol: float = 0.70        # Flag bars: volume < X × pole avg
@@ -174,7 +183,7 @@ class PatternSignal:
     A detected chart pattern with a specific entry setup.
     Returned by each pattern detector in patterns.py.
     """
-    pattern_type: str    # 'GAP_AND_GO', 'BULL_FLAG', 'MICRO_PULLBACK', 'ABCD', 'DIP_BUY', 'FLAT_TOP'
+    pattern_type: str    # 'GAP_AND_GO', 'VWAP_RECLAIM', 'BULL_FLAG', 'MICRO_PULLBACK', 'ABCD', 'DIP_BUY', 'FLAT_TOP'
     confidence: int      # 1-5 stars (matching strategy doc reliability rating)
     entry_price: float   # Suggested entry (current bar close)
     stop_price: float    # Pattern-specific stop loss (NOT just bar low - $0.01)
