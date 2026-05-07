@@ -136,6 +136,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.paper
+.env.live
 .envrc
 .venv
 env/
@@ -217,3 +219,10 @@ analysis/*.csv                  # Old analysis outputs location
 research/optimizer/*.csv
 research/optimizer/logs/
 data/cache/
+
+# Live trading logs (keep locally, don't commit)
+production/logs/
+
+# Haiku batch extraction outputs (temporary)
+Ross Cameron Day Trading Videos/haiku_output_*.txt
+Ross Cameron Day Trading Videos/*_merged.txt

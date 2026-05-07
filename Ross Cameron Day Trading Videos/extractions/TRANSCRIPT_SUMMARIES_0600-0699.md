@@ -7,6 +7,13 @@ TRADES:
 | 1  | ITCI   | biotech | $26.78-$27.13 | gap-scanner    | yes  | gap-and-go / break of premarket high  | PROF: scaled $28-$34.49           | +$859   | WIN     |
 | 2  | SAVA   | general | $3.55-$3.90   | premarket-scan | no   | dip buy / micro pullback              | PROF: scaled at $3.95-$4.00       | +$740   | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go / break of premarket high | scaled entry | - | $859 | - | unknown | unknown |
+| 2 | - | - | - | dip-buy | dip buy / micro pullback | scaled entry | - | $859 | - | unknown | unknown |
+
 SUMMARY:
 Ross traded ITCI and SAVA in his small account on day 12 of the challenge, finishing up $1,600 (20% account growth). ITCI gapped up over 160% as the leading gapper of the day with FDA approval news. Ross initially hesitated due to heavy pre-market volume but eventually entered at $26.78 for the break of $27, scaling into the position as it moved higher to a peak of $34.49, capturing momentum through multiple entries. He scaled out on the surge, walking away with $859 on the trade. SAVA was on his watchlist; it spiked early but Ross waited for the pullback, buying the dip at $3.55-$3.90, then adding into the move. The stock reached $4.00 and he sold on strength for $740. Market conditions were hot with exceptional momentum across the board. By day 12, his account had grown from $500 to $8,700 in just 12 days of trading.
 
@@ -24,6 +31,14 @@ TRADES:
 | 1  | CATB   | general | $4.80-$5.00| gap-scanner | yes  | break of $5.00 resistance      | STOP: reversal - fast reversal  | -$580    | LOSS    |
 | 2  | CRDS   | general | $5.00      | high-day-momo | no | second break / bounce setup    | STOP: BE - unable to hold       | +$20     | BE      |
 | 3  | GLBS   | general | $8.50      | high-day-momo | no | break of $8.50 first 5min high | PROF: scaled $9.15-$9.47       | +$769    | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | break of $5.00 resistance | n/a | stop loss | $. | - | unknown | unknown |
+| 2 | - | - | - | unknown | second break / bounce setup | n/a | stop loss | $. | - | unknown | unknown |
+| 3 | - | - | - | unknown | break of $8.50 first 5min high | n/a | - | $. | - | unknown | unknown |
 
 SUMMARY:
 Day 12 presented a challenging morning for Ross despite ultimately finishing up $475 after commissions. He started with a $580 loss on CATB when he got filled on 7,000 shares for the break of $5.00, but the stock immediately rolled over and he was forced to exit at breakeven to prevent further damage. Technical issues with his trading platform caused two orders not to execute properly, costing him potential profits. CRDS provided a near-breakeven trade after getting halted; he bought the micro-pullback at $5.00 and exited essentially flat. GLBS was the key recovery trade—it hit his scanner, and Ross recognized the strong technical setup with a clean break above $8.50. He bought 1,200 shares at that level and rode the move to $9.47, scaling out for a $769 gain that brought him back to profitability. The day highlighted the importance of mental discipline and risk management; after the early losses, Ross made the deliberate choice to stay calm rather than revenge trade into the next setup.
@@ -44,6 +59,15 @@ TRADES:
 | 3  | MBOT   | tech    | $15.00     | high-day-momo | no   | break of $15.00             | PROF: scaled to $17.00     | +$6,200  | WIN     |
 | 4  | CLPS   | general | $5.00-$6.00| high-day-momo | no   | pullback entry              | PROF: scaled exit           | +$1,300  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go / red-to-green | n/a | - | $. | - | unknown | unknown |
+| 2 | - | - | - | micro-pullback | micro pullback / reversal | n/a | stop loss | $. | - | unknown | unknown |
+| 3 | - | - | - | unknown | break of $15.00 | n/a | - | $. | - | unknown | unknown |
+| 4 | - | - | - | unknown | pullback entry | n/a | - | $. | - | unknown | unknown |
+
 SUMMARY:
 Day 13 (Christmas Eve) was extraordinary—Ross nearly doubled his account again, finishing up $8,163.71. SAVA opened with a clean gap-and-go trade, but more importantly, MBOT stole the show. The stock did a red-to-green move in the morning, and Ross initially got shaken out for a small loss, but he recognized the continuing strength and re-entered on the break of $15.00, eventually holding through to near $17.00 for a massive $6,200 gain. His big account took a $555 loss on MBOT due to slippage from aggressive share sizing, illustrating the cost of trading two accounts simultaneously. CLPS provided a smaller but solid $1,300 win on the pullback entry. The combination of precise entries on the strongest setups and aggressive position sizing on high-conviction trades drove the blowup. This was the third time in the 13-day challenge that Ross had doubled his account in a single day, marking exceptional momentum trading execution.
 
@@ -61,6 +85,14 @@ TRADES:
 | 1  | GLBS   | general | $10.80     | high-day-momo | no  | gap-and-go attempt          | STOP: failed-breakout       | -$300    | LOSS    |
 | 2  | SGY    | general | $7.55-$7.75| high-day-momo | no  | break of whole dollar / hold | PROF: scaled at $8.00-$8.15 | +$250    | WIN     |
 | 3  | DFFN   | general | $5.25-$6.00| high-day-momo | no  | first 5min to new high / add | PROF: scaled profits        | +$183    | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go attempt | scaled entry | stop loss | $8.00 | - | unknown | unknown |
+| 2 | - | - | - | whole-dollar-break | break of whole dollar / hold | scaled entry | - | $8.00 | - | unknown | unknown |
+| 3 | - | - | - | unknown | first 5min to new high / add | scaled entry | - | $8.00 | - | unknown | unknown |
 
 SUMMARY:
 Day 13 was notably slower with $1,002 profit, but Ross demonstrated disciplined risk management. GLBS had been gapping up all morning but Ross correctly avoided it, recognizing the choppy, non-clean action despite broad interest. SGY provided a cleaner breakout over the whole dollar at $7.50; he entered and scaled into the move, taking profits as resistance appeared at the $8.00 level. DFFN was a former runner making a new high; the daily chart looked good above moving averages, but the stock had recently pulled back from a 30% move, creating seller resistance. Ross got aggressive adding at $6.00, thinking $7.00 was resistance and would be surpassed, but the stock lacked follow-through and he took a smaller profit than intended. He recognized these were below-average quality setups for sub-$200-moving-average stocks with recent parabolic history, showing how sizing down on lower-probability trades preserved capital during a slow session.
@@ -80,6 +112,15 @@ TRADES:
 | 2  | GLBS   | general | $11.95-$12.48| high-day-momo | no   | first 5min candle to new high| STOP: failed-breakout / halt  | -$300   | LOSS    |
 | 3  | SGY    | general | $7.50-$8.00 | high-day-momo  | no   | break of whole dollar        | PROF: micro scalp            | +$280   | WIN     |
 | 4  | ZX     | general | $unknown    | unknown        | no   | unknown                      | STOP: reversal               | -$199   | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | break of moving average | added on move | - | $12.48 | - | unknown | scalp |
+| 2 | - | - | - | unknown | first 5min candle to new high | added on move | failed breakout | $12.48 | - | unknown | scalp |
+| 3 | - | - | - | whole-dollar-break | break of whole dollar | added on move | - | $12.48 | - | unknown | scalp |
+| 4 | - | - | - | unknown | unknown | added on move | failed breakout | $12.48 | - | unknown | scalp |
 
 SUMMARY:
 Day 14 was frustrating overall despite finishing green (+$314 after commissions). Ross struggled with accuracy and follow-through, taking four trades across two accounts with mixed results. ETRM was a small $80 win on a continuation trade. GLBS was the biggest disappointment in his small account—he got in at $11.95 for what he thought would be a clean first 5-minute candle to new high, added at $12.48 as it hit $12.50, but the stock failed to hold the level and he was stopped out after adding aggressively. In his larger account, he had taken much bigger size ($8,500 shares) and watched it retrace from $12.50 to near breakeven before stopping out. SGY provided a small $280 scalp win. The gap scanner that morning had no quality setups—ETRM and GLBS were crowded with no fresh news, and the market lacked the kind of clean breakouts that produce home runs. Ross philosophically noted he'd rather have small steady wins than take unnecessary risk chasing poor setups.
@@ -101,6 +142,16 @@ TRADES:
 | 4  | PDSB   | general | $3.00       | high-day-momo  | no   | break of daily high             | PROF: quick scalp              | +$300    | WIN     |
 | 5  | MREO   | general | $1.75-$3.75 | premarket-scan | yes  | break of yesterday's high       | STOP: reversal / double top    | -$300    | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go / break of 9.50 | scaled entry | - | $4.20 | - | unknown | scalp |
+| 2 | - | - | - | unknown | break of yesterday's high | scaled entry | - | $4.20 | - | unknown | scalp |
+| 3 | - | - | - | halt-resume | halt resume / add on breakouts | scaled entry | - | $4.20 | - | unknown | scalp |
+| 4 | - | - | - | unknown | break of daily high | scaled entry | - | $4.20 | - | unknown | scalp |
+| 5 | - | - | - | unknown | break of yesterday's high | scaled entry | reversal | $4.20 | - | unknown | scalp |
+
 SUMMARY:
 Day 15 was the fourth account double-up in 15 days, with Ross finishing up $19,660.70. VRNA gapped up massively and Ross entered for the break of the $9.50 pre-market high, getting filled around $9.80-$10.00. The stock squeezed from $10 to $12.50 and he held the entire 3,000-share position, capturing a stunning $6,318 gain. TTPH was a continuation play from yesterday's close; he got in at $3.95 for the break of yesterday's high and scaled out into the $4.20-$4.24 range for $2,261. ITRM was the wildcard—it hit the scanner unexpectedly and was moving 100%+. He got in at $4.00, added through multiple halts at $4.50 and $5.50, and rode it up to $6.50, capturing $8,700 on extremely aggressive sizing (up to 9,000 shares). The risk-reward was exceptional given the momentum. PDSB was a small $300 scalp. MREO was the only loss (-$300) when it double-topped at $3.75 and he got caught adding on the reversal. Days like this demonstrate how five exceptional days per year can contribute 30% of annual profits in day trading.
 
@@ -117,6 +168,12 @@ TRADES:
 |----|--------|---------|-------------|----------------|------|--------------------------------|-------------------------------|---------|---------|
 | 1  | BGI    | biotech | $1.71-$1.95 | high-day-momo  | no   | former runner / break of whole | PROF: scaled at resistance    | +$900   | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | former runner / break of whole | scaled entry | - | $1.92 | - | unknown | unknown |
+
 SUMMARY:
 Day 15 was quiet with only one trade, finishing up $836 after commissions on BGI, a former runner that unexpectedly hit the scanner. After deciding the morning's gap scanner was uninspiring (MSXC too cheap, IDXG crowded, DFFN below 200-MA, CATB flat), Ross contemplated sitting out. However, he recognized BGI had strong technical setup on the daily chart with no nearby resistance. The stock was up 133% with high relative volume. He entered at $1.71-$1.75 for the break of whole-dollar resistance, and the stock squeezed to $1.92, where sellers appeared. He scaled out at $1.92-$2.08, then added back 2,000 shares at $1.95 for the second push, riding it to $2.10 where he took the final profits. This was a day where Ross exercised discipline by not forcing a trade when setups weren't clean, then capitalizing on the one decent opportunity that materialized. His small account closed the day at nearly $10,000, and he made 10% growth on a single trade.
 
@@ -132,6 +189,12 @@ TRADES:
 | #  | SYMBOL | SECTOR  | PRICE       | SCANNER        | NEWS | ENTRY SETUP                    | EXIT                          | RESULT  | OUTCOME |
 |----|--------|---------|-------------|----------------|------|--------------------------------|-------------------------------|---------|---------|
 | 1  | BGI    | biotech | $1.71-$1.95 | high-day-momo  | no   | former runner / break of whole | PROF: scaled at resistance    | +$900   | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | former runner / break of whole | n/a | - | - | - | unknown | unknown |
 
 SUMMARY:
 This is a duplicate of FILE 0606 based on the transcript content.
@@ -152,6 +215,16 @@ TRADES:
 | 3  | NBR    | energy  | $11.30-$11.50| high-day-momo | no   | halt resume / squeeze          | STOP: halt-down - added avg   | -$2,700  | LOSS    |
 | 4  | CEDX   | biotech | $13.50-$14.50| high-day-momo | yes  | first pullback / breakout      | PROF: momentum scale          | +$1,300  | WIN     |
 | 5  | WLL    | energy  | $1.40-$1.75 | gap-scanner    | yes  | ABCD pattern / whole dollar    | PROF: squeeze through         | +$2,800  | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go | added on move | - | $1.50 | - | unknown | unknown |
+| 2 | - | - | - | unknown | break of premarket high | added on move | stop loss | $1.50 | - | unknown | unknown |
+| 3 | - | - | - | halt-resume | halt resume / squeeze | added on move | stop loss | $1.50 | - | unknown | unknown |
+| 4 | - | - | - | unknown | first pullback / breakout | added on move | - | $1.50 | - | unknown | unknown |
+| 5 | - | - | - | whole-dollar-break | abcd pattern / whole dollar | added on move | - | $1.50 | - | unknown | unknown |
 
 SUMMARY:
 Day 16 started badly, with Ross down over $2,700 early on (his biggest loss to date), primarily from NBR which halted going up after he entered, then gapped down $1.50 on resumption. He added on the way down trying to average in but got stopped out at a large loss. After taking two losses in a row (CPAH small win but then INOV loss, then NBR massive loss), Ross considered stopping but recognized he was down $2,600 and had room for more risk. PYX hit the scanner and he nailed the halt resume trade for $1,500, cutting his loss to $1,100. QUIK provided another small win. CEDX came through with a strong $1,300 gain on the news catalyst. Finally, WLL (Whiting Petroleum) presented a textbook ABCD pattern with an ascending sequence; it squeezed from $1.40 to $2.40, and Ross captured $2,800 on the momentum, bringing him from deeply red to finishing the day up $1,100 for his 16th consecutive green day despite the volatile intraday swing.
@@ -175,6 +248,18 @@ TRADES:
 | 6  | SIVA   | general | $7.00       | high-day-momo  | no   | break over resistance           | PROF: small scalp             | +$159    | WIN     |
 | 7  | MKD    | IPO     | $7.00-$8.90 | high-day-momo  | no   | IPO high / first breakout       | PROF: scaled through adds     | +$10,000 | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | break of premarket high 4.30 | scaled entry | - | $10 | - | unknown | scalp |
+| 2 | - | - | - | whole-dollar-break | break of $20.00 whole dollar | scaled entry | stop loss | $10 | - | unknown | scalp |
+| 3 | - | - | - | halt-resume | halt resume / squeeze | scaled entry | - | $10 | - | unknown | scalp |
+| 4 | - | - | - | unknown | reverse split / break of 7-ma | scaled entry | - | $10 | - | unknown | scalp |
+| 5 | - | - | - | unknown | break of daily high / squeeze | scaled entry | - | $10 | - | unknown | scalp |
+| 6 | - | - | - | unknown | break over resistance | scaled entry | - | $10 | - | unknown | scalp |
+| 7 | - | - | - | unknown | ipo high / first breakout | scaled entry | - | $10 | - | unknown | scalp |
+
 SUMMARY:
 Day 16 (second-to-last of 2019) demonstrated exceptional recovery and FOMO management. Starting down $2,500 after bad fills on SVRA (small $506 win) and a disastrous SLGL false breakout (down $2,600 when he tried to force a $20 break with aggressive 3,000 shares and got trapped in a wide spread). Ross resisted panic selling and took a breath, recognizing he was still within his 10% daily max loss. PYX hit the scanner as it squeezed out of a halt; he nailed the micro-pullback entry and scalped $1,500. QUIK was a reverse-split stock that broke the 200-MA cleanly and he captured $1,900. SEED provided a momentum scalp for $1,000, and SIVA added a small $159. The main event was MKD, an IPO that hit $7.00, then squeezed to $8.49, pulled back, and ripped to $12.00 through two halts. Ross scaled in and out through the volatility, eventually making $10,000 despite the complexity and final flush back below the opening price. This $15,000 day pushed his account to over $50,000 (halfway to his $100K goal in just 16 days), though his larger accounts hit max loss and were locked out of the final big MKD trade.
 
@@ -194,6 +279,16 @@ TRADES:
 | 3  | NVCN   | general | $8.08-$8.40   | gap-scanner    | yes  | VWAP reclaim / red-to-green move      | STOP: failed-breakout - reversed      | -$99    | LOSS    |
 | 4  | EVSI   | general | $5.40         | high-day-momo  | no   | first one-minute candle to new high   | PROF: quick exit on reversal          | +$155   | WIN     |
 | 5  | ONCY   | general | $5.78-$6.00   | high-day-momo  | no   | breakout over $5.78 / add at $6.00   | STOP: reversal - flushed down         | -$2,100 | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | break of $5.20 / add on dips | added on move | - | $2 | - | unknown | scalp |
+| 2 | - | - | - | unknown | momentum surge / breakout attempt | added on move | stop loss | $2 | - | unknown | scalp |
+| 3 | - | - | - | vwap-reclaim | vwap reclaim / red-to-green move | added on move | stop loss | $2 | - | unknown | scalp |
+| 4 | - | - | - | unknown | first one-minute candle to new high | added on move | - | $2 | - | unknown | scalp |
+| 5 | - | - | - | unknown | breakout over $5.78 / add at $6.00 | added on move | stop loss | $2 | - | unknown | scalp |
 
 SUMMARY:
 Ross finished day 17 of his small account challenge up $1,300.73, ending the month-long challenge with approximately $54,000 (growing from an initial $500). The day was frustrating despite the green finish, as he gave back significant gains on his final trade. NEURO was identified on his premarket watchlist and provided his best trade; he entered on the break of $5.20 with multiple adds on dips, scaling out at resistance around $6.13 for a $3,500 gain. His next three trades (IMAC, NVCN, EVSI) were all false breakouts or weak follow-throughs, typical of choppy market conditions mid-session. The most significant loss came on ONCY, where despite early success with an $800 scalp profit, he added aggressively near the highs and was forced to cut losses after the stock flushed, losing roughly $2,100 and triggering his daily rule of stopping after giving back half his profits. Ross emphasized the importance of the strict rules he follows: three red trades in a row, losing half daily profits, or hitting maximum daily loss all force him to stop trading. He acknowledged frustration at missing the larger NEURO move earlier and leaving money on the table, but credited his discipline with protecting his capital.
@@ -220,6 +315,14 @@ TRADES:
 | 1  | FFHL   | general | $3.75-$4.70   | gap-scanner    | yes  | gap-and-go / break of premarket high  | PROF: scaled at momentum spike $5.17  | +$1,500 | WIN     |
 | 2  | FFHL   | general | $4.00         | watching       | yes  | first five-minute candle new high     | STOP: failed-breakout - rejection     | -$1,000 | LOSS    |
 | 3  | MSDI   | general | $2.48-$2.50   | high-day-momo  | no   | breakout over $2.50 / momentum surge  | PROF: quick exit on pop to $2.95      | +$583   | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 40% | - | gap-and-go | gap-and-go / break of premarket high | added on move | - | $4.5 | - | unknown | scalp |
+| 2 | - | 40% | - | unknown | first five-minute candle new high | added on move | stop loss | $4.5 | - | unknown | scalp |
+| 3 | - | 40% | - | unknown | breakout over $2.50 / momentum surge | added on move | - | $4.5 | - | unknown | scalp |
 
 SUMMARY:
 Ross finished this midday recap up $1,925 in his small account and $5,999 in his big account, approximately $8,000 combined. However, he expressed frustration about his final two trades being losers, which tempered what should have been an excellent day. FFHL was his lead trade, identified as the top gapper with 4.5M float and 40% gap-up on news. His first entry attempt at the open only filled 70 shares at $3.75 due to order execution challenges, then he aggressively added higher in the $3.60s, capturing gains as the stock squeezed to $5.17 for a $1,500 profit. Dissatisfied with the partial fill and wanting larger size, he re-entered shortly after 10:00 a.m. on the first five-minute candle to make a new high over $4.00, but the stock was sharply rejected and he lost $1,000. MSDI, discovered on the high-day momentum scanner, presented a cleaner trade with entry around $2.48-$2.50 and a quick $583 profit from the pop to $2.95. Ross highlighted the importance of aggressive positioning during hot morning sessions with multiple quality gappers, noting that just one or two exceptional days per month can define annual profitability.
@@ -248,6 +351,15 @@ TRADES:
 | 3  | ESES   | general | $1.70         | high-day-momo  | no   | momentum surge / parabolic squeeze    | PROF: exit into momentum spike        | +$1,500 | WIN     |
 | 4  | PM     | general | $2.80-$2.90   | unknown        | no   | momentum pullback / dip entry         | STOP: BE - no follow-through          | $0      | BE      |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | vwap-reclaim | breakout attempt / vwap resistance | n/a | reversal | $4.00. | - | unknown | scalp |
+| 2 | - | - | - | gap-and-go | gap-and-go / break of premarket high | n/a | - | $4.00. | - | unknown | scalp |
+| 3 | - | - | - | unknown | momentum surge / parabolic squeeze | n/a | - | $4.00. | - | unknown | scalp |
+| 4 | - | - | - | unknown | momentum pullback / dip entry | n/a | reversal | $4.00. | - | unknown | scalp |
+
 SUMMARY:
 Ross completed day 18 of his small account challenge finishing up $2,249.53, his best single day of the year in that account. Despite incorporating one losing trade (GLBS down $265) and one breakeven trade (PM at $0), the day demonstrated strong execution on higher-quality setups. GLBS, which was gapping up, initially looked promising but failed at VWAP resistance; Ross cut the loss quickly, recognizing the failed breakout pattern that he had been noticing frequently throughout the week. MYOS, a former runner on his premarket watchlist consolidating above the moving average, provided a solid 40-50 cent move to resistance around $4.00. The standout trade was ESES, which exploded on the high-momentum scanner, squeezing from 85 cents to over $2.05. Ross jumped in at $1.70 with 6,000 shares, riding the parabolic momentum for a $1,500 profit. He noted that in current market conditions, these parabolic moves don't provide clean pullback opportunities; instead, traders must enter aggressively into the initial squeeze and exit before the sharp reversal. The PM trade proved choppy and unrewarding, so he exited at breakeven. Ross emphasized the pattern he was observing: stocks ripping hard then reversing sharply without clean consolidations, limiting multi-leg opportunities.
 
@@ -271,6 +383,12 @@ TRADES:
 | #  | SYMBOL | SECTOR  | PRICE         | SCANNER        | NEWS | ENTRY SETUP                           | EXIT                                  | RESULT  | OUTCOME |
 |----|--------|---------|---------------|----------------|------|---------------------------------------|---------------------------------------|---------|---------|
 | 1  | RGSC   | general | $4.75-$5.72   | gap-scanner    | yes  | gap-and-go / former runner breakout   | PROF: scaled at momentum peak $5.85   | +$7,499 | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go / former runner breakout | n/a | - | $55 | - | unknown | extended |
 
 SUMMARY:
 Ross finished day 19 of his small account challenge with a spectacular +$7,499.18 gain (50% account growth), his best trading day in over a year. Combined with his big account, he was up $15,996.87, bringing his month-to-date profit to over $55,000, eclipsing his previous best month of $34,500 by more than $20,000. The entire day centered on one dominant trade: RGSC, a former runner stock identified on the gap scanner with appropriate catalyst news and sufficient buzz. Ross emphasized his trading philosophy of taking high risk for very short time periods, a trait rooted in his discomfort with extended position holding. He entered RGSC at the open with multiple fills from $4.75 up to $5.72, riding the explosive momentum as the stock squeezed from the $4.75 entry all the way up to a $5.85 peak—capturing approximately a full dollar per share. His scaling approach and disciplined exit timing on the momentum spike allowed him to bank the substantial profit despite the stock's extreme volatility. The trade exemplified his core strategy: identifying stocks with the right combination of former runner pedigree, reverse split history, news headlines, and trading buzz, then executing rapid entry-to-exit cycles that capture momentum without overholding.
@@ -298,6 +416,15 @@ TRADES:
 | 2  | OUR    | general | $8.30         | high-day-momo  | no   | sub-VWAP trap / micro-pullback entry  | PROF: scaled at resistance $8.10      | +$200   | WIN     |
 | 3  | TWAC   | general | $16.50        | news-driven    | yes  | breakout / Kanye West news pop        | PROF: scaled at $17.50-$18.00         | +$50    | WIN     |
 | 4  | DWAC   | general | $16.00        | news-driven    | yes  | continuation move / breakout attempt  | STOP: reversal / scattered fills      | -$50    | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | breakout attempt at highs | n/a | failed breakout | $. | - | unknown | scalp |
+| 2 | - | - | - | vwap-reclaim | sub-vwap trap / micro-pullback entry | n/a | - | $. | - | unknown | scalp |
+| 3 | - | - | - | unknown | breakout / kanye west news pop | n/a | - | $. | - | unknown | scalp |
+| 4 | - | - | - | unknown | continuation move / breakout attempt | n/a | failed breakout | $. | - | unknown | scalp |
 
 SUMMARY:
 This was day two of a live trading broadcast from the All-Star Traders Summit, featuring Ross trading alongside five other professional traders (Chris, Manoli, Chess, Max, and Danny) in a collaborative, educational environment. The group discussed aha moments and trading psychology before the open, sharing insights on discipline, profit-taking, and loss management. Ross's trading was relatively cautious due to a weak gap scanner and slow market conditions. His first trade on ATXI at $4.20 was a failed breakout attempt, resulting in a small $77 loss. He found success with a sub-VWAP trap setup on OUR (likely an abbreviation in the transcript), capturing a $200 scalp. News-driven trades on TWAC and DWAC provided mixed results: TWAC (fueled by Kanye West/Trump partnership headline) generated approximately $50 profit with an entry around $16.50 and exits around $17.50-$18.00, while DWAC (Parlor news) experienced scattered fills and a $50 loss. Overall, Ross remained disciplined, prioritizing capital preservation over forcing trades in choppy morning conditions, demonstrating the risk management theme discussed pre-market.
@@ -328,6 +455,17 @@ TRADES:
 | 5  | XLTI   | biotech | $5.00         | high-day-momo  | no   | break of whole dollar level           | STOP: reversal - big red candle       | -$1,800 | LOSS    |
 | 6  | AIFF   | biotech | $11.00        | watching       | yes  | break over VWAP / continuation play   | PROF: scaled into open and after      | +$3,400 | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | holding strength ah / morning rip | n/a | - | $. | - | unknown | unknown |
+| 2 | - | - | - | vwap-reclaim | vwap reclaim / first pullback re-entry | n/a | - | $. | - | unknown | unknown |
+| 3 | - | - | - | unknown | break of consolidation resistance | n/a | reversal | $. | - | unknown | unknown |
+| 4 | - | - | - | unknown | dip re-entry / pullback bounce | n/a | - | $. | - | unknown | unknown |
+| 5 | - | - | - | whole-dollar-break | break of whole dollar level | n/a | reversal | $. | - | unknown | unknown |
+| 6 | - | - | - | vwap-reclaim | break over vwap / continuation play | n/a | - | $. | - | unknown | unknown |
+
 SUMMARY:
 Ross finished February 13 up $8,849.43 (his worst day of February, but still profitable—his prior worst day was $18,000). The majority of his gains came from AIFF (Firefly Neuroscience), a biotech that had exploded 250-300% the prior day on Nvidia AI partnership news. After hours the night before, AIFF had held 75% of the gain and showed ascending support, signaling strength into the next session. Ross took five distinct trades on AIFF between 6:45 a.m. and the 9:45 a.m. window, capturing roughly $7,600 of his daily profit. His early morning trades (7:15-9:15) on NRUP and XLTI resulted in losses totaling roughly $2,200 due to weak follow-through and reversals on lower-float biotech runners. BDRX (a stock with prior big moves) yielded a small $1,000 win. Ross emphasized his defensive trading approach on a day with fewer fresh gappers and reduced his position sizing due to the riskiness of second-day continuation plays. He noted that at $8,849, he fell short of his aggressive $20,000 daily goal but remained profitable above his $5,000 baseline goal and was tracking ~$32,000 daily average for the month ($228K YTD through February 13). Ross highlighted the psychological challenge of maintaining a $20,000-per-day average through slower market periods, noting that hot market days like the prior day must compensate for coming summer slowness.
 
@@ -354,6 +492,14 @@ TRADES:
 | 2  | PTGX   | general | $8.25-$8.34   | watching       | no   | first 5-min candle new high / entry   | STOP: failed breakout / early exit    | -$25    | LOSS    |
 | 3  | PTGX   | general | $7.72         | watching       | no   | second entry / ABCD setup anticipation| STOP: reversal - no follow-through    | -$60    | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | 2M | - | - | unknown | break of first pop / continuation | n/a | - | $. | - | unknown | scalp |
+| 2 | 2M | - | - | unknown | first 5-min candle new high / entry | n/a | reversal | $. | - | unknown | scalp |
+| 3 | 2M | - | - | abcd | second entry / abcd setup anticipation | n/a | reversal | $. | - | unknown | scalp |
+
 SUMMARY:
 Ross completed day two of his small account challenge finishing down $18.40 after commissions (up $12.20 before commissions), his first red day of the challenge. The gap scanner was weak out of the open with most leaders either too cheap or faded. SMIT, gapping on news of a $2M stock repurchase announcement, provided a quick $35 scalp when the stock broke over $4.00. However, the day's dominant action centered on PTGX, a higher-float (22-23M shares) stock that was a gap-down reversal play—a setup Ross typically avoids. The stock ripped from $5.40 to $6.43 without pullback, then halted at $7.48. Ross deliberately sat on his hands during this move despite watching it carefully, as the 43-cent pullback and higher float created excessive risk he couldn't manage properly. Upon resumption from the halt, the stock moved to $8.34, and Ross entered with 300 shares expecting a continuation breakout over $7.88. The stock briefly hit $8.50 but then reversed sharply, forcing him to exit at $7.51 for a -$25 loss. Emotionally frustrated by FOMO, Ross regrouped and took a second PTGX entry at $7.72 anticipating an ABCD five-minute pattern with a break over $7.88, but the stock failed to follow through and he stopped out at the bid for a -$60 loss. Ross emphasized that while breaking his rule to sit on sidelines would have been profitable short-term, his disciplined approach protected his account. The red day triggered his rule to immediately stop trading.
 
@@ -379,6 +525,14 @@ TRADES:
 | 1  | EV     | general | $3.00         | gap-scanner    | no   | break of resistance / heavy seller    | PROF: quick exit at heavy ask         | +$55    | WIN     |
 | 2  | IDXG   | general | $8.82         | high-day-momo  | no   | momentum attempt / breakout           | STOP: failed breakout / quick loss    | -$14    | LOSS    |
 | 3  | HMNY   | general | $3.55         | watching       | no   | former runner / breakout over $3.50   | PROF: quick scalp at $3.70            | +$150   | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | break of resistance / heavy seller | n/a | - | $187 | - | unknown | scalp |
+| 2 | - | - | - | unknown | momentum attempt / breakout | n/a | reversal | $187 | - | unknown | scalp |
+| 3 | - | - | - | unknown | former runner / breakout over $3.50 | n/a | - | $187 | - | unknown | scalp |
 
 SUMMARY:
 Ross completed day two of his small account challenge (starting balance $500, now ~$900) finishing up 26% or $87.99, bringing his combined account profit to $187 across both his small account and larger trading account. This was his fourth consecutive winning trade. The day demonstrated patience and quality-over-quantity trading: he watched several high-momentum runners (IDXG, OXY) pop up but sat on his hands when he lacked buying power or margin, avoiding the frustration of missed opportunities. His first trade, EV, gapped from $0.98 to nearly $3.00 on strong premarket volume. Ross entered at $3.00 anticipating a break of the 50,000-share seller resistance, but quick profit-taking pressure emerged as the heavy ask at $3.10 never allowed the stock to hold. He exited at $3.07 for a quick +$55 profit, narrowly avoiding the stock's sharp reversal to $2.82. A small $14 loss on IDXG served as a reminder of his portfolio management rule. The standout trade was HMNY, a former runner identified by a chat room member as suddenly popping up. Entering at $3.55 (slightly high), Ross immediately set a 10-cent profit target using a custom hotkey (Ctrl+P), capturing $150 before the stock could consolidate. Ross emphasized his disciplined approach: in a small account with six times leverage, even a $300 loss would be catastrophic relative to his $700 equity, requiring him to focus on multiple small wins ($50-$150 per trade) rather than swinging for larger targets.
@@ -407,6 +561,15 @@ TRADES:
 | 3  | HSDT   | general | $2.54         | watching       | no   | false breakout / dip attempt          | PROF: quick exit near VWAP           | +$4,000 | WIN     |
 | 4  | HSDT   | general | $2.60         | watching       | no   | second pullback / anticipation entry  | STOP: reversal - no follow-through    | -$600   | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 96% | - | unknown | break of resistance / consolidation | n/a | - | $10 | - | unknown | unknown |
+| 2 | - | 96% | - | dip-buy | dip buy / retest support | n/a | - | $10 | - | unknown | unknown |
+| 3 | - | 96% | - | unknown | false breakout / dip attempt | n/a | - | $10 | - | unknown | unknown |
+| 4 | - | 96% | - | unknown | second pullback / anticipation entry | n/a | reversal | $10 | - | unknown | unknown |
+
 SUMMARY:
 Ross finished day two of his Martha's Vineyard trading challenge up $9,600 (revised from initial report of $9,200), exceeding his entire two-week profit target in just two days of trading. He had set a daily goal of $1,000, hoping to make approximately $10,000 over the full two-week vacation trip. Trading alone with HSDT, a 96% gapper, Ross demonstrated disciplined patience and willingness to sit on sidelines. Early in the morning, HSDT consolidated below $2.00, and Ross initially passed despite it being the leading-gapper candidate. When sellers started being absorbed and the stock broke through $2.00 with force, Ross jumped in and rode the momentum surge to $2.45 and beyond, capturing his largest win of ~$3,500. He then re-entered on subsequent dips, scoring another ~$800 profit on a VWAP bounce and a third ~$4,000 win on a false breakout reversal entry. On his final trade, attempting to capitalize on the second pullback near $2.60 anticipating movement toward $3.00, the stock reversed sharply and flushed, resulting in a -$600 loss. Ross immediately cut losses and shut down his screens, adhering to his vacation-trading philosophy of "get in, get green, shut it down." He emphasized bearing market frustration and noted his shift from pushing for large $50,000-$100,000 days (from earlier months) to being grateful for consistent base hits, reflecting realistic expectations for bear market conditions.
 
@@ -434,6 +597,15 @@ TRADES:
 | 3  | BJDX   | general | $4.30-$4.70   | watching       | yes  | break of resistance / starter add     | PROF: scaled on dips / double bottom  | +$20,000| WIN     |
 | 4  | BJDX   | general | $4.90-$5.20   | watching       | yes  | large buyer confirmation / adds       | PROF: scaled to highs $5.48           | +$17,000| WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | dip-buy | dip buy / micro-pullback entry | scaled entry | - | $4.70 | - | unknown | short |
+| 2 | - | - | - | unknown | dip re-entry / continuation break | scaled entry | - | $4.70 | - | unknown | short |
+| 3 | - | - | - | unknown | break of resistance / starter add | scaled entry | - | $4.70 | - | unknown | short |
+| 4 | - | - | - | unknown | large buyer confirmation / adds | scaled entry | - | $4.70 | - | unknown | short |
+
 SUMMARY:
 Ross completed day two of trader rehab, finishing up $42,000 and making significant recovery progress after a catastrophic $188,000 loss two days prior that resulted in a $196,000 red day. Trading exclusively BJDX, a stock that met his refined five-pillar selection criteria (low float, high relative volume, price $2-20, breaking news, strong technical setup), Ross demonstrated disciplined focus and emotional recovery. BJDX gapped from $2.50 and squeezed to $5.50 in the opening 45 minutes, with Ross methodically entering on dips and adding on resistance breaks. His starter position at $3.50 was followed by a second entry near $4.00, then a larger position build starting at $4.55 following a double-bottom reversal and spotting a large buyer. He scaled adds aggressively on breaks of $4.70, $4.90, and through $5.00, exiting the bulk of his position as the stock formed a doji at the $5.48 high. After 7:30 a.m., despite multiple scanner alerts, Ross demonstrated discipline by refusing to trade GLTO (the stock responsible for his $188,000 loss two days prior), recognizing that emotional involvement and lower relative volume made it unsuitable despite its squeeze. No new stocks met his stringent criteria thereafter, so he ended the session at nearly 60% recovery of his drawdown. Ross emphasized the psychological shift from deficit mentality (being down $196K) to confidence-building recovery (now down ~$100K for the week) as the true victory.
 
@@ -457,6 +629,12 @@ TRADES:
 | #  | SYMBOL | SECTOR  | PRICE      | SCANNER        | NEWS | ENTRY SETUP                    | EXIT                              | RESULT   | OUTCOME |
 |----|--------|---------|------------|----------------|------|--------------------------------|-----------------------------------|----------|---------|
 | 1  | RGSE   | general | $6.00-6.50 | premarket-scan | no   | break of 550 / FOMO add at 6.50 | STOP: reversal - dropped to 4.10  | -$5,652  | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | break of 550 / fomo add at 6.50 | added on move | stop loss | $25 | - | unknown | unknown |
 
 SUMMARY:
 Ross closed Day 20 with a -$5,652 loss on a single aggressive trade in RGSE, his first red day of the $583-to-$25k challenge. The stock had been yesterday's star performer, turning $166,000 profit when he entered at $4.40 and rode it to $5.86. Pre-market it gapped up to $6.20, triggering Ross's plan to watch for a break of the $6 handle into $7. He intended to wait for a pullback but received only a 200-share partial fill at his initial $6 limit order. Frustrated by the small size, he chased the move by adding 6,000 shares at $6.50 despite being down only cents—a pure FOMO entry that violated his own rules. The stock immediately reversed, dropping to $4.10 within minutes. His mental stop turned emotional; he held hoping for a red-to-green move like a previous win on DFFN, but instead took a catastrophic loss at $5.75. Despite the setback, Ross remained net positive on the week (+$3k) and month (+$42k), allowing him to weather the loss. He explicitly acknowledged breaking his FOMO rule by chasing after a partial fill and committed to waiting for pullbacks in future trades. The session highlighted the volatility of RGSE as both best and worst trade opportunity of the week, and reinforced how position sizing at scale can amplify poor execution.
@@ -483,6 +661,14 @@ TRADES:
 | 1  | HMNY   | general | $0.77-0.90 | gap-scanner    | yes  | gap up 9% / break 200ma / dips | PROF: scaled at 5.25 and 5.33    | +$3,500  | WIN     |
 | 2  | PLUM   | general | $2.65-2.70 | high-day-momo  | no   | first candle new high / dip    | STOP: failed-breakout - big seller| +$400    | WIN     |
 | 3  | ETRM   | general | $6.95-7.34 | high-day-momo  | no   | 1min pullback / break moving av | STOP: resistance - 40k seller 78 | +$779    | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 9% | - | unknown | gap up 9% / break 200ma / dips | added on move | - | $. | - | unknown | unknown |
+| 2 | - | 9% | - | unknown | first candle new high / dip | added on move | failed breakout | $. | - | unknown | unknown |
+| 3 | - | 9% | - | unknown | 1min pullback / break moving av | added on move | failed breakout | $. | - | unknown | unknown |
 
 SUMMARY:
 Ross rebounded on Day 21 (February 1st) with a +$4,343 green day after yesterday's -$5,652 loss. He opened at $16,596 with intentional focus on avoiding revenge trading while channeling his competitive energy into quality setups only. HMNY gapped 9% on news and consolidated under $5 pre-market—the inverse of yesterday's failed RGSE setup. He entered at $0.77 adding through $0.90 on the break of the 200-period moving average, capturing two complete pullback trades up to $5.25-$5.33 for $3,500 profit. PLUM squeezed from $2.20 to $2.83 on the scanner but hit a 20,000-share seller at $2.80; he entered on the dip at $2.65-$2.70 and exited at $2.80 for $400 profit, missing a subsequent break above resistance. ETRM, curling off red days, touched his high-day momentum scanner at $6.60; he waited for the pullback instead of chasing, entered at $6.95, rode it to $7.34-$7.78 but encountered a 40,000-share seller at $7.80 causing indecision (doji candles). He exited at market for $779 profit rather than chase. Despite trading three stocks, he took 3-4 commissions each with $350 total commissions and ECN fees, yet remained disciplined on sizing and pullback entries. The session restored $3,400 of yesterday's loss and kept him net positive for the week, reinforcing that quality setup selection and patience on partial fills matter more than size.
@@ -511,6 +697,15 @@ TRADES:
 | 3  | BNTC   | general | $2.50-4.33 | high-day-momo  | no   | first spike / multiple pullback| PROF: multiple 5min entries     | +$3,877  | WIN     |
 | 4  | APOP   | general | $3.87-5.71 | high-day-momo  | no   | high day scanner spike / gap   | STOP: reversal - faded move     | -$1,750  | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | first spike / pullback break | added on move | - | $. | - | unknown | scalp |
+| 2 | - | - | - | unknown | break 200ma / first new high | added on move | - | $. | - | unknown | scalp |
+| 3 | - | - | - | unknown | first spike / multiple pullback | added on move | - | $. | - | unknown | scalp |
+| 4 | - | - | - | unknown | high day scanner spike / gap | added on move | reversal | $. | - | unknown | scalp |
+
 SUMMARY:
 Ross achieved his biggest day of the challenge (+$14,805) on Day 22, crossing over the $25,000 threshold required to trade with a US broker. He opened at $21,000 and closed near $35,000, with combined profits of +$22,000 across both accounts. After Tuesday's brutal -$13,000 loss and Wednesday's +$4,500 rebound, he approached today aggressively searching for a stock to "sink his teeth into." PLUM squeezed from pre-market lows into a high-day momo scanner spike; he jumped into the one-minute scalp at $5.00-$5.25 and rode it to $5.51, capturing $2,200 on two quick trades. NAKD appeared on scanner at $1.60, consolidating near its 200-period moving average; he entered the break at $1.60-$1.75, captured the pullback first-candle-new-high move to $1.97, and exited for $2,500 profit. BNTC was a former runner breaking over the 200ma with halt + resumption; he entered at $2.50, rode the spike to $4.33, and used two subsequent 5-minute pullback first-candle breakouts for additional entries, totaling $3,877 profit. APOP, the largest position, entered on high-day scanner at $3.87-$4.20 candle, squeezed to $5.71 where he sold, but the stock reversed hard (faked out by sellers stacked above), losing -$1,750 on the exit. Net result was four highly correlated opportunities (all former runners, all on high-day scanner, all breaking 200ma) with three strong wins and one failed reversal. He emphasized that trading the 5-minute pullback is safest; one-minute entries require speed and precision but can miss parabolic moves (like RGSE on Monday). The session demonstrated his ability to scale size when setups align, reaching milestone $25,000 after just 22 trading days.
 
@@ -535,6 +730,13 @@ TRADES:
 |----|--------|---------|------------|----------------|------|--------------------------------|-----------------------------------|----------|---------|
 | 1  | APDN   | general | $11.57-12+ | premarket-scan | no   | gap up / dip entries / VWAP bre| PROF: multiple dips and breakout | +$6,000  | WIN     |
 | 2  | RVP    | general | $3.95-4.32 | high-day-momo  | no   | break of 4.00 / pull back entry | PROF: quick scalps              | +$300    | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 90% | - | vwap-reclaim | gap up / dip entries / vwap bre | added on move | - | $8 | - | unknown | scalp |
+| 2 | - | 90% | - | unknown | break of 4.00 / pull back entry | added on move | - | $8 | - | unknown | scalp |
 
 SUMMARY:
 On May 4th (Day 23), Ross closed +$6,000 on APDN, continuing a strong green streak that now spans 20+ consecutive days. He opened near $112,000 (net positive since last red day: ~$106,000). APDN gapped up 90% pre-market; anticipating bag holders from prior failed attempts (where stock had dropped from $8 to $4 previously), Ross expected immediate profit-taking followed by retest moves. His thesis proved partially correct: the stock opened, pulled back slightly, then attempted multiple breakouts of the VWAP and volume-weighted average price without sustained follow-through. He took multiple dip entries near $11.57-$11.60, riding bounces back through $12.00, capturing small $100-150 scalps on each bounce. However, the stock failed to break and hold above $12+ for extended momentum, instead flushing down to $10.38-$10.48 where he tried additional dips but suffered two small losses (-$100, -$600) before re-entering at the $9.69 low for final profit capture. By session end, he netted $6,000 on APDN despite giving back some mid-trade profit. RVP appeared on high-day-momo scanner early but felt weak on float; he traded it mechanically but missed key breakouts, capturing only $300. He notably stayed disciplined, walking away after APDN's flushed attempts rather than overtrading the 5-minute consolidation (doji candles indicated indecision). The session reinforced his principle: when deep in a stock's level-2 tape, don't watch multiple names. Focus single-stock trading is yielding better risk/reward. He now sits at approximately $121,000 YTD with April gross profit of $92,000 net, demonstrating the power of extended green streaks in volatile momentum trading.
@@ -563,6 +765,15 @@ TRADES:
 | 3  | DYAI   | general | $7.00-7.12 | high-day-momo  | no   | break 7.00 / dip bounce        | PROF/LOSS: mixed small scalps   | ~$0      | BE      |
 | 4  | CLSK   | general | $5.00-5.60 | high-day-momo  | no   | pullback bounce entry          | STOP: failed entry / slippage   | -$100    | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 58% | - | unknown | gap up 58% / multiple dips | added on move | - | $4.40. | - | unknown | scalp |
+| 2 | - | 58% | - | unknown | break premarket high | added on move | - | $4.40. | - | unknown | scalp |
+| 3 | - | 58% | - | unknown | break 7.00 / dip bounce | added on move | - | $4.40. | - | unknown | scalp |
+| 4 | - | 58% | - | unknown | pullback bounce entry | added on move | stop loss | $4.40. | - | unknown | scalp |
+
 SUMMARY:
 On Day 24 (May 5th), Ross closed +$1,300 but described it as his worst day in two weeks, marking the 24th consecutive green day on a weak follow-through of gappers. He botched his first two trades on GNPX, the primary focus: jumped in for the breakout at $3.74-$3.79 and got faked out for 2-cent profit, then accidentally hit Ctrl+Z while repositioning at keyboard, selling a dip entry at $4.01 for breakeven just before the stock ripped to $4.40. He then took a third loss buying the flush at $3.85 for -10 cents, putting him red on the day. Spending the rest of the morning digging out, he captured dips and breakouts back up to $4.40, eventually climbing +$2,800 before losing back ~$1,500 on final trades (one being a 7,500-share VWAP bounce that flushed through for a full 10-cent stop). VIS gapped up off the watchlist; he entered the premarket-high breakout at $7.70-$8.50 for +$100 quick scalp. DYAI and CLSK were low-conviction trades with poor fills (CLSK's limit order got filled 10 cents worse than intended). His largest loss of the day was the VWAP bounce (-$750). The session demonstrated the tension between conviction-sizing on breakouts versus adding into flushes when already in position; GNPX's weakness (despite 58% gap) meant fewer clean opportunities compared to prior days' 5-min pullback setups. He remains 3 days into May at approximately $15,300 profit ($4k + $6k + $1.3k), maintaining his extended hot streak through March-May but acknowledging that without big momentum followthrough, consolidation days yield smaller profits. His stats: 80% accuracy, 4-minute average winner, fastest losses under 1 minute; May YTD has 50 trades.
 
@@ -589,6 +800,14 @@ TRADES:
 | 2  | PLUM   | general | $4.80-5.10 | premarket-scan | no   | dip entry / second 5min setup  | STOP: failed follow-through     | +$70     | WIN     |
 | 3  | OPPT   | general | $3.19-3.47 | gap-scanner    | yes  | gap up on news / breakout buy  | PROF: mixed follow-through     | +$500    | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | 1min pullback break 20ma | n/a | - | - | - | unknown | unknown |
+| 2 | - | - | - | unknown | dip entry / second 5min setup | n/a | stop loss | - | - | unknown | unknown |
+| 3 | - | - | - | unknown | gap up on news / breakout buy | n/a | - | - | - | unknown | unknown |
+
 SUMMARY:
 FILE 0625 is an Educational video discussing market momentum and psychological resilience in trading, woven around a Super Bowl 51 analogy. Ross closed Friday (Day 24) +$932 on three partial setups: ETRM's pullback entry yielded +$70 profit after failing at $8; PLUM's second 5-minute setup also yielded +$70 as it sold off after the first pull-back succeeded; OPPT (former runner, gapped on news) showed chopping action and delivered only +$500-$600 despite 4,000-share position and reaching $3.47. The primary teaching moments: (1) trading daily chart resistance windows before entering, (2) understanding momentum shifts when in "deficit mode," (3) psychological parallels to football (Patriots comeback from 28-3 down mirrors how traders recover from losses), (4) the importance of staying focused on process rather than P&L when emotional. Ross emphasizes that his single red day (-$5,600 on Day 20) nearly broke his mentality but became fuel for a +$37,000 week. Now at +$42,000 YTD (Day 24), he's 42% toward his $100k goal. Discussion covers: moving-average windows (9/20/50/200), stale order detection on Level 2, simulator limitations (5k share max), and why position sizing matters for beginner traders. The session reinforces that trading is a marathon requiring mental resilience and that setups with clean daily resistance windows (stocks above 200ma with multiple-level pullback opportunities) offer the safest risk/reward profiles. Trading weak gaps above the 200ma creates crowded resistance and reduces win probability.
 
@@ -612,6 +831,12 @@ TRADES:
 | #  | SYMBOL | SECTOR  | PRICE      | SCANNER        | NEWS | ENTRY SETUP                    | EXIT                              | RESULT   | OUTCOME |
 |----|--------|---------|------------|----------------|------|--------------------------------|-----------------------------------|----------|---------|
 | 1  | XRF    | general | $2.00-3.06 | gap-scanner    | no   | gap up 123% / multiple pullback| PROF: multiple entries/exits    | +$8,652  | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | 5.88M | 123% | - | unknown | gap up 123% / multiple pullback | added on move | - | $9 | - | unknown | scalp |
 
 SUMMARY:
 On Day 25 (May 6th, consecutive green day 25), Ross focused entirely on XRF after it gapped 123% on the scanner with 5.88 million share float. He identified two pre-market entry zones: breakout above 227 (pre-market pivot) or 240 (pre-market high). His game plan centered on buying pullbacks to the VWAP and taking dip entries near the 9-period moving average. His first trade dipped at 214 with 900-share stop, targeting a break of 220; he was filled at 213 expecting 206, then flushed and re-entered at the dip for another scalp. Building confidence as the stock ripped, he took multiple micro-pullback dips as volume continued coming in, with each pop higher reaching 225, 240, 250, 260. His largest position (13,000 shares at ~$2.90) was taken when XRF was up 187% and dipped to the 9-period moving average at $2.65-$2.68; with only a 10-cent stop, he captured the pop to $3.06 for ~$1,900 profit on that single trade. He also attempted a dip around $2.10 pre-open and added for a break of $3.00, getting a partial fill on the high-of-day breakout. Additional wins included dips in the $2.55-$2.65 range that bounced to $2.94-$2.96. Total day: +$8,652 on XRF alone. He compared two gappers: XRF (6M float, tight spreads, 41M volume, smooth trending structure) versus AXLA (gapping only 23%, 15-cent spreads, lighter volume), choosing to concentrate on the stronger setup. He emphasized discipline: when focused on one stock with strong structure, fewer opportunities are missed. His approach: start with small size (6k shares), build a profit cushion, then increase to 10-13k shares once green. YTD: 117,000 profit since last red day; 5-year stats show 6,000 trades averaging +990 loss, currently cutting losses to ~$500-$700 range; 80% accuracy month-to-date vs. 68% annual average.
@@ -638,6 +863,14 @@ TRADES:
 | 1  | IO     | general | $3.47-4.25 | gap-scanner    | no   | gap up 100% / multiple dips    | PROF: dip trades + breakout    | +$8,000  | WIN     |
 | 2  | PIXIE  | general | $7.50-8.00 | high-day-momo  | no   | VWAP break / dip bounce        | STOP: reversal - flushed lower  | -$2,500  | LOSS    |
 | 3  | TTPH   | general | $2.95-3.50 | high-day-momo  | no   | VWAP break / dip entry add     | STOP: failed pop on dip add     | -$800    | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | 12M | - | - | unknown | gap up 100% / multiple dips | added on move | - | $4.20 | - | unknown | unknown |
+| 2 | 12M | - | - | vwap-reclaim | vwap break / dip bounce | added on move | failed breakout | $4.20 | - | unknown | unknown |
+| 3 | 12M | - | - | vwap-reclaim | vwap break / dip entry add | added on move | failed breakout | $4.20 | - | unknown | unknown |
 
 SUMMARY:
 On Day 26 (consecutive green day 26), Ross closed +$11,921 despite two larger losing trades. IO was the leading gapper (+100%) with 12M share float and 40M volume—the thickest, cleanest setup. His opening trade at $3.47-$3.50 captured the initial break above pre-market high, riding it to $4.20, then dipped at VWAP and added 8k shares at $4.00, eventually scaling out at $4.20-$4.25 for his largest single win (approx $1,900+). Later he added 13,000 shares ($4.00 entry) and held for the break of $4.25 (high of day), eventually selling into strength for an additional ~$1,000+. However, a panic drop on IO flushed him out at $3.71 for an $800 loss when he expected a bounce (bought at $3.84, sold at $3.71). PIXIE broke VWAP with initial strength but failed to hold; his starter 2,300 shares at $7.80 saw the stock grind lower to $7.00 despite waiting for the anticipated bounce. He cut the loss at $7.50, suffering a -$2,500 total loss. Analysis: lighter volume, bigger spreads, and trading below VWAP created compounded risk ("triple risk" per Ross). TTPH's pullback entry at $2.36 initially worked (pop to $3.42), but his add-on entry at $2.20 (adding 12k more shares) saw the stock flush below entry and close at $2.30 for an $800 loss. His biggest concern: dip trades (relatively new to his strategy) had larger losers when they failed versus his usual breakout trades. Despite accuracy at 80% (1,500 winning trades vs breakeven), larger losing trades on failed dips offset some gains. He emphasized: never trade expensive stocks like MGNX ($23-$30 range, big spreads, lower volume) where slippage destroys profitability. YTD since last red day: ~$129,000 profit. Week 2 of May (27,300) slightly behind Week 1 of May (33,000) but still exceptional.
@@ -666,6 +899,15 @@ TRADES:
 | 3  | XGTI   | general | $2.15-2.20 | high-day-momo  | no   | 1min pullback dip entry        | STOP: failed hold               | -$211    | LOSS    |
 | 4  | AEHR   | general | $2.70-3.40 | high-day-momo  | no   | first + second 5min pullbacks  | PROF: multiple entries/exits   | +$3,500  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | gap up 46% / third pullback | added on move | - | $2 | - | unknown | short |
+| 2 | - | - | - | unknown | gap up 31% / chased breakout | added on move | - | $2 | - | unknown | short |
+| 3 | - | - | - | unknown | 1min pullback dip entry | added on move | stop loss | $2 | - | unknown | short |
+| 4 | - | - | - | unknown | first + second 5min pullbacks | added on move | - | $2 | - | unknown | short |
+
 SUMMARY:
 On Day 26 (Day 26 of the broader timeline, concurrent with another Day 26 discussed in 0627), Ross closed +$10,571 in a frustrated but ultimately aggressive trading session. He opened with a messed-up account balance (moved to Speed Trader, losing visibility of afternoon P&L from prior day, down $2,600 in equity). Emotionally agitated (broken glass, tech issues, dog barking), he channeled frustration into aggressive positioningwith larger share sizes. DFFN gapped +46% on news, hitting the top of the gap scanner; identifying it as a potential parabolic, he entered what he thought was the first pullback at $6.21 but realized post-trade it was actually the third pullback. Despite this mistake, he built to 17,500 shares and captured a $10k unrealized gain before selling on the 200ma break ($6.40-area), locking $4,700 profit. APOP similarly gapped +31% on news; he chased the move ($5.75-$6.15 initial, added $6.63 at high-of-day), built 10-12k shares, but the stock refused to break $7 (target was $7.88 resistance-free zone). Sold into strength for +$2,900 despite having $10k+ unrealized profit. XGTI appeared on high-day scanner; he dip-bought at $2.15 on the pullback, targeting $2.20-$2.25, but the stock rolled over immediately—took -$211 loss on 3,000 shares. AEHR was the cleanest win: strong pop from $2.20 to $2.97, first 5-minute pullback entry at $2.70 with 15k shares (target $3.00), saw the pop to $3.09 with a 10k-share seller at $3.40. Added on the second pullback (entry $3.16-$3.33, sold $3.40), locking $3,500 profit. Account now at $55,000 (55% toward $100k goal, from $583 start on Jan 1). YTD profit across accounts: ~$88,000 in 26 days (~$23k/day average). Ross reflects on aggressive positioning when frustrated but disciplined (knowing max loss, not holding losers); recognizes the danger of third-pullback trades (DFFN, APOP both disappointed where first-pullback setups (AEHR) delivered cleaner gains.
 
@@ -692,6 +934,15 @@ TRADES:
 | 2  | VUZI   | general | $2.85-3.08 | gap-scanner    | yes  | news catalyst / false breakout | PROFIT: small gain on bounces   | +$336    | WIN     |
 | 3  | PTGX   | general | $13.50-14+ | high-day-momo  | no   | halt resume + dip bounces      | STOP: reversal - flushed lower  | -$551    | LOSS    |
 | 4  | MRAM   | general | $4.00-4.50 | high-day-momo  | no   | dip entry 1 / dip entry 2      | STOP: failed reversal           | -$896    | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | gap + premarket high break | added on move | - | $27 | - | unknown | scalp |
+| 2 | - | - | - | unknown | news catalyst / false breakout | added on move | - | $27 | - | unknown | scalp |
+| 3 | - | - | - | halt-resume | halt resume + dip bounces | added on move | failed breakout | $27 | - | unknown | scalp |
+| 4 | - | - | - | unknown | dip entry 1 / dip entry 2 | added on move | failed breakout | $27 | - | unknown | scalp |
 
 SUMMARY:
 On Day 27 (Friday, final day of the week), Ross closed +$617 to continue his 27th consecutive green day streak, but called it his "wildcard Friday" characterized by slow momentum and choppy price action. FTECH was the leading gapper, gapping modestly but providing his only strong trade: he bought the premarket-high break at $1.23 and rode the squeeze to $1.35 ($.35 after halt-resume to $1.49), capturing +$1,700 on the initial entry. Two follow-up dip-entry attempts ($1.25 and $1.28 re-entries) failed; both losses gave back ~$500 combined but didn't offset the opener. VUZI came out with news catalyst around 9:16 AM; he entered at $2.85 anticipating a squeeze to $3.00, caught the pop to $3.08 but then took two consecutive false-breakout losses as it repeatedly tapped $3.05-$3.06 and pulled back. Net small profit: +$336. PTGX was "worst trade of the day"—a light-volume halt-resume stock outside his typical range; he started with 200 shares at $13.50 (sold at $14+ for small win), then re-entered with 250 shares on the dip, kept adding size as it flushed further, and held through a halt-down. Upon resumption at $13.62, he added and sold at $13.11 for a -$551 loss. MRAM presented 400k shares in a single candle at $4.40, prompting a 3,000-share entry; it tapped $4.45, pulled back, and he stopped out at $4.10 for a small loss. Attempting a second dip-entry at $4.00 ($1,500 shares), the stock dropped further to $3.80, flushed to support at $3.65, and he cut losses at -$896 rather than add (which would have been +$2,400 if he'd averaged down, but he correctly recognized weak momentum). Four total trades, 2 wins / 2 losses, 50% accuracy (below his usual 70-80%). He walked away when he recognized the leading gapper (FTECH) had failed to hold momentum, signaling a weak market day. YTD since last red day: $130,000. Weekly total: $27,000 (after Monday's $12k + Tuesday's $8.6k + Wed's $8.5k + Thursday's $11.9k + Friday's $0.6k = $41.2k but numbers suggest ~$27k for this specific week). May MTD: $37,000 with 80% accuracy. He emphasizes: cutting losses quickly when momentum fails is smarter than averaging down in weak markets; recognizing "weak Friday" versus "hot Friday" is critical to decision-making.
@@ -722,6 +973,17 @@ TRADES:
 | 5  | AMC    | general | $4.92-5.05 | premarket-scan | no   | bounce off 200ma support       | PROF: quick scalp at $5.05       | +$64     | WIN     |
 | 6  | CLBS   | general | $2.50-2.60 | high-day-momo  | no   | momentum squeeze entry         | STOP: reversal - flushed lower   | -$692    | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | dip-buy | dip buy off $5 support / add | n/a | - | $6.89 | - | unknown | scalp |
+| 2 | - | - | - | unknown | consolidation dip entry | n/a | failed breakout | $6.89 | - | unknown | scalp |
+| 3 | - | - | - | dip-buy | flush dip buy off support | n/a | - | $6.89 | - | unknown | scalp |
+| 4 | - | - | - | unknown | momentum pop / breakout entry | n/a | - | $6.89 | - | unknown | scalp |
+| 5 | - | - | - | unknown | bounce off 200ma support | n/a | - | $6.89 | - | unknown | scalp |
+| 6 | - | - | - | unknown | momentum squeeze entry | n/a | failed breakout | $6.89 | - | unknown | scalp |
+
 SUMMARY:
 On Day 28 (Monday, 28 consecutive green days), Ross finished up $4,224, his primary focus on the leading gapper APOP which gapped 118 percent on biotech positive data. Despite being a known stock with a history of gap fades, APOP presented strong daily technical setup with room to $6.89 and support at $4.30. The trading was choppy and irrational, with constant squeezes and flushes reflecting a dynamic between aggressive short-sellers and FOMO-driven longs. Ross's first entry at $5.00 capitalized on the dip bounce off the whole-dollar psychological level, scaling out at $5.28-$5.12 for +$645 profit. A second consolidation entry at $4.87-$4.92 targeting a break over $5.00 failed as the stock reversed; he cut the loss at -$120 before it flushed further. His biggest win came on the third dip entry, buying the panic flush down to $4.30 and riding it back up to $4.60 for +$2,700, demonstrating strong risk management by holding that level as a hard stop. CMT hit the high-day momentum scanner and he scalped it for +$960 on the initial pop. AMC offered a small +$64 win on a bounce off the 200-day moving average. CLBS was his worst trade: a momentum squeeze that ripped from $2.50 to $2.60 but then catastrophically flushed to $1.92 (his panic-stop at $2.18 cost -$692). Despite going down $500 early (after CLBS loss), Ross managed his psychology well, recognizing the temptation to oversize and revenge-trade on a 28-day hot streak. He stopped trading at 11:06 AM after the final flush, avoiding the trap of forcing trades into declining momentum. The day exemplified his approach: fast platform execution, tight stops, size management linked to conviction, and recognition of when irrational volatility offers dip-buy opportunities versus traps.
 
@@ -747,6 +1009,14 @@ TRADES:
 | 1  | KBSF   | general | $5.50-6.60 | premarket-scan | no   | reverse split squeeze momentum | PROF: added on halt resume       | +$2,300  | WIN     |
 | 2  | KBSF   | general | $8.20      | watching       | no   | first 1-min pullback add        | STOP: reversal - missed target   | -$80     | LOSS    |
 | 3  | KBSF   | general | $8.45-7.00 | watching       | no   | first 5-min new high entry      | STOP: reversal - liquidated     | -$11,000 | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | reverse split squeeze momentum | added on move | - | $40 | - | unknown | short |
+| 2 | - | - | - | unknown | first 1-min pullback add | added on move | stop loss | $40 | - | unknown | short |
+| 3 | - | - | - | unknown | first 5-min new high entry | added on move | stop loss | $40 | - | unknown | short |
 
 SUMMARY:
 On Day 28 of the $100K challenge, Ross closed down $5,370 on three trades (finishing Friday with a red day), a disappointing conclusion to a week that started at $40,000 and ended at $45,000 (still up $5,000 for the week). KBSF was a recent 15:1 reverse split stock that he watched the prior day but hesitated entering at the open due to light volume (45,000 shares) and a $5 spread. When the spread widened from $5.20 to $5.40-$5.50, he placed orders twice but received only an 85-share fill (the stock halted up to $6.41 at that point). He added in the $6-$7 range after the halt resumed higher and banked +$2,300 on the early position. Seeking a clean 1-minute pullback add, he entered 1,000 shares at $8.20 for a target of $9, but the stock reversed immediately, topping at $8.10 and losing -$80. The critical mistake came in the third entry: viewing KBSF as a clean 5-minute setup (first candle to make a new high over $8.45, similar to a MYOS trade that worked for +$3,000 on Wednesday), he aggressively entered 7,500-11,000 shares expecting a potential 50-cent runner to $9-$9.50 (target: $25-$30K profit). The stock popped to $8.63, pulled back to $7.20, and he was forced to liquidate in panic down to $7.10 with slippage, losing -$6,000 (approximately -$11,000 total on the third entry). Though the stock eventually rallied to $10+, he could not hold through the pullback. Ross reflects on profit-to-loss ratios (risking $6K for potential $25-30K), accepting two red days after a hot streak but noting he needs to tighten execution—limit share size on 1-minute setups, get out at breakeven rather than chasing consolidations, and focus on 5-minute setups which he views as more reliable.
@@ -779,6 +1049,19 @@ TRADES:
 | 7  | NVAX   | general | $9.75-10.60 | watching       | no   | consolidation, reeentry dip    | PROF: scaled into and out       | +$700    | WIN     |
 | 8  | GRUB   | general | $60.75-63.00| high-day-momo  | yes  | red-to-green, break of 61      | PROF: added at 62-63, exit high | +$777    | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | 10M | - | - | unknown | gapped 147% / breakout entry | added on move | stop loss | $12 | - | unknown | scalp |
+| 2 | 10M | - | - | unknown | multiple small adds/scalps | added on move | - | $12 | - | unknown | scalp |
+| 3 | 10M | - | - | unknown | dip entry on momentum scanner | added on move | stop loss | $12 | - | unknown | scalp |
+| 4 | 10M | - | - | unknown | premarket watchlist entry | added on move | - | $12 | - | unknown | scalp |
+| 5 | 10M | - | - | dip-buy | dip buy / break of 10.00 | added on move | - | $12 | - | unknown | scalp |
+| 6 | 10M | - | - | unknown | additional small trades | added on move | - | $12 | - | unknown | scalp |
+| 7 | 10M | - | - | unknown | consolidation, reeentry dip | added on move | - | $12 | - | unknown | scalp |
+| 8 | 10M | - | - | red-to-green | red-to-green, break of 61 | added on move | - | $12 | - | unknown | scalp |
+
 SUMMARY:
 On Day 29 (29 consecutive green days), Ross finished up $1,281 after commissions, but the day required him to trade until 12:20 PM (3 hours) to recover from being down $250 at 10:10 AM. CBAY was the leading gapper, up 147% on news, with 10M shares pre-market volume and a 68M share float. Ross caught it early and was up $2,500 by 10:00 AM on small-cap trades, but one catastrophic loss on CBAY destroyed the cushion: entering at $4.50 for a break over VWAP (4.30), the stock squeezed to $5.54, but Ross added on the pullback to 4.50 and the stock flushed through support to $4.08, costing him -$2,500 in a single trade. Down $250 at 10:10 AM, Ross made the conscious decision to over-trade and chase green setups to preserve his green streak, knowing the risk but believing he could find quality trades. CBAY produced small wins and losses (+$100 net). NINE hit the momentum scanner but he bought the dip too early, stopping out at -$400. STC was a premarket watchlist scalp (+$150). NVAX offered his best small-cap opportunity: dip-buying at $9.75, adding over $10.00, and riding it to $10.60 (+$741). Later, NVAX consolidated, he re-entered lower around $9.75-$10.00 area, and squeezed up over $10.50 to $10.60 (+$700). GRUB (news-driven on Uber acquisition reports) was hesitated on initially due to lack of cushion, but after the move consolidated, he traded it conservatively with 250-share size entries, adding at $61-$63, and exiting into strength for +$777. Despite commissions of ~$600 on C-Bay trades and total month ECN fees of $4K, Ross finished green and notes that while he over-traded (which beginners should avoid), his experience allowed him to remain disciplined enough to avoid FOMO-buying every scanner alert. He emphasizes the market was slower today, with momentum stronger in large-cap names (GRUB, NVAX) versus small-caps (CBAY).
 
@@ -810,6 +1093,19 @@ TRADES:
 | 7  | GLBS   | general | $8.30      | watching       | no   | consolidation add attempt      | STOP: breakeven, scratched      | $0       | BE      |
 | 8  | SOO    | general | $4.55-4.87 | high-day-momo  | no   | sympathy / first 5-min new hi  | PROF: small size scalp          | +$324    | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | gap up / early entry momentum | scaled entry | - | $5 | - | unknown | scalp |
+| 2 | - | - | - | unknown | first 5-min new high break | scaled entry | stop loss | $5 | - | unknown | scalp |
+| 3 | - | - | - | unknown | first daily candle new high | scaled entry | - | $5 | - | unknown | scalp |
+| 4 | - | - | - | unknown | first 5-min new high pullback | scaled entry | stop loss | $5 | - | unknown | scalp |
+| 5 | - | - | - | unknown | sympathy play / 5-min pullback | scaled entry | - | $5 | - | unknown | scalp |
+| 6 | - | - | - | unknown | first 5-min new high add | scaled entry | stop loss | $5 | - | unknown | scalp |
+| 7 | - | - | - | unknown | consolidation add attempt | scaled entry | stop loss | $5 | - | unknown | scalp |
+| 8 | - | - | - | unknown | sympathy / first 5-min new hi | scaled entry | - | $5 | - | unknown | scalp |
+
 SUMMARY:
 On Day 29 of the $100K challenge (Tuesday), Ross finished up $8,097 (after commissions) in a redemption day following two consecutive red days (lost $4K Thursday, $5K Friday). Starting at $45,000 in account equity (45% of the $100K goal), he strategically chose not to trade ZZZ (the leading gapper of the day despite 3.7M volume and a 5-minute move to 2.69) and instead focused on his watchlist picks. KBSF, which had crushed him for a -$6K loss the prior Friday, gapped up again from $16 pre-market high. Catching the open at $16, he saw it spike to $18 (up $4K unrealized) but hesitated, thinking it could squeeze to $18-30 similar to DRYS. Holding resulted in a flush to $15.21 in one candle; he exited at $18.00 levels for +$1,500 profit, disappointed he gave back most of the intraday gain. Adding for the first 5-minute candle new high break over $17 cost -$1,200 more. MYOS, on his watchlist for several days awaiting a first-daily-candle-new-high breakout, finally triggered: he entered at $4.00 (yesterday's high), rode it to $4.60 (+$4,426), but re-entered for a first 5-minute new high setup and stopped out at -$2,400. GLBS (a shipping stock showing sympathy with sector leaders like SOO, DRYS, EC) provided his best trade: waiting for a 5-minute pullback consolidation, he caught it at $7.50, rode it to $8.49 (+$5,700 on the big position). Two additional adds—one at $8.10 for a new high (stopped -$1,500) and another at $8.30 (breakeven)—gave back some but kept net GLBS positive. SOO (shipping sector leader with 13M volume) provided a small scalp at lower size (+$324). Eight total trades: 4 wins ($14,850), 4 losses ($6,100), netting $8,750 before commissions. Ross reflects that today, despite being choppy, represents recovery—he's scaled back after two red days, focusing on 5-minute setups per his rule. He notes his comfort with $8K days is due to increased share size (now 10-15K vs. 3K a year ago), making gains and losses proportionally bigger. He's 45% to goal, mid-race, emphasizing pace and consistency rather than aggression until he reaches 80%+ completion.
 
@@ -836,6 +1132,15 @@ TRADES:
 | 2  | SES    | general | $6.96  | gap-scanner    | yes  | break over $7.00 resistance    | PROF: scaled over resistance    | +$60     | WIN     |
 | 3  | IMAC   | general | $3.28  | high-day-momo  | no   | dip buy on pop, seeking retest | STOP: reversal, flushed lower   | -$50     | LOSS    |
 | 4  | HEPA   | general | $6.38  | high-day-momo  | no   | break of double top            | PROF: quick scalp on squeeze    | +$44     | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 14% | - | unknown | breakout over premarket high | n/a | - | $244 | - | unknown | scalp |
+| 2 | - | 14% | - | unknown | break over $7.00 resistance | n/a | - | $244 | - | unknown | scalp |
+| 3 | - | 14% | - | dip-buy | dip buy on pop, seeking retest | n/a | stop loss | $244 | - | unknown | scalp |
+| 4 | - | 14% | - | unknown | break of double top | n/a | - | $244 | - | unknown | scalp |
 
 SUMMARY:
 On Day 3 of the small account challenge (starting from $395 cash), Ross finished up $74.50 in a slower market day, bringing his three-day total to +$244 before commissions (approximately +$170 after ~$75 in commissions). With 4 trades taken, he improved to 7 wins and 2 losses across 9 total trades (77% accuracy). STAC was the first trade on the gap scanner with news and a daily window from $4.35-$5.49; he caught the breakout at $4.48 and exited quickly for +$21. SES gapped 14% on news (history as a former runner) and broke over the $7.00 resistance level; he entered under $7, rode it through $7.15, and scalped +$60. IMAC hit the high-day-momo scanner and looked like a dip opportunity, but he entered at $3.28 thinking it would test back to $3.50, only to have it flush all the way to $2.46; he cut losses at $3.28 for -$50. HEPA broke a double-top resistance and he caught the move at $6.38, exiting into the squeeze for +$44. Ross emphasizes that while today was modest ($74.50), the goal of the small-account challenge is steady base hits, not home runs. His account has grown over 50% in three days (from $395 to ~$650 in buying power), but commissions consume a significant percentage of early profits. He notes the difference between this slow market week and his prior challenge (which had back-to-back 100%+ wins) is timing—small accounts require surviving slow periods until a strong momentum stock provides a big breakout day. He reflects on balancing his roles as trader and educator, using this challenge to remain relatable to struggling traders while normally trading his six-figure account for ~$500K annual profits.
@@ -864,6 +1169,15 @@ TRADES:
 | 3  | QNRX   | general | $0.90  | unknown        | yes  | break of descending resistance | PROF: added at 3.01, 3.08      | ~+$423   | WIN     |
 | 4  | RDHL   | general | $0.87  | watching       | yes  | second entry on consolidation  | PROF: took small profit off top  | ~+$190   | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | squeeze on short coverage | scaled entry | - | $75 | - | unknown | scalp |
+| 2 | - | - | - | unknown | breakout sympathy play | scaled entry | failed breakout | $75 | - | unknown | scalp |
+| 3 | - | - | - | unknown | break of descending resistance | scaled entry | - | $75 | - | unknown | scalp |
+| 4 | - | - | - | unknown | second entry on consolidation | scaled entry | - | $75 | - | unknown | scalp |
+
 SUMMARY:
 On Day 3 of the All-Star Traders Summit 2022 (live broadcast with multiple professional traders), Ross participated in a slow pre-market session with modest gains of approximately $892-$895 in pre-market trading. RDHL ($0.76 gapper) was the leading focus of the day with 15+ million shares of pre-market volume and news of a covid antiviral treatment patent. Ross initially scaled out 75% of his position on the first squeeze up to $0.89, capturing approximately +$190 profit while fellow short seller Chris held a short position averagedaround $0.79. ARAB ($0.31) showed sympathy momentum but failed to hold volume and Ross exited quickly for a small -$10 loss. QNRX showed strength with an ascending triangle pattern; Ross added multiple times, buying at $0.90, then $3.01, then $3.08 (appearing to track consolidation breakouts), capturing approximately +$423 in profit. RDHL provided a second entry opportunity on the consolidation formation near $0.87 with Ross scaling out on strength for another ~+$190 win. The session emphasized the tension between waiting for clean setups (first five-minute candles to make new highs, breaks of support/resistance) versus the challenge of trading illiquid penny stocks where order book depth doesn't support large size. Ross discussed market maker behavior, pre-market order flow manipulation, and institutional insight into pending orders while maintaining that base-hit trading (15-20 cent gains) remains viable despite these factors. The pre-market close had him holding small gains with conviction ahead of the open bell.
 
@@ -891,6 +1205,16 @@ TRADES:
 | 3  | ETRM   | general | $3.75      | gap-scanner    | yes  | break of premarket pullback    | PROF: rode 100% intraday move   | +$115    | WIN     |
 | 4  | OPTT   | general | $6.00      | gap-scanner    | no   | unknown entry point            | PROF: speed trader account      | +$850    | WIN     |
 | 5  | PN     | general | $unknown   | unknown        | no   | unknown entry/exit             | STOP: loss in speed trader acct | -$450    | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | break of premarket high $3.93 | n/a | - | $. | - | unknown | scalp |
+| 2 | - | - | - | unknown | attempted break of premarket | n/a | failed breakout | $. | - | unknown | scalp |
+| 3 | - | - | - | unknown | break of premarket pullback | n/a | - | $. | - | unknown | scalp |
+| 4 | - | - | - | unknown | unknown entry point | n/a | - | $. | - | unknown | scalp |
+| 5 | - | - | - | unknown | unknown entry/exit | n/a | failed breakout | $. | - | unknown | scalp |
 
 SUMMARY:
 On Day 3 of the small account challenge (starting with $583 on Monday), Ross finished up $450 ($896 opening balance → $1,346 closing) for a 16% profit on the day and 79% total return since Monday. Operating across two accounts (SureTrader with 3:1 margin restrictions and Speed Trader with full access), he executed five trades with a 4W-1L record. HMNY (former runner stock with low float, continuation play from prior day) gapped up with no fresh catalyst, and he caught the first 5-minute breakout over the $3.93 premarket high at $3.80 with 500 shares (maximum size allowed under SureTrader's margin restriction). The position ripped to $4.00 and he exited at $3.99 for +$84 (after commissions, approximately +$98 gross). COO (low-float biotech candidate) appeared on the gap scanner at $4.50 for a premarket-high break attempt, but his order failed to fill as the stock moved away; he cancelled and avoided what would have been a -$0.20 or -5-cent winning scalp at best. ETRM was the day's big winner: gapping 100% from $2.50 open to $5.00 high (prior day low was $1.75), and he rode this move for +$115 profit despite being constrained to smaller size. In the Speed Trader account, he took OPTT for +$850 profit and PN for -$450 loss (exact entries and exits not detailed but net +$300 for Speed Trader account). Across both accounts, +$450 total. Ross emphasizes finding the "needle in the haystack" using stock scanners to identify low-float gap-up movers with 20-50% or parabolic home-run potential daily. Despite the constraints of a small account, he demonstrates that the setup discipline (waiting for premarket-high breaks and pullback entries) remains the same regardless of account size. His goal for the week is turning the $583 into $1,000, and he's 79% of the way there by Day 3. He closes early to avoid over-trading and protect his small cushion.
@@ -921,6 +1245,17 @@ TRADES:
 | 5  | FWP    | general | $9.00-12.39 | high-day-momo  | no   | low-float 5-min new high dip   | PROF: added at 9.24, 9.36      | +$16,600  | WIN     |
 | 6  | FWP    | general | $11.80-12.30| watching       | no   | pullback off VWAP retest       | PROF: final pop to 12.30        | ~$2,000   | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | whole-dollar breakout entry | added on move | - | $9 | - | unknown | scalp |
+| 2 | - | - | - | dip-buy | dip buy + adds for 5-min break | added on move | - | $9 | - | unknown | scalp |
+| 3 | - | - | - | unknown | v-whap bounce / flush recovery | added on move | - | $9 | - | unknown | scalp |
+| 4 | - | - | - | halt-resume | halt-resume breakout attempt | added on move | failed breakout | $9 | - | unknown | scalp |
+| 5 | - | - | - | unknown | low-float 5-min new high dip | added on move | - | $9 | - | unknown | scalp |
+| 6 | - | - | - | vwap-reclaim | pullback off vwap retest | added on move | - | $9 | - | unknown | scalp |
+
 SUMMARY:
 On Day 30 (30 consecutive green days, "Wildcard Wednesday" which has been Ross's strongest day of the week), he finished up $25,218 in exceptional conditions marked by early technical difficulties (OBS and Restream failures, delayed YouTube/Facebook stream launch) that left him frustrated and running late to his 9:15 AM premarket watchlist broadcast. Starting with emotional disadvantage (nervous, wanting to avoid ending his streak), SIF was the leading gapper with 60% pre-market gap on earnings news, light pre-market volume (80K shares) but strong early market volume (2.3M in first 5 minutes). After hesitating and passing the initial breakout to $4.20 (where other 100K Club traders John and Jess also jumped), he caught the move starting at $4.00 for the whole-dollar breakout, taking quick 2-cent scalp profit (+$1,200). When the first 5-minute candle to make a new high triggered, he sized aggressively: entered at $4.67, added at $4.92 and $4.94 for the break over $5.00 (total 6,000-7,000 shares), rode it to $5.50 high (+$3,500). Subsequent moves saw him buying dips off VWAP ($4.85 area), adding to positions, capturing multiple flush-and-recovery cycles for +$3,935 net. Total SIF profit: +$8,635 from multiple entries. SL (continuation from prior day's big move) gapped up but only took one trade for a failed halt-resume breakout, exiting with -$30 loss. FWP hit the high-day-momo scanner at $8.19 multiple times; researching showed 480K share float (per Finviz, despite broker data showing 1.85M), confirming low-float status. He caught the initial pop at $9.00, rode it to $9.20 (hesitated on first candle new high), then aggressively entered on the pullback at $9.14 with 5,000 shares, added at $9.24 and attempted order at $9.36 (order didn't fill). Stock halted at $9.36 and resumed to $12.10 high—Ross was up +$16,600 on his position (shares × profit-per-share). Took additional trades: re-entered at $11.80 on VWAP bounce and final pop to $12.30 (+$2,000 more). Total FWP profit: +$16,600-18,600. The day exemplified his discipline of letting P&L accumulate (watching the green indicator move far enough to signal $10K+ profit), stepping up position size as conviction increased ("when the market's hot, put the pedal to the metal"), and using scanners + community context (seeing what 100K Club traders watch) to gain confirmation. He emphasized scanning nuance: false alerts exist, most scans are ignored, but quality setups (whole-dollar breaks, first 5-minute candles, low-float dips) drive the big winners. Total month-to-date (May): $68K gross profit on 77% accuracy through day 9 of ~21. He close early to avoid over-confidence leading to red day and emphasized gratitude, having donated $44K of early COVID-period profits to local causes.
 
@@ -947,6 +1282,15 @@ TRADES:
 | 2  | ZIS    | general | $3.40-3.75  | high-day-momo  | no   | break of half-dollar resistance | PROF: quick scalp, pulled back   | +$1,300   | WIN     |
 | 3  | AHPI   | general | $2.50-2.72  | high-day-momo  | no   | momentum pop, chased entry      | STOP: reversal, flushed lower    | -$2,600   | LOSS    |
 | 4  | APOP   | general | $5.86-6.66  | high-day-momo  | no   | former runner spike / big move  | PROF: held through halt resume   | +$769    | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | whole-dollar-break | break of whole dollar resistance | added on move | - | $116 | - | unknown | unknown |
+| 2 | - | - | - | unknown | break of half-dollar resistance | added on move | - | $116 | - | unknown | unknown |
+| 3 | - | - | - | unknown | momentum pop, chased entry | added on move | reversal | $116 | - | unknown | unknown |
+| 4 | - | - | - | unknown | former runner spike / big move | added on move | - | $116 | - | unknown | unknown |
 
 SUMMARY:
 On Day 30 of the $100K challenge (Tuesday, $62,000 account starting balance), Ross finished up $8,430 after commissions despite only winning 3 of 4 trades (75% accuracy), bringing his week total to +$116,000 and month-to-date (through 9 days) to approximately $68,000 gross. He started the day reflecting on emotional resilience—having lost $133,000 two weeks prior but made it back $35,000 in the following days—and on the scaling strategy that increased his average position size from 1,500 shares (last year) to 6,000 shares (this year), which amplifies both profits and losses proportionally ($10K gain last year vs. $40K this year, $55K last February vs. $53K this February YTD). RV (consolidating under $7 on the premarket watchlist) was the first intended entry; however, a broker system error rejected his initial 5,000-share order at $6.80 (would have been a $5-7K winner if filled), delaying his entry to $7.41 after the fix. Despite missing the initial move to $7.91, he added at $7.99 and captured +$2,500 on the eventual move to $8.50 high. ZIS (high-day-momo scanner) was hit multiple times; he entered 12,500 shares at $3.40-3.75 for the half-dollar break, captured a move to $3.70 high but the stock pulled back to $3.31; he exited with +$1,300 profit, missing a subsequent $125 run to $4.44 (23M volume day, would have supported 25K share position). AHPI (high-day-momo) appeared strong with a daily chart breakout pattern, but despite the intraday spike from a low of $2.50, he chased it at $2.72 with 10,000 shares (only filled 1,000) and held into a reversal to $2.40s, cutting -$2,600 loss—a trade he acknowledged was logical breakout-following but failed execution. APOP (former runner, "cult stock" with history like MYOS, HMNY) spiked on the high-day-momo scanner; recognizing its pattern of big moves, he aggressively jumped in at $5.86 (22-24-cent above the low), added after halt-resume at $6.19, and rode the consolidation move towards the $6.77 daily resistance (next target $8.78). Despite only hitting $6.75 before pulling back to $6.34, he captured +$769. Ross emphasized that former-runner stocks with "cult followings" (APOP, MYOS, GBSN, HMNY, LEDs, DRYS) tend to get exaggerated moves when they hit scanners because traders expect repetition of prior big moves. By day 30, he's 62% of the way to the $100K milestone and projects hitting it by mid-March if current pace holds (~4 days of $8K days or one $25K day per week). The session quantified the scaling metrics: losses at larger size ($2,600 on AHPI vs. what would have been $260 at 1,500 share baseline), but wins also magnified accordingly, and emotional comfort with loss requires repeated exposure at progressively larger position sizes.
@@ -975,6 +1319,15 @@ TRADES:
 | 3  | ALT    | general | $5.10-5.74 | gap-scanner    | yes  | break of premarket high entry   | PROF: first 5-min pullback scalp | ~+$4,500 | WIN     |
 | 4  | AKER   | general | $5.00-5.40 | high-day-momo  | yes  | halt resume + dip entries      | PROF: multiple dips captured    | +$1,116  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | 2.3M | - | - | vwap-reclaim | attempt to break vwap pattern | added on move | stop loss | $1 | - | unknown | unknown |
+| 2 | 2.3M | - | - | unknown | dip entry off support level | added on move | - | $1 | - | unknown | unknown |
+| 3 | 2.3M | - | - | unknown | break of premarket high entry | added on move | - | $1 | - | unknown | unknown |
+| 4 | 2.3M | - | - | halt-resume | halt resume + dip entries | added on move | - | $1 | - | unknown | unknown |
+
 SUMMARY:
 On Day 31 (31 consecutive green days, second-longest hot streak since November 2015-January 2016's 56-day streak, most profitable consecutive green streak ever at $161K gross since last red day), Ross finished up $6,466 in a strong momentum day with all four trades green (100% accuracy). The day featured leading gaps with all stocks starting with the letter "A": APDN (well-documented gap-and-fade history) where he tested a small 1,000-share position trying to break its VWAP resistance, capturing +$149 on the initial pop but hesitating due to established short bias. AIM (initially showing 2.3M share float on data feed but confirmed at 29M on SEC 10-Q filing and finviz) provided his best trade: caught the red-to-green move and then bought the pullback dip at $3.10, selling into bounces at $3.18-$3.19-$3.20 for a +$700 profit on 9,000 shares. ALT (15M float, news catalyst) offered a break of the $5.10 premarket high with no resistance until $5.94 (daily chart); initial squeeze to $5.50 flushed back down but he captured the move for approximately +$4,500. AKER (5M+ volume, news headline on halt) was missed at the news/first halt but he caught subsequent dip entries off support levels ($5.00 area), multiple bounces as stock halted twice and resumed higher, adding trades for +$1,116 total. May month-to-date gross: $74,405 through 10 green days, still tracking toward his all-time monthly best of $117K (which requires 9-10 more days of similar gains, or consistency without a red day). Ross reflected on emotional discipline and position-sizing philosophy—unwilling to take 100K share positions or huge IRA swings for record days, preferring consistent 2-hour daily sessions (9:30-11:30 AM) with $6K average size over massive bet-the-farm strategies. He emphasized that while his 56-day streak (2015-16) made less money due to smaller position sizes, this current 31-day streak is already $161K in gross profit, demonstrating that scaling position size (from 1,500 avg shares historically to 6,000-20,000 now) directly magnifies both wins and losses proportionally. He announced "Summer School" beginning June 1st (daily live trading + class instruction through June/July with recorded archives for Warrior Pro members), using coupon code "summer40" for new students.
 
@@ -1001,6 +1354,15 @@ TRADES:
 | 2  | FNCX   | general | ~$450         | gap-scanner    | no   | half dollar break / momentum attempt     | STOP: failed-breakout - no follow-through | -$177   | LOSS    |
 | 3  | QBAK   | general | $480-$540     | premarket-scan | yes  | partial fill then dip re-entry / break at $540 / add on pop to half dollar | STOP: reversal - sharp pullback at 524, cut at 486 | -$4,400 | LOSS |
 | 4  | NOOV   | general | $688-$690     | high-day-momo  | no   | 5-minute pullback dip-buy / break over $7 / consolidation bounce | PROF: took profits at resistance $7.30 | +$1,600  | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go / break of premarket high | added on move | - | $. | - | unknown | scalp |
+| 2 | - | - | - | unknown | half dollar break / momentum attempt | added on move | failed breakout | $. | - | unknown | scalp |
+| 3 | - | - | - | unknown | partial fill then dip re-entry / break at $540 / a | added on move | failed breakout | $. | - | unknown | scalp |
+| 4 | - | - | - | dip-buy | 5-minute pullback dip-buy / break over $7 / consol | added on move | - | $. | - | unknown | scalp |
 
 SUMMARY:
 Ross finished the day down $1,849.72 after a challenging session that nonetheless represented progress on an emotional level. The morning started with two gap-scanner plays on EV and FNCX, both gapping 50-70% overnight. EV produced a quick $267 scalp, while FNCX resulted in a $177 loss due to weak follow-through on the half-dollar break. The largest loss came on QBAK, a premarket-scanned stock that he identified as a high-quality setup. After receiving only a partial fill (1,000 of 10,000 shares) at $480, Ross added 10,000 shares on a $540 dip-entry, but the stock failed to sustain above the half-dollar and collapsed, resulting in a $4,400 loss. This trade pushed Ross past his historical max loss threshold of $3,600, a milestone he had not exceeded in over a year. Rather than ending the day, Ross waited patiently for another setup and found it on NOOV, which he had watched but initially decided not to chase on a one-minute setup when it reached $8. He waited for the five-minute pullback to $6.36, then entered at $688-$690 with 2,000 shares, adding another 2,000 on the move. Though he did not capture the full range, he exited at $7.30 for a $1,600 winner. This final trade demonstrating calm decision-making under stress placed the day in perspective: while red, it felt like a victory because Ross maintained composure, made clear decisions, and avoided the downward emotional spiral that typically follows max-loss events.
@@ -1031,6 +1393,17 @@ TRADES:
 | 5  | SRNE   | biotech | $5.25         | watching       | yes  | second entry on pop                      | STOP: reversal - quick flush back down   | -$1     | BE      |
 | 6  | SRNE   | biotech | $5.30-$5.60   | watching       | yes  | break over $5.25 / multiple adds on dips | PROF: scaled throughout move to 6.05    | +$2,400  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | 2.8M | 100% | - | unknown | break of premarket high / add on dip | added on move | - | $2.85 | - | unknown | scalp |
+| 2 | 2.8M | 100% | - | unknown | second entry on pop | added on move | failed breakout | $2.85 | - | unknown | scalp |
+| 3 | 2.8M | 100% | - | dip-buy | dip-buy on pullback | added on move | - | $2.85 | - | unknown | scalp |
+| 4 | 2.8M | 100% | - | unknown | break of premarket high | added on move | failed breakout | $2.85 | - | unknown | scalp |
+| 5 | 2.8M | 100% | - | unknown | second entry on pop | added on move | failed breakout | $2.85 | - | unknown | scalp |
+| 6 | 2.8M | 100% | - | unknown | break over $5.25 / multiple adds on dips | added on move | - | $2.85 | - | unknown | scalp |
+
 SUMMARY:
 Ross finished his 32nd consecutive green day with a net gain of $1,500 after initially being up nearly $2,900 and then giving back significant profit. BLIN opened as the leading gapper with a 100% gap and 2.8 million share float. Ross's first trade on BLIN resulted in an $800 winner when he exited the initial pop from $2.75 to $2.85-$2.93. He re-entered on the second bounce at $2.90 but stopped out for a $600 loss when momentum failed. ACB provided a quick $169 scalp when Ross bought a pullback dip to $1.70, exiting at $1.72. SRNE was the leading gapper the day before but had a concerning 250-million-dollar secondary offering announced overnight. Ross was reluctant to trade it initially due to the massive 127-million-share float and offering news, but after missing early opportunities, he took two small trades that went breakeven ($1 profit and $1 loss). He then committed to the stock for its strongest move, entering at $5.30 with 2,000-share starter, adding at $5.15, $5.30, and subsequent dips down to $5.10, building to 6,000 shares. Despite a tense moment when the stock stalled at $5.50, he stayed with the position as it squeezed to the high of $6.05, capturing approximately $2,400 in profit. Noting significant slippage and weak follow-through early in the day, Ross became concerned about his account down only $250 after two trades and considered quitting. Instead, he stayed disciplined and waited for better setups, ultimately cashing out after the major SRNE run to avoid overstaying his welcome and risking exposure to additional news that could trigger a halt.
 
@@ -1056,6 +1429,14 @@ TRADES:
 | 1  | NOOV   | general | $5.50         | high-day-momo  | no   | break of consolidation / momentum        | STOP: reversal - couldn't hold gains    | -$636    | LOSS    |
 | 2  | CURB   | general | $3.50-$4.00   | high-day-momo  | yes  | gap-and-go out of consolidation / adds  | PROF: scaled at $4.36 and $4.44         | +$10,000 | WIN     |
 | 3  | PSIX   | general | $5.90-$6.80   | high-day-momo  | no   | add on momentum / chase higher / multiple adds | STOP: reversal - came back from $6.94 to break even, then down $0.30 | -$7,000 | LOSS |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | break of consolidation / momentum | added on move | failed breakout | $5.72 | - | unknown | unknown |
+| 2 | - | - | - | gap-and-go | gap-and-go out of consolidation / adds | added on move | - | $5.72 | - | unknown | unknown |
+| 3 | - | - | - | unknown | add on momentum / chase higher / multiple adds | added on move | failed breakout | $5.72 | - | unknown | unknown |
 
 SUMMARY:
 Ross finished the day up $6,367.66 after starting the morning at $60,000 in his $100K challenge account. Despite being up nearly $10,000 midway through the session, he gave back approximately $3,500 on his last trade, ending with a net positive but finishing on a losing position. The session reflected his aggressive position-sizing approach that characterizes his trading during the challenge. NOOV provided the opening trade, but failed to extend beyond $5.72, resulting in a $636 loss despite identifying the setup as similar to yesterday's strong $5.50-$8.00 runner. CURB emerged as the day's primary winner after hitting the high-day-momo scanner. After receiving poor initial fills averaging $3.70, Ross aggressively added on every dip and pop, building to a 20,000-share position at approximately $3.87 average. The stock halted at $4.04 during the move, resumed at $4.37, and continued to $4.44, where Ross exited the full position for a clean $10,000 win. PSIX presented the day's key lesson in position management. After a clean entry at $5.90 (pre-halt), Ross added at $6.50, $6.80, and beyond, building to 7,000+ shares with an average around $6.20. The stock spiked to $6.94—a potential $4,200 profit on the full position—but collapsed in two minutes to $5.94 breakeven and then down to $5.60 (-$0.30), where Ross finally exited for a $7,000 loss. He identified this as his core weakness: failing to exit when a winner returns to breakeven, instead waiting and hoping for a recovery.
@@ -1083,6 +1464,14 @@ TRADES:
 | 2  | BSGM   | general | $12.00        | gap-scanner    | no   | opening range breakout / break of 12.30 | STOP: reversal - couldn't hold, flushed down | -$1,200 | LOSS |
 | 3  | ACB    | cannabis| $16.50-$18.50 | high-day-momo  | no   | micro pullback dip-buy / ABCD continuation pattern / momentum adds | PROF: scaled exits at 17.50, 18.50, 19.68 | +$7,000 | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | vwap-reclaim | bounce off support / vwap reclaim | added on move | failed breakout | $. | - | unknown | unknown |
+| 2 | - | - | - | unknown | opening range breakout / break of 12.30 | added on move | failed breakout | $. | - | unknown | unknown |
+| 3 | - | - | - | dip-buy | micro pullback dip-buy / abcd continuation pattern | added on move | - | $. | - | unknown | unknown |
+
 SUMMARY:
 Ross finished his 33rd consecutive green day with a net profit of $5,553.87, with the bulk ($7,000) coming from Aurora Cannabis (ACB) after a session that included two choppy, losing trades. The morning started with SRNE, a continuation play from Friday that failed to hold momentum. Despite two bounce attempts off support—first at $9.00 (ripping to $9.50) and again at $9.00 (reaching $9.80)—the stock halted going down at $8.62, forcing Ross to stop out with a $500 loss. BSGM followed as a light-volume opening range breakout attempt; Ross attempted to trade the break above $12.30 with a longer position, but the stock flushed down to $11.75, costing a $1,200 loss. Frustrated by the choppiness, Ross resolved to focus only on high-volume stocks with institutional attention. ACB emerged mid-morning from the high-day-momo scanner, initially opening down to $12.32 before halting and recovering. After missing the initial gap-fill dip-buy, Ross entered his first pullback at $16.50 as the stock squeezed higher. He identified an ABCD pattern and added aggressively, building to 6,000 shares at various price points ($16.50, $17.50, $18.00+). The stock climbed to $19.68 on strong volume. Ross took profits incrementally and closed out the majority of his position before entering one final set of trades that he estimates gave back approximately $1,000. He notes that had he exited at the $16.50 breakdown (already up $2,000), he would have left money on the table, but staying too long cost him approximately $1,000 in final profits that could have pushed the day toward $9,000.
 
@@ -1109,6 +1498,15 @@ TRADES:
 | 2  | MBOT   | general | $7.60-$8.19   | high-day-momo  | no   | 5-minute pullback / multiple entries and adds | PROF: scaled out at various levels    | +$1,700  | WIN     |
 | 3  | MBOT   | general | $9.50         | watching       | no   | second entry on final push higher        | STOP: reversal - failed to hold resistance | -$200   | LOSS    |
 | 4  | KBSF   | general | $8.15-$8.28   | high-day-momo  | no   | 5-minute bull flag breakout / dip re-entry | PROF: scaled out at $9.02-$9.37      | +$4,746  | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go / break over consolidation | added on move | - | $69 | - | unknown | short |
+| 2 | - | - | - | unknown | 5-minute pullback / multiple entries and adds | added on move | - | $69 | - | unknown | short |
+| 3 | - | - | - | unknown | second entry on final push higher | added on move | failed breakout | $69 | - | unknown | short |
+| 4 | - | - | - | bull-flag | 5-minute bull flag breakout / dip re-entry | added on move | - | $69 | - | unknown | short |
 
 SUMMARY:
 Ross finished his 34th consecutive trading day with a net profit of $8,053.20 (reported as $8,500 in opening), bringing his month to $69,000—his best month ever. The session showcased his aggressive position-sizing approach with four trades totaling 15,000, 15,000, 6,000, and 2,000 shares respectively. INAP emerged from the high-day-momo scanner while Ross waited for MBOT to provide a clean pullback. After jumping in with 15,000 shares at $2.60 and adding at $2.68, the stock halted mid-move at $3.03. Upon resumption, it failed to break higher and consolidated before eventually pulling back, resulting in only a $1,890 profit despite the significant position size and potential. MBOT, though moving from $6.50 to $10.00, proved choppy due to extended pre-market pricing and multiple false breakouts. Ross captured $1,700 across his entries, with his initial 15,000-share position achieving only 13 cents profit due to adding at resistance ($8+), followed by a second 2,000-share entry that lost $200. KBSF provided the day's cleanest setup—a textbook bull flag consolidation after the 5-minute pullback. Ross entered with 2,500 shares at $8.15, added approximately 4,000 more at $8.50, and exited around $9.05 for a clean $4,746 profit on 6,200+ shares. This trade validated his thesis: best profits come from trading the highest-quality setups rather than chasing extended moves.
@@ -1141,6 +1539,19 @@ TRADES:
 | 7  | ACY    | general | $4.00+        | high-day-momo  | no   | break of premarket high                  | PROF: quick momentum scalp               | +$1,000 | WIN     |
 | 8  | SFET   | general | $0.85         | gap-scanner    | no   | break of premarket high                  | STOP: resistance at $0.94               | +$300   | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go / early entry post halt | added on move | - | $. | - | unknown | unknown |
+| 2 | - | - | - | halt-resume | dip re-entry / false halt / anticipation of 2.20 b | added on move | reversal | $. | - | unknown | unknown |
+| 3 | - | - | - | halt-resume | second dip re-entry after halt resume / multiple a | added on move | reversal | $. | - | unknown | unknown |
+| 4 | - | - | - | unknown | dip re-entry / bounce off support / momentum pop | added on move | - | $. | - | unknown | unknown |
+| 5 | - | - | - | dip-buy | dip-buy and continuation adds / first candle new h | added on move | - | $. | - | unknown | unknown |
+| 6 | - | - | - | unknown | break of support level into consolidation | added on move | - | $. | - | unknown | unknown |
+| 7 | - | - | - | unknown | break of premarket high | added on move | - | $. | - | unknown | unknown |
+| 8 | - | - | - | unknown | break of premarket high | added on move | reversal | $. | - | unknown | unknown |
+
 SUMMARY:
 Ross finished his 35th consecutive green day with a net profit of $11,565 despite significant frustration with his largest loss of the month on PHUN. The stock presented three separate trade opportunities but punished him twice. His initial entry at $1.30 post-halt resulted in a clean $2,500 profit as the stock squeezed to $1.68 before he exited. Seeking a second opportunity, he re-entered at $1.95 with 14,000-15,000 shares for an anticipated break over $2.20, but encountered a "false halt" where the halt level moved upward from $2.03 to $2.03+, causing the stock to flush back to breakeven before dropping. This confusion cost him approximately $4,000. A third entry at $2.15 after the halt resume, with subsequent adds building to 15,000 shares as the stock approached $2.50, resulted in a $3,000 loss when it failed to sustain above $2.20. Despite his frustration with PHUN's deceptive action (nine consecutive halts going up, then multiple false halts and reversals), Ross's remaining six trades on NNDM, RMBL, CCCL, ACY, and SFET delivered $11,200 in combined profits. NNDM, which he held yesterday at the $47,000 mark, represented the most significant winner today at $7,000 after a secondary offering dip. His decision to walk away after the PHUN losses, despite the stock eventually rallying to $2.46 and beyond, demonstrated emotional discipline. He noted that yesterday's $47,000 profit came from the same NNDM stock, which continued to $4.00 after his exit at 1:05 PM due to a commitment.
 
@@ -1166,6 +1577,14 @@ TRADES:
 | 1  | XTNT   | general | $2.77-$2.89   | gap-scanner    | yes  | gap-and-go / aggressive entry 12k shares / add to 16k on pop | STOP: reversal - halted at $3.50, opened at $2.30, multiple add-backs | -$1,600 | LOSS    |
 | 2  | SURF   | general | $5.36-$6.39   | high-day-momo  | no   | dip-buy multiple entries / first candle new high / continuation | PROF: scaled through multiple halt resumes / 7000 shares | +$11,500 | WIN |
 | 3  | SMCA   | general | $2.00+        | high-day-momo  | no   | momentum trade on scanner alert         | PROF: quick scalp                       | +$200   | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | 7.5M | 311% | - | gap-and-go | gap-and-go / aggressive entry 12k shares / add to  | added on move | stop loss | $. | - | unknown | unknown |
+| 2 | 7.5M | 311% | - | dip-buy | dip-buy multiple entries / first candle new high / | added on move | - | $. | - | unknown | unknown |
+| 3 | 7.5M | 311% | - | unknown | momentum trade on scanner alert | added on move | - | $. | - | unknown | unknown |
 
 SUMMARY:
 Ross finished his 36th consecutive green day with a net gain of approximately $10,000, though his frustration level with XTNT tempered the victory. XTNT opened as the leading gapper with a 311% gap, jumping from 77 cents premarket to $3.50, appearing on pace to repeat yesterday's PHUN-style run. Ross aggressively entered with 12,000 shares at $2.77 as soon as the bell rang, anticipating a gap-and-go continuation. Adding to 16,000 shares as the stock squeezed toward $3.50, he briefly held an unrealized $6,500 profit. However, the stock halted going up at $3.50 and resumed dramatically lower at $2.30—a gap down that shocked Ross, as it mirrored PHUN's deceptive action but with only two halts versus PHUN's nine. After multiple attempts to average down the 8,000-share core position he retained, taking losses on half the original 16,000 shares, he ultimately exited with a $1,600 loss. SURF emerged as the day's true winner and redemption story. With 7.5 million shares of volume and only 68% up initially, Ross recognized the cleaner setup and aggressively traded multiple dips and breakouts, building various sized positions and scaling out through halt resumes. The stock ran from $5.36 to near $7.50, and despite giving back some profit off the highs, Ross captured approximately $11,500 on SURF, which single-handedly preserved his green day. Ross reflected on the risk of swinging for "homeruns"—taking oversized positions in the hopes of massive moves—acknowledging that yesterday's $47,000 day and today's volatile tape had conditioned him to expect multi-dollar runners, making it tempting to hold XTNT for a bigger move rather than cutting size earlier.
@@ -1196,6 +1615,17 @@ TRADES:
 | 5  | OBLN   | general | $0.20-$0.48   | high-day-momo  | no   | micro pullback dip-buy / add on pop     | PROF: scaled through halt resumptions  | +$3,000 | WIN     |
 | 6  | ALT    | general | $8.50+        | gap-scanner    | no   | continuation through halt resumes       | PROF: small scalps through consolidation | +$200   | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | dip-buy | dip-buy on big buyer visible on bid | added on move | failed breakout | $. | - | unknown | scalp |
+| 2 | - | - | - | dip-buy | dip-buy hoping for halt resume pop | added on move | failed breakout | $. | - | unknown | scalp |
+| 3 | - | - | - | dip-buy | micro pullback dip-buy / continuation | added on move | - | $. | - | unknown | scalp |
+| 4 | - | - | - | bull-flag | 5-minute bull flag breakout | added on move | - | $. | - | unknown | scalp |
+| 5 | - | - | - | dip-buy | micro pullback dip-buy / add on pop | added on move | - | $. | - | unknown | scalp |
+| 6 | - | - | - | halt-resume | continuation through halt resumes | added on move | - | $. | - | unknown | scalp |
+
 SUMMARY:
 Ross finished his 38th consecutive green day with a modest gain of $2,709.05 on the first trading day after a long weekend. Unlike the sizzling Monday-Friday, this Tuesday marked a slowdown with no dominant leading gapper or obvious standout momentum stock. SRNA, the leading gapper at 149%, failed immediately after the open, and Ross lost $596 on a dip-buy attempt when the stock failed to break $6.00. SKYS, another gapper, provided only a $150 loss on a halt-resume pullback. CLSN, a watchlist continuation, yielded a small $563 profit after a slow start. USAU (gold sector) delivered a $700 win on a bull flag setup with a clean breakout, though a false break at resistance required quick profit-taking. OBLN proved the day's salvation, emerging from the high-day-momo scanner without advance notice. Ross entered on a micro pullback at $0.20, added at subsequent dips around $0.28-$0.32, and built to 15,000 shares. Despite halting and resuming multiple times, the stock squeezed to $0.48, yielding approximately $3,000 profit. ALT, also on the gapper, provided modest $200 profit through choppy halt resumptions. Ross noted that with the overall market gapping up significantly, the typical gap-scanner strategy became difficult—too many sympathetic gappers without clear catalysts. He managed the red start professionally by scaling back and staying defensive until OBLN allowed him to flip positive and walk away to preserve the green streak.
 
@@ -1221,6 +1651,14 @@ TRADES:
 | 1  | HTZ    | general | $1.00-$1.08   | gap-scanner    | yes  | dip-buy on breakout attempt / add on pop | PROF: scaled on halt resume at $1.11-$1.12 | +$360   | WIN     |
 | 2  | ECJ    | general | $4.10-$4.67   | gap-scanner    | yes  | VWAP dip-buy at open / add for pre-market high break | PROF: scaled at $4.60, $4.67 and $5.00, dip trades | +$7,000 | WIN     |
 | 3  | MRSN   | general | $14.30-$15.00 | gap-scanner    | no   | VWAP breakout / micro pullback adds    | PROF: scaled exits through resistance  | +$2,800 | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | 1.49M | - | - | dip-buy | dip-buy on breakout attempt / add on pop | added on move | - | $149 | - | unknown | unknown |
+| 2 | 1.49M | - | - | dip-buy | vwap dip-buy at open / add for pre-market high bre | added on move | - | $149 | - | unknown | unknown |
+| 3 | 1.49M | - | - | micro-pullback | vwap breakout / micro pullback adds | added on move | - | $149 | - | unknown | unknown |
 
 SUMMARY:
 Ross finished his 39th consecutive green day with $10,200.84 profit on "Wildcard Wednesday," statistically his best day of the week year-to-date with $149,000 in Wednesday profits (compared to $41,000 on Mondays). This statistical confidence encouraged more aggressive trading. HTZ (Hertz), after bankruptcy filing news, bounced from $0.40 low yesterday to $1.47 pre-market. Ross entered his first trade with 20,000 shares for a $1.00 break, achieving only $0.01 profit ($200) when the stock stalled at $1.08. He re-entered with another 20,000-share position at $1.08 for the five-minute break, halted at $1.16, and sold on resumption at $1.11-$1.12 for a modest additional $160 profit. Though frustrated about missing the full $1.00-$1.49 move (which would have yielded $10,000+ on his 20,000 shares), he recognized the unpredictability of halt-resume patterns. ECJ proved the day's dominant trade, hitting the gap-scanner with earnings news. Opening at $3.97, it dipped to $3.91 as Ross bought aggressively with 20,000+ shares. Adding at $4.10-$4.50 for the pre-market high break of $4.50, the stock squeezed to $4.76 (halt), resumed, and climbed to $5.10. Ross executed multiple dip trades off VWAP, scaling profits throughout, capturing approximately $7,000. MRSN emerged as the gap-scanner's third entry, with earnings catalyzing the move. After an aggressive VWAP breakout entry at $14.30 and multiple micro-pullback adds, Ross captured $2,800 despite resistance near $15.00. Ross noted his streak sitting at 39 consecutive green days with 2+ days remaining in May to preserve his second consecutive no-red month, and reflected on his evolution: since starting his small-account challenge on January 1, 2017 with $583, he has now generated $1.75 million in gross profit.
@@ -1274,6 +1712,13 @@ TRADES:
 | 1  | SKLN   | general | $2.90-$3.19   | high-day-momo  | no   | sympathy pop / break of $3 / dip re-entry| PROF: scaled at $3.10 and $3.22         | +$50-$60 | WIN     |
 | 2  | JVO    | general | $3.50         | high-day-momo  | no   | reverse split bounce / post-pop entry   | PROF: scaled on spike to $5.35          | +$112    | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | low-float | sympathy | high | dip-buy | break of $3 / dip re-entry | added 1000 shares at $3.19 | failed new high below $3.32 | $3.22-$3.23 | pre-market/open | - | short |
+| 2 | - | reverse-split | - | gap-and-go | reverse split bounce / post-pop entry | - | - | $5.35 | pre-market | - | short |
+
 SUMMARY:
 Ross finished Friday, day four of his small account challenge, with $154 profit, bringing his weekly total to +$618.51 (106% gain) on his $583.15 starting balance. This positioned him $200 ahead of his self-imposed $1,000 weekly goal, opening Monday with $1,200. SKLN emerged as a sympathy play after ETRM made a large pre-market move from $5 to $7. The stock was restricted in Ross's SureTrader account due to margin limitations, so he awaited the first sympathy momentum play—finding it in SKLN, which had low float and broke above $3 on the daily chart. He entered 500 shares at $2.90 for the $3 break, locked in 15 cents profit ($75) after the stock spiked to $3.23, but was left with only $50 net after $20 in commissions and ECN fees. Seeking to capitalize on the momentum cushion, he re-entered 1,000 shares at $3.19 on the first one-minute candle making a new high (his preferred setup), but hesitated after the stock dropped from $3.32 high to $3.16, cutting the position at $3.22 for merely $30 profit. Multiple entries and exits across both positions totaled approximately $107 gross, reduced to $50-$60 after all commissions. JVO, which had just completed a reverse split at 20-to-1, spiked from $3.50 to $5.35, and Ross captured 11 cents per share on 1,000 shares for a clean $112 profit. Despite the market being slow on Friday with few setups after 10:15 AM, Ross demonstrated discipline by taking only two trades—reflective of his conviction to trade only high-quality setups. Commission costs exemplified the challenge of small-account trading: $70 in total commissions ($20 on SKLN, expected ~$15 on JVO) consumed over 30% of his $219 gross realized profit, leaving approximately $154 net. The trading illustrated the razor-thin margins of small-account trading where position sizing and scaling mechanics directly impact profitability.
 
@@ -1297,6 +1742,12 @@ TRADES:
 | #  | SYMBOL | SECTOR  | PRICE         | SCANNER        | NEWS | ENTRY SETUP                              | EXIT                                    | RESULT   | OUTCOME |
 |----|--------|---------|---------------|----------------|------|------------------------------------------|-----------------------------------------|----------|---------|
 | 1  | LMPX   | general | $5.80-$6.14   | high-day-momo  | yes  | recent IPO breakout / break of premarket high | PROF: scaled at $6.30, $6.50+ across six entries | +$427    | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | 4M | - | high | gap-and-go | recent IPO breakout / break of premarket high | six separate entries, scaling at $5.80-$6.59 | failed continuation | $6.30-$6.50+ | pre-market/open | - | extended |
 
 SUMMARY:
 Ross completed day four of his second small account challenge with $427 profit, marking the largest single-day gain so far and bringing his four-day total to approximately $550 (account up from $673.95 to over $1,100). With 16 trades over four days yielding 13 winners and 3 losers (81% accuracy), Ross demonstrated discipline despite the emotional challenge of dividing focus between his small account and main trading account. LMPX, a recent IPO from yesterday with a four-million-share float, presented the opportunity Ross identified through historical pattern recognition—specifically similar to LFIN (which squeezed from $5 to $140 on news) and BOXL/IMTE. The stock gapped up and opened with news catalyzing activity. Ross entered six times across multiple volatility bursts, using approximately 90 percent of his buying power on the concentrated play, first triggering at the break of the $5.80 premarket high as the stock squeezed to $6.59. Careful scaling throughout captured consistent 15-30 cent gains per entry, with peak risk of $50 on the first trade yielding $150 profit, establishing a cushion for subsequent entries. Ross maintained vigilant position management, avoiding additional overexposure despite the stock remaining strong at $6.14 by day's end, conscious that this was a small account requiring measured growth rather than aggressive outsizing. The session highlighted the primary psychological challenge of the challenge itself: experiencing FOMO from dual-account trading, where the best setups were reserved for the small account while the main account received lower-quality opportunities, resulting in a $1,300 loss in the main account on the same morning despite the small account's victory. Ross reframed the trade as acceptable sacrifice for challenge authenticity, recognizing that account size constraints would naturally limit daily earnings potential until the capital base expanded.
@@ -1324,6 +1775,14 @@ TRADES:
 | 2  | SNOA   | general | $13.20-$17.00 | gap-scanner    | yes  | halt resume dip-buy / multiple breakout attempts | STOP: late-exit / gave back $2,000 of profit | +$5,000 | WIN     |
 | 3  | ADAP   | general | $9.80-$10.50  | gap-scanner    | yes  | breakout of VWAP / pullback dip trade  | PROF: scaled at $10.50                  | +$4,000  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 125% | high | dip-buy | premarket move / opening range breakout | scaled at $5.25, $5.75, $5.98 | reversed after $5.98 | $5.98 | 9:30am+ | - | extended |
+| 2 | - | 142% | high | dip-buy | halt resume dip-buy / multiple breakout attempts | scaled at multiple resistance levels | reversed at $17.50, late exit | $19.58 | morning | - | extended |
+| 3 | - | 106% | high | vwap-reclaim | breakout of VWAP / pullback dip trade | scaled at $10.50 | - | $10.50 | morning | - | extended |
+
 SUMMARY:
 Ross finished his 41st consecutive green day with $20,370 profit, bringing his May total to approximately $225,000 for the best month of his entire trading career. Trading three stocks from his premarket gap-scanner watchlist, each gapping up over 100 percent (PHIO +125%, SNOA +142%, ADAP +106%), Ross demonstrated aggressive position sizing with share counts reaching 10,000+ shares per trade. PHIO opened with premarket strength, testing $6.20 before the bell rang, providing an early $6,000 cushion from initial entries at $5.00 and pullback adds at $5.50-$5.75. Ross scaled exits at strategic resistance levels ($5.98 below the whole-dollar), capturing approximately $8,000 despite multiple small entries and exits inflating commission costs. SNOA presented a more complex trade: halting on its way down at $15.04, Ross bought multiple dips anticipating bounces off the volume-weighted average price (VWAP). Early dips at $13.20-$14.80 yielded significant profits as the stock bounced to $19.58, but aggressive position adds at higher prices turned profitable positions into losses when the stock failed to break $17.50 resistance, forcing him to stop out with cumulative $2,000 losses after initially being up $8,000. Despite the late-exit error on SNOA, ADAP provided a final profitable trade, buying the VWAP breakout at $9.80 with 10,000 shares, holding as it squeezed to $10.50 for a clean $4,000 profit. Ross notes that dip-trading strategy, developed during March's 35% market correction when stocks halted repeatedly, has become a core tool. He acknowledged choosing to walk away after ADAP at 11:00 AM despite market hotness because consecutive losses typically signal time to stop, not just when profit slows. The day exemplified his 2020 evolution: 300+ trades versus 150 in May 2019, with similar profitability but higher daily average gains reflecting more aggressive position sizing and multiple-entry strategy development.
 
@@ -1348,6 +1807,13 @@ TRADES:
 |----|--------|---------|---------------|----------------|------|------------------------------------------|-----------------------------------------|----------|---------|
 | 1  | CETX   | general | $2.55-$2.94   | gap-scanner    | no   | false breakout / pullback dip trade     | PROF: scaled at $2.67, $2.85, $2.94     | +$5,000+ | WIN     |
 | 2  | AESC   | general | $3.80-$5.20   | gap-scanner    | yes  | first pullback dips / 5-min alignment breakout | PROF: scaled at $5.01, $5.13-$5.20, $4.80-$4.90 | +$18,000+ | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 100%+ | high | false-breakout | false breakout / pullback dip trade | scaled at $2.67, $2.85, $2.94 | flushed on pullback | $2.94 | pre-market/open | - | short |
+| 2 | - | 100%+ | high | dip-buy | first pullback dips / 5-min alignment breakout | scaled at $5.01, $5.13-$5.20, $4.80-$4.90 | reversed sharply at $5.37 | $5.27-$5.73 | morning | - | extended |
 
 SUMMARY:
 Ross finished his 42nd consecutive green day on June 1st, the first day of summer school and new month, with $24,397 profit and explicit recognition of market conditions supporting aggressive trading. With CETX and AESC both gapping 100%+ on the day, Ross demonstrated disciplined position management while scaling share sizes to 10,000-15,000 shares per trade. CETX traded first out of the gates, initially yielding a marginal $98 profit across two early trades before Ross identified a cleaner pullback setup at $2.55, adding aggressively at $2.67, and riding momentum as the stock squeezed to $2.94 on intense volume (71 million shares). The multi-timeframe alignment with 5-minute breakout support encouraged position accumulation. AESC presented Ross's primary win and highest-conviction setup of the morning: three consecutive first-one-minute pullback dips at $3.80 resistance built inventory before the critical break of the $3.80 handle. Ross's signature trade came with a 14,000-share entry at $4.83 anticipating the $5.27-$5.73 daily resistance zone break. The stock immediately squeezed to $5.19-$5.20, producing a full $7,280 profit on that single entry before Ross added 1,000 more at $5.25, expecting a push toward intraday highs. Tightening profit targets, he scaled exits across $5.01-$5.20 with partial add attempts at the half-dollar resistance. However, the stock reversed sharply, forcing an unwind of 12,000 shares at $5.47-$5.37 for a devastating $1,200 loss—his largest of the day—demonstrating the double-edged risk of oversized positions on dip reversals. Despite the late-trade loss trimming gains, he walked away at 10:30 AM before summer school commitments, notably leaving additional CTX profits uncaptured as the stock climbed to $3.07. Ross emphasized the emotional complexity of position management: discomfort walking away early versus frustration at giving back profits on extended holds.
@@ -1375,6 +1841,14 @@ TRADES:
 | 2  | NOOV   | general | $7.50-$8.19   | gap-scanner    | yes  | scanner pop / impatient entry / first candle | STOP: reversal - no follow-through      | -$2,000+ | LOSS    |
 | 3  | CNCE   | general | $13.25-$14.84 | gap-scanner    | no   | ABCD pattern anticipation / consolidation | STOP: BE - minimal loss on ABC trigger   | -$9     | BE      |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 20% | - | whole-dollar-break | first 5-minute candle high break / gapped 20% | - | failed follow-through at $6.79 | $7.00-$7.20 | morning | - | scalp |
+| 2 | - | - | - | red-to-green | scanner pop / impatient entry / first candle | - | reversal - no follow-through | $7.98+ | morning | - | scalp |
+| 3 | - | - | - | abcd | ABCD pattern anticipation / consolidation | - | ABC trigger, minimal loss | $13.84-$18.00 | morning | - | short |
+
 SUMMARY:
 Ross completed day 42 of his $100,000 small account challenge with $5,689.79 profit, reaching $86,000 total balance and positioning within striking distance of his target. This day marked his largest green day since February 22nd ($88,000 profit) as he climbed from a recent plateau involving multiple breakeven and slow days. Trading three stocks from his gap-scanner watchlist, Ross confronted the tension between waiting for ideal multi-timeframe alignment versus impatient entries triggered by FOMO of missing moves. SPU gapped 20% on light volume, showing early strength with a $6.56-$6.88 pop, but Ross's 5,000-share entry at $6.50 captured only 14 cents due to premature exit before 70-cent target ($7.00-$7.20 daily resistance). NOOV represented his signature error: historically a runner that squeezed from $4.79 to $8.00 without pullback entry two weeks prior, Ross jumped impatient at $7.50 with 10,000 shares, anticipating the break of $7.98 and 50-cent gain potential toward $11.68 red moving average. Instead, the stock stalled at $8.19, reversed sharply, and Ross exited half at $8.00 for breakeven and the core 500-share position with breakeven stop, ultimately trimming the remaining 2,000 shares at $7.44 for a $2,000+ cumulative loss. CNCE presented the only tightly-managed loss: Ross waited for his preferred ABCD pattern, entering 1,000 shares at $13.25 for a consolidation-to-13.84 breakout attempt toward $18.00-$18.50 resistance. Executed disciplined breakout-or-bailout mentality, he cut immediately with minimal $9 loss when follow-through failed, demonstrating his core risk management principle: small losses when conviction thesis breaks. His reflection on the trades highlights ongoing internal conflict between five-minute setups (which have worked well Friday on RNVA) versus immediate scanner entries risking being left behind.
 
@@ -1398,6 +1872,12 @@ TRADES:
 | #  | SYMBOL | SECTOR  | PRICE         | SCANNER        | NEWS | ENTRY SETUP                              | EXIT                                    | RESULT   | OUTCOME |
 |----|--------|---------|---------------|----------------|------|------------------------------------------|-----------------------------------------|----------|---------|
 | 1  | AMRH   | general | $4.31-$5.30   | high-day-momo  | yes  | premarket break / opening range breakout| PROF: dip trades off $4.00, breaks over $5.00 | +$28,207 | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 218-250% | high | gap-and-go | premarket break / opening range breakout | scaled via dip trades off $4.00 VWAP | - | $5.00+ | pre-market/open | - | extended |
 
 SUMMARY:
 Ross finished his 43rd consecutive green day with $28,207 profit, bringing his 2020 month-to-date total to approximately $52,000 and maintaining his extraordinary hot streak through April and May into June. Trading solely AMRH, which ultimately moved 218-250% on the day with 45 million shares of volume, Ross demonstrated aggressive position sizing with base hit scaling using 4,000-18,000 shares per trade executed repeatedly. Starting with premarket entries before the bell at $4.31, Ross built conviction through the opening range breakout and successive dips off the $4.00 VWAP level, capturing consistent 2,000-2,800 profit increments across approximately twenty trades throughout the morning. The day exemplified his current market psychology: feeling completely dialed in like his high school skiing years, executing from a place of confidence rather than conviction-seeking, with no single trade dominating but instead multiple clean base hits accumulating to a massive daily total. Unlike yesterday's more diversified two-stock approach, Ross focused entirely on AMRH, running 4,000 shares through multiple trade cycles without experiencing significant losses, capturing momentum through micro-breakouts and dip bounces off the 4.00-4.30 zone. His reflection highlighted the contrast between overwhelming multi-year goals ($1M from $583, now at $1.58M) versus daily/weekly target-setting: he noted difficulty with large goals, preferring achievable short-term targets (100K monthly goal vs. 200K seemed unrealistic despite being 25% of the way two days into the month). Ross emphasized the sustainable nature of recent gains: since April 1, 2020 ($342K gross on 5,000+ trades), averaging $36,000/month, well below March 2020's $49,000 monthly average but part of realistic seasonal variation rather than unsustainable peaks.
@@ -1425,6 +1905,14 @@ TRADES:
 | 2  | MYZ    | general | $3.40-$3.80   | gap-scanner    | yes  | VWAP breakout / aggressive add chase   | PROF: scaled on squeeze to $3.63-$3.64  | +$800    | WIN     |
 | 3  | SZ     | general | $3.43-$3.80   | high-day-momo  | yes  | 5-minute consolidation breakout / add aggressively | STOP: sharp reversal - gave back $1,300 | -$1,300  | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | whole-dollar-break | opening range breakout / first 5-min candle | scaled, added back -$500 loss | reversal | $3.92-$3.89 | morning | - | short |
+| 2 | - | - | high | vwap-reclaim | VWAP breakout / aggressive add chase | scaled on squeeze to $3.63-$3.64 | - | $3.63-$3.64 | morning | - | short |
+| 3 | - | - | high | whole-dollar-break | 5-minute consolidation breakout / add aggressively | sharp reversal | $4.00-$4.10 | morning | - | scalp |
+
 SUMMARY:
 Ross finished day 43 of his $100K small account challenge with $6,185.79 profit, bringing his account to approximately $92,000 and narrowing his gap to the milestone to roughly $8,000. Trading in a state of frustration following a server crash in the chatroom at 9:15 AM, Ross acknowledged being "rattled" and trading more aggressively than usual, taking calculated risks that fortunately aligned with market strength. HTGM emerged as his primary trade following the server outage, where frustration drove him into 10,000-17,000 share positions at $3.50 for the opening range breakout above the $3.50 half-dollar resistance level. The stock spiked to $4.08 early on before rolling over, forcing him to scale out at $3.92-$3.76 for approximately $5,260 profit, though he re-added 10,000 shares at $3.94 expecting a five-minute candle high break to $4.00-$4.10 (high of day $3.78), only to be halted by a sharp red candle reversing from $3.75 to $3.27, costing him $500. MYZ was the secondary gapper with a similar aggressive pattern: 10,000-16,000 share adds at $3.40-$3.80, capturing approximately $800 on the gap-fill toward $4.00-$4.20 daily target after breaking VWAP support. SZ represented his only clean loss, where frustration-driven sizing led him to take 10,000 shares at $3.43-$3.80 for a first five-minute candle breakout above daily high of $3.78, anticipating movement to $4.00 whole-dollar resistance. Instead, the stock reversed sharply in a high-volume candle from $3.75 down to $3.27, forcing a $1,300 loss despite breakout-or-bailout discipline. Ross reflected on how his frustrated state removed normal fear-based position discipline, pushing him to his share-size limits ($16,000-$17,000 positions) rather than testing conservatively. He emphasized that his weekly accuracy stood at 57% (4W-3L combined), but with a favorable 27-cent average winner versus 11-cent average loser, producing a strong 2.5-to-1 profit-loss ratio sustaining profitability despite sub-60% accuracy. He noted the server crash as emotionally destabilizing but chose aggressive positioning on high-conviction daily-chart setups (gappers, first candle breaks, new highs), calculating that solid daily structure justified larger sizing despite frustration state.
 
@@ -1450,6 +1938,14 @@ TRADES:
 | 1  | HUGE   | general | $11.00-$12.00 | gap-scanner    | yes  | halt resume dip-buy / multiple entries | PROF: partial exits $10.45-$10.30, recovered loss | -$4,000 then +$1,000+ | BE      |
 | 2  | SECO   | general | $4.27-$4.66   | gap-scanner    | yes  | premarket pivot break / 5-minute breakout | PROF: scaled at $4.60-$4.66 then dips  | +$5,000+ | WIN     |
 | 3  | GNUS   | general | $5.55-$6.70   | high-day-momo  | yes  | halt resume dip-buy / series of adds    | PROF: scaled on breakouts $6.10-$6.70  | +$21,000 | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | high | halt-resume | halt resume dip-buy / multiple entries | dip purchases at $9.75-$10.00 | halted going down, stopped out | $10.30-$10.45 | pre-market/morning | - | extended |
+| 2 | - | 96% | - | gap-and-go | premarket-pivot breakover $4.27 / 5-minute breakout | scaled 5,000-10,000 share adds | VWAP retest flushed lower | $4.66 | morning | - | short |
+| 3 | - | 24% | high | halt-resume | halt resume dip-buy / series of adds | scaled adds at $5.55, $5.70, $5.85, $6.00, $6.10 | halted going down at $6.20, reversed | $6.70 | morning | - | extended |
 
 SUMMARY:
 Ross finished his 44th consecutive green day (wildcard Wednesday) with $27,472.86 profit, bringing his June month-to-date total to approximately $80,000 through day three, positioning him well ahead of his initially conservative 100K monthly goal. Despite missing HUGE in premarket due to caution on high-priced stocks from a prior halt-induced loss memory, Ross took it on resumption, buying dips at $11.00-$11.50 and adding at $12.00 anticipating a squeeze back through previous resistance. A halt going down at $12.61 forced a stop-out at $11.67 resulting in a $4,000 loss—his largest of the month—but subsequent dip purchases at $9.75-$10.00 bouncing back to $10.30-$10.45 recovered most losses, ultimately breaking even on the series. SECO, gapping 96%, presented a cleaner execution: buying the premarket-pivot breakover $4.27 with 5,000-10,000 share adds as it squeezed to $4.66 high, capturing a quick 40-50 cent move before a VWAP retest flushed lower, locking in approximately $5,000 profit. GNUS became the dominant trade: initially hesitant yesterday due to perceived choppiness despite uptrend from $2.50, Ross watched it rip 24% premarket and into the open. Buying aggressive dips at $5.55 off the halt resumption, he scaled to 15,000-18,000 shares by adding at every half-dollar ($5.55, $5.70, $5.85, $6.00, $6.10) as the stock squeezed from $5.74 open all the way to $6.70 intraday high, capturing approximately $21,000 profit on predominantly dip trades and breakout followthrough. A significant unrealized loss of $8,000 appeared mid-trade when halted going down at $6.20, dropping to $5.16 low before resuming and bouncing, but Ross' add mentality converted it to profit. Ross emphasized his psychology shift: willing to risk $2,000-$3,000 on individual 15,000-18,000 share trades given strong daily structure and volume (GNUS 173M shares), with statistical support from 88% trading accuracy yesterday across 26 trades and now six consecutive days exceeding $10,000 profit. He explicitly noted preparing to increase maximum position size from 18,000 to 25,000 shares given sustained liquidity, calculating even a 5% monthly drawdown acceptable against $400K+ gross profit since April 1.
@@ -1477,6 +1973,14 @@ TRADES:
 | 2  | QCOM   | general | $58.02-$58.08 | reversal-scan  | no   | short after consecutive green candles   | PROF: reversal/ 6-cent risk covering dips | +$350    | WIN     |
 | 3  | AUXO   | general | $4.83-$5.40   | high-day-momo  | yes  | recent reverse split / first breakout  | PROF: scaled at $5.35, $5.25 on pullback | +$6,454  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | false-breakout | continuation move / VWAP above moving averages | adds at $3.60 | failed new high above $3.86 | $3.80s | morning | - | short |
+| 2 | - | - | - | red-to-green | short after consecutive green candles | incremental covering $57.88-$57.68 | reversal | $57.67 low | morning | - | scalp |
+| 3 | - | - | - | gap-and-go | recent reverse split / first breakout | aggressive adds via hotkey to 20,000 shares | stalled at $5.40 | $5.27-$6.00 | late morning | - | short |
+
 SUMMARY:
 Ross completed day 44 of his $100,000 small account challenge with $8,871.40 profit, crossing his primary goal and finishing with an account balance of approximately $101,000. Starting the day with $992,000 in balance, Ross took only three trades, demonstrating his selective approach: MYOS, a stock that had squeezed from $1.30 to $7 approximately one month prior, appeared to break above moving averages (9, 20, 50, 200) despite technical weakness from prior rejection. Entering 15,500 shares at $3.55 with adds at $3.60 and above the $3.60 half-dollar, Ross immediately faced volatility: stock popped to $3.75 (up $3,000) then fell to $3.35 (down $3,000), forcing him to execute his two-week-old discipline rule of exiting at breakeven if unable to achieve a new high. Partial sells in the $3.80s and final exits at $3.60 locked $2,300 profit on a false five-minute breakout that couldn't sustain above $3.86. QCOM emerged from the reversal scanner showing 8-10 consecutive green candles (statistical mean reversion setup), triggering Ross's short entry at $58.02 with only 2,000-share size and a 6-cent stop ($120 risk). The stock reversed sharply, flushed from $58.08 high to $57.67 low, with Ross covering at $57.88-$57.68 via incremental positions as the stock stabilized, capturing $350 profit on extremely tight risk management. AUXO, flagged by chat room traders as a recent reverse split with a $7.50 price target, showed late-morning momentum at $4.83 despite initially appearing thin on volume. Convinced by chat support and reverse-split category history (KBSF, JVO), Ross entered 5,000 shares at $4.83, then aggressively added via four control-1 hotkey presses to accumulate 10,000-15,000 shares, finally to 20,000 at $4.94 average, targeting the $5.27-$6.00 home run range. The stock ripped to $5.43 high before stalling at $5.40, forcing Ross to scale exits at $5.35-$5.25 for $6,454 profit despite leaving potential gains unrealized. Ross emphasized the milestone represents mastery of scalability limits: a $583 starting account turned into $100K in 44 market days (9 weeks), achieving annual pace of $400K+, but the concentrated small-cap strategy cannot replicate with larger account sizes due to liquidity constraints—buying 200,000 shares to achieve 20-30 cent gains is impossible. He contrasted his focused momentum-reversal strategy against diversified "jack-of-all-trades" approaches, noting specialization in one strategy drives higher returns within its applicable market conditions.
 
@@ -1501,6 +2005,13 @@ TRADES:
 |----|--------|---------|---------------|----------------|------|------------------------------------------|-----------------------------------------|----------|---------|
 | 1  | GNUS   | general | $9.18-$11.73  | gap-scanner    | yes  | premarket dip buys / multiple breakouts | STOP: activist short alert halt resume | +$6,500  | WIN     |
 | 2  | CIDM   | general | $3.55-$4.45   | gap-scanner    | yes  | premarket dip / multiple adds at resistance | PROF: scaled at $4.00, $4.11, $4.45   | +$20,000+ | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | high | halt-resume | premarket dip buys / multiple breakouts | scaled adds on pop to $9.50 and after premarket pullback | activist short alert halt resume | $11.73 | pre-market/morning | - | extended |
+| 2 | - | 174% | high | dip-buy | premarket dip / multiple adds at resistance | scaled at $4.00, $4.11, $4.45 | - | $6.00+ | pre-market/morning | - | extended |
 
 SUMMARY:
 Ross finished his 45th consecutive green day with $26,924 profit, bringing his June month-to-date total to approximately $107,000 and reaching his secondary monthly goal of exceeding $100K in just four trading days. Trading two stocks entirely, Ross capitalized on extended momentum following halt resumptions and premarket volatility, demonstrating aggressive position management while acknowledging near-misses and psychological stress. GNUS extended its extraordinary move from prior $2.50 opening price, closing yesterday at $6.00 but halting premarket at $9.30. Ross entered premarket at $9.18 off a dip, built position to approximately 5,000 shares on the pop to $9.50, then re-entered at the break of $9.30 after premarket pullback, scaling to 10,000-15,000 shares as it squeezed through $10.00 and $10.50 resistance toward intraday high of $11.73. However, a critical activist short seller tweet from Citron Research alleging "stock promotion" and "massive dilution" at 10:30 AM triggered a cascade of selling pressure, halting the stock going down from $11.00 to $10.05. Simultaneously, news of an S-3 shelf registration filing for 60 million shares (at proposed $2.00 price) circulated, amplifying panic as traders expected an imminent direct offering. The stock flushed from $11.73 to a low of $4.50 on multiple circuit breaker halts, with Ross taking small dip trades at $10.00-$10.05 and $10.05 low for bounce attempts, capturing approximately $6,500 despite the capitulation. Frustrated by missing the bounce from $4.50 back to $8.00 after stopping trading to teach summer school, Ross explicitly acknowledged FOMO over a $4.00-per-share move while recognizing his decision not to pursue maximum size on the late bounce was prudent given the undisclosed direct offering risk. CIDM, the day's leading gapper at +174%, presented a cleaner trade: premarket entry at $3.55 off a double-bottom dip at the half-dollar, with aggressive adds at $3.89 and again at $4.11 for the first candle breakout above that level. Building a maximum position of 18,500 shares at an average near $3.90, Ross caught the premarket squeeze to $4.45 high before scaling profits, executing follow-through breakout trades at $4.50 (hitting $6.00 high intraday) for approximately $20,000 profit. Ross candidly analyzed his psychology: despite holding the $9.18-$11.73 GNUS trade that produced $6,500 profit, he was bothered by missing the $4.50-$8.00 bounce, illustrating the tension between prudent risk management and emotional satisfaction. He noted his June statistics: 85% accuracy with $1,400 average winners versus $440 average losers (exceptional 3.2-to-1 ratio), and having now surpassed $395,000 gross profit since April 1 ($9,000 daily average vs. his historical $2,350 average), he voiced awareness that this performance is unsustainable and will compress as market conditions normalize.
@@ -1538,6 +2049,24 @@ TRADES:
 | 12 | FTSI   | general | $17.88        | watching       | no   | dip re-entry                            | PROF: scaled at high                    | unknown   | WIN     |
 | 13 | DGLY   | general | $4.15         | premarket-scan | yes  | break of premarket high / micro pullback | PROF: scaled at $4.50                   | +$3,300   | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | dip-buy | dip buy / break of VWAP | scaled on bounce | reversal flush | $12.50-$12.88 | morning | - | short |
+| 2 | - | - | - | dip-buy | dip buy / pop off lows | scaled on bounce | - | $12.50+ | morning | - | scalp |
+| 3 | - | - | - | unknown | continuation entry | - | failed-breakout | - | morning | - | short |
+| 4 | - | - | - | whole-dollar-break | break of whole dollar | scaled at $4.06 | reversal | $4.06 | morning | - | short |
+| 5 | - | - | - | whole-dollar-break | break of prior resistance | - | reversal stopped at $4 | $4.15+ | morning | - | scalp |
+| 6 | - | - | - | halt-resume | halt resume / opening range breakout | scaled at $2.90-$3.05 | - | $3.05+ | morning | - | short |
+| 7 | - | - | - | halt-resume | halt resume / dip add | scaled at $5.85-$6.00 | - | $6.00+ | morning | - | short |
+| 8 | - | - | - | unknown | unknown entry | quick exit | - | - | morning | - | scalp |
+| 9 | - | - | - | dip-buy | dip buy | scaled at $43-$44 | - | $43-$44 | morning | - | short |
+| 10 | - | - | - | dip-buy | re-entry on dip | - | reversal | - | morning | - | scalp |
+| 11 | - | - | - | whole-dollar-break | break of whole dollar / add at $16 | - | reversal flushed down | $16+ | morning | - | short |
+| 12 | - | - | - | dip-buy | dip re-entry | scaled at high | - | high | morning | - | short |
+| 13 | - | - | - | whole-dollar-break | break of premarket high / micro pullback | scaled at $4.50 | - | $4.50+ | morning | - | short |
+
 SUMMARY:
 Ross finished the day up $14,980.76, a strong recovery after starting the morning with losses. The leading gapper ENOB failed dramatically despite initial enthusiasm, resulting in consecutive losses that put him underwater early. By the third trade, he was down roughly $500 and made a deliberate decision to stop forcing trades if he couldn't regain momentum. The turning point came with halt-resume trades on ADIL and particularly SNDE, where he capitalized on strong gap-up resumptions with multi-add scaling strategies. Energy sector strength dominated the session, with SNDE providing approximately $4,000 profit on eight thousand shares and multiple energy stocks (MXC, CHK, FTSI) creating additional opportunities. DGLY provided consistent setups for whole-dollar breaks, yielding two significant wins totaling over $6,600. Though CHK proved difficult with wide spreads causing losses, Ross stayed disciplined by avoiding overtrading the volatile $36-$47 range. The session demonstrated his core strategy: starting cautious after mixed Friday results, then scaling aggressively into confirmed momentum (halt-resume patterns, sector strength). He stopped trading after exceeding his daily goal, maintaining his hot-streak preservation mentality despite $125,000 monthly profit opportunity.
 
@@ -1564,6 +2093,15 @@ TRADES:
 | 2  | EVRI   | general | $4.00      | high-day-momo  | yes  | whole dollar entry / chasing    | STOP: reversal - slippage to $3.66       | -$340    | LOSS    |
 | 3  | EVRI   | general | $3.66      | watching       | yes  | short on reversal               | STOP: bounced off low                    | -$30     | LOSS    |
 | 4  | KO     | general | $3.45      | premarket-scan | no   | red-to-green / first HoD move   | STOP: reversal                           | -$134    | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | red-to-green | chasing momentum squeeze | reversal flushed | - | - | morning | - | scalp |
+| 2 | - | - | - | whole-dollar-break | whole dollar entry / chasing | reversal slippage to $3.66 | - | $4.25-$4.50 | morning | - | scalp |
+| 3 | - | - | - | red-to-green | short on reversal | bounced off low | - | - | morning | - | scalp |
+| 4 | - | - | - | red-to-green | red-to-green / first HoD move | reversal | - | - | morning | - | scalp |
 
 SUMMARY:
 Ross finished the day down $5,914.16 on four trades, his fourth consecutive red day after hitting $101,000 on his $100k challenge just four days prior. The session highlighted a critical pattern he identified: chasing one-minute setups on whole-dollar and half-dollar entries without waiting for pullback confirmation. CERU set the day's tone with a squeeze that failed to continue. EVRI exemplified the problem—Ross bought aggressively at the whole dollar of $4, targeting $4.25-$4.50 based on earlier strength, but the stock pulled back immediately, rolling over to $3.66 with slippage. He added a short on the bounce but was stopped at the low, compounding losses. KO provided a small loss on a red-to-green setup that failed. Despite ending the day with max loss, Ross used the recap to analyze his metrics: 33% win rate, 4-cent average winner, 12-cent average loser. He traced four consecutive red days to the same behavioral deviation—entering extended moves without waiting for clean pullback confirmation. The market had shifted from rewarding aggressive chasing (as it did in February-March) to punishing it. Rather than fight the conditions, he committed to waiting for one-minute and five-minute pullback setups, downsizing share size, and reducing trade frequency until cleaner opportunities emerged.
@@ -1595,6 +2133,18 @@ TRADES:
 | 6  | LMPX   | tech    | $7.12         | watching       | no   | break of whole dollar                  | STOP: reversal                           | -$60      | LOSS    |
 | 7  | LMPX   | tech    | $7.30         | watching       | no   | bounce / re-entry attempt              | STOP: failed-breakout                    | -$60      | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go / break of premarket high | scaled at $7.50 on breakout | - | $8+ | morning | - | short |
+| 2 | - | - | - | micro-pullback | micro pullback dip entry | scaled on surge to $8+ | - | $8+ | morning | - | short |
+| 3 | - | - | - | whole-dollar-break | break of whole dollar | flat exit on pullback | - | $8.85 | morning | - | scalp |
+| 4 | - | - | - | whole-dollar-break | breakout re-entry / surge move | booked on spike to $8.85 | - | $8.85 | morning | - | scalp |
+| 5 | - | - | - | dip-buy | bounce off support | failed-breakout stopped | - | $7.05+ | morning | - | scalp |
+| 6 | - | - | - | whole-dollar-break | break of whole dollar | reversal | - | $7.05+ | morning | - | scalp |
+| 7 | - | - | - | dip-buy | bounce / re-entry attempt | failed-breakout | - | - | morning | - | scalp |
+
 SUMMARY:
 Ross finished the $1,000 small account challenge day five up $353.50 after trading only LMPX, a recent IPO that gapped up on the gap scanner. Trading two accounts simultaneously, he made $3,800 in his main account while scaling his small account position carefully (500-share maximum, often 200 shares on later trades). The stock provided excellent initial follow-through: he entered at $6.75 on the break of premarket highs, scaled at $7.50, $8.00, and $8.30 as it surged toward $8.85. First four trades produced approximately $410 in profit within the first ten minutes. However, he then took three consecutive losses on attempted re-entries at lower levels ($7.00, $7.12, $7.30), each failing to break above the consolidation zone and triggering stops. These three back-to-back losses triggered his third rule—stop trading for the day—which he had self-imposed with a hair-cutting penalty. Though frustrated at missing potential further upside (the stock eventually spiked higher), he honored his rule to prevent emotional snowballing. After commission costs (~$12 per trade), he remained solidly green, demonstrating the impact of scaling and adherence to position-sizing rules on small account survival.
 
@@ -1621,6 +2171,15 @@ TRADES:
 | 2  | PRAX   | general | unknown       | premarket-scan | no   | gap-down reversal / opening setup       | STOP: reversal / false breakout          | -$178    | LOSS    |
 | 3  | GOVX   | general | $2.25         | high-day-momo  | no   | break of seller resistance / dip buy    | PROF: scaled at $2.33-$2.34               | +$1,000  | WIN     |
 | 4  | PNRG   | general | $3.20         | high-day-momo  | no   | momentum squeeze / breakout            | STOP: failed-breakout at $2.40          | +$340    | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | red-to-green | momentum squeeze on momo scanner | dip bought | reversal | - | morning | - | scalp |
+| 2 | - | - | - | gap-and-go | gap-down reversal / opening setup | - | reversal false breakout | - | morning | - | scalp |
+| 3 | - | - | - | whole-dollar-break | break of seller resistance / dip buy | scaled at $2.33-$2.34 | - | $2.34+ | morning | - | short |
+| 4 | - | - | - | red-to-green | momentum squeeze / breakout | - | failed-breakout at $2.40 | $2.40+ | morning | - | short |
 
 SUMMARY:
 Ross finished day five of his Martha's Vineyard challenge up just $666.24, the smallest green day yet and notably his first session to go underwater before recovering. Trading from his traveling station, he encountered a slow market with no quality gap scanner candidates at the open. CISO was the opening high-day momo scanner setup, squeezing from $7.50 to $8.50, but a sharp red candle immediately reversed the trade, pushing him down $700 before he bought the dip and recovered to -$574. PRAX followed as a gap-down reversal attempt that failed after an initial pop to $5.30, yielding a -$178 loss on multiple exits. The turning point came with GOVX, where he identified breaking seller resistance at $2.25, scaled profit at $2.33-$2.34, and booked approximately $1,000 on the trade, returning to green. PNRG provided a final small winner of $340 on another momo squeeze, though it failed to hold $2.40 resistance. He deliberately avoided trading IMTE (volatile halt situation) and stopped trading despite being slightly green, fearing a quick loss could pull him back into red. His risk management was tight throughout, never dropping more than $700 intraday, demonstrating cautious position-sizing on a low-setup day.
@@ -1651,6 +2210,17 @@ TRADES:
 | 5  | CHNR   | chinese | unknown       | watching       | no   | re-entry on second move                  | STOP: double top rejection               | -$5,000  | LOSS    |
 | 6  | NDR    | general | $11.50        | high-day-momo  | yes  | break of resistance / momentum squeeze   | PROF: scaled at $12.00                   | +$3,700  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | break of resistance / short squeeze | double top rejection at $11.87 | - | $11.87 | morning | - | scalp |
+| 2 | - | - | - | dip-buy | dip re-entry / cup-and-handle pattern | scaled at $12.20-$12.50 | - | $12.50 | morning | - | extended |
+| 3 | - | - | - | gap-and-go | break of whole dollar on news | scaled at $9.50-$10.00 | - | $10+ | morning | - | short |
+| 4 | - | - | - | dip-buy | dip re-entry / curl back up | scaled to break $11.00+ | double top rejection | $11.00+ | morning | - | short |
+| 5 | - | - | - | red-to-green | re-entry on second move | - | double top rejection | - | morning | - | short |
+| 6 | - | - | - | gap-and-go | break of resistance / momentum squeeze | scaled at $12.00 | - | $12.00+ | morning | - | short |
+
 SUMMARY:
 Ross finished day five of trader rehab up $18,668, the second strong recovery day following his $188,000 loss from a single position on Tuesday. Trading four stocks across his large account, he remained green on all four trades despite notable challenges. STI was the anchor trade: after initially losing $700 on a false breakout attempt, he correctly identified a cup-and-handle pattern on the pullback and re-entered at $11.50, scaling through $12.20-$12.50 for an $8,600 gain that established his cushion. AT provided a quick $1,500 on news-driven momentum from $8.88 toward $10.00, taken with reduced size due to light volume and higher risk. CHNR represented the day's most volatile holding: he grew cautious about the Chinese stock without news catalyst but eventually entered a dip re-entry into a $9.50-$11.00 move, capturing roughly $10,000 profit before a double-top rejection forced him to give back $5,000 and exit. NDR yielded $3,700 on a break-of-resistance pattern at $11.50, though he notably missed the best part of the move from $12 to $14 while scaling. He deliberately avoided trading his small account, prioritizing large-account recovery and meaningful progress toward offsetting his month-to-date drawdown. By session end, he had recovered approximately half of his Tuesday losses.
 
@@ -1680,6 +2250,17 @@ TRADES:
 | 5  | PTX    | general | unknown  | watching       | no   | dip re-entry                   | PROF: scaled                   | +$60   | WIN     |
 | 6  | PTX    | general | unknown  | watching       | no   | second re-entry                | STOP: reversal                 | -$40   | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | red-to-green | momentum squeeze | scaled on strength | reversal | $2.33-$2.34 | morning | - | scalp |
+| 2 | - | - | - | dip-buy | dip re-entry | partial exit | reversal | - | morning | - | short |
+| 3 | - | - | - | red-to-green | re-entry on move | reversal | - | - | morning | - | scalp |
+| 4 | - | - | - | red-to-green | momentum spike | quick exit | reversal | - | morning | - | scalp |
+| 5 | - | - | - | dip-buy | dip re-entry | scaled | reversal | - | morning | - | short |
+| 6 | - | - | - | red-to-green | second re-entry | - | reversal | - | morning | - | scalp |
+
 SUMMARY:
 Ross finished the small account challenge day five up $148 after commissions (or $212 before commissions). Trading two stocks—CNAT and PTX—he executed multiple entries and exits across both positions, demonstrating his scaling strategy within a constrained position size. The morning revealed a critical challenge of small-account trading: commission costs of approximately $63 consumed nearly 30% of gross profit, resulting from the fixed $4.95-per-trade cost regardless of share quantity. CNAT provided early profit from momentum runs with multiple scaling exits, though one re-entry resulted in a loss. PTX similarly showed mixed results across three separate entries, with earlier scalps capturing gains but a final re-entry costing $40. Despite the commission drag, the session yielded a 12% account gain (from $1,201 to $1,349), continuing his overall challenge progress of +130% since starting with $583 on January 3rd. He acknowledged needing $200-250 daily pre-commission profit to reach his weekly target, and today's $212 came close. The session reinforced the difficulty of profitably trading small accounts given fixed commissions, though disciplined scaling and multiple re-entries kept losses modest and kept him ahead of costs.
 
@@ -1706,6 +2287,15 @@ TRADES:
 | 2  | TOPS   | general | $2.31         | watching       | no   | bounce on red candle                 | STOP: failed-breakout               | -$200   | LOSS    |
 | 3  | TOPS   | general | $2.40         | watching       | no   | break of first 5-min high           | PROF: scaled at $2.40-$2.44          | +$194   | WIN     |
 | 4  | SOO    | general | $2.92         | high-day-momo  | no   | momentum spike / spiking up          | PROF: scaled on spike to $3.19       | +$2,100 | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 100% | - | gap-and-go | momentum spike on 100% gap | quick exit on spike | failed-breakout | $2.40-$2.44 | morning | - | scalp |
+| 2 | - | - | - | dip-buy | bounce on red candle | - | failed-breakout | $2.31+ | morning | - | scalp |
+| 3 | - | - | - | whole-dollar-break | break of first 5-min high | scaled at $2.40-$2.44 | - | $2.44+ | morning | - | short |
+| 4 | - | - | high | gap-and-go | momentum spike / spiking up | scaled on spike to $3.19 | disappeared 10k bid | $3.20 | morning | - | short |
 
 SUMMARY:
 Ross ended his four-day red streak with a $2,042.40 green day, capitalizing on shipping-sector momentum across TOPS and SOO. Coming in with conservative intent (planning 200-500 shares after recent losses), he adjusted mid-session when strong setup quality warranted larger size. TOPS opened the 100% gap from $1.12 to $2.50 but was heavily congested on consolidations with notable seller resistance at $2.50 (60,000-share wall). His first trade at $1.86 yielded just $12 before exiting; a second attempt at $2.31 failed on rejection, costing $200. He found success re-entering at $2.40 for the break of the first five-minute high, scaling toward $2.45 for +$194. SOO was the day's major winner: seeing strong daily chart structure with room up to $3.75-$4.27, he entered at $2.92 during the spike, targeted $3.20+ breakout, and exited strategically at $3.10 when a 10,000-share bid disappeared—locking +$2,100. He deliberately avoided GLBS despite a $5.50-$7.50 move, citing light volume (400k shares) and 15-20 cent spreads creating execution risk. This recovery day reflected discipline in accepting smaller wins (under $2K) after his aggressive high-size habits during the four-day drawdown.
@@ -1736,6 +2326,17 @@ TRADES:
 | 5  | EDSA   | general | unknown       | gap-scanner    | yes  | breakout attempt / VWAP break         | PROF: scaled on false breakout pivot | +$3,400   | WIN     |
 | 6  | GIN    | general | $5.00         | premarket-scan | no   | premarket break of whole dollar        | PROF: scaled at $5.05                | +$250     | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | halt-resume | gap-and-go / halt-down then resume | dip re-entry on bounce | false-breakout flushed | $10.75 | morning | - | short |
+| 2 | - | - | - | dip-buy | dip re-entry / break of consolidation | - | false-breakout flushed | $11.75+ | morning | - | scalp |
+| 3 | - | - | - | dip-buy | dip bounce / bounce off lows | scaled on pop to $10.75 | reversal | $10.75 | morning | - | short |
+| 4 | - | - | - | unknown | continuation on bounce | - | reversal | - | morning | - | short |
+| 5 | - | - | - | vwap-reclaim | breakout attempt / VWAP break | scaled on false breakout pivot | - | $8.00+ | morning | - | short |
+| 6 | - | - | - | whole-dollar-break | premarket break of whole dollar | scaled at $5.05 | - | $5.05+ | morning | - | scalp |
+
 SUMMARY:
 Ross finished the week opening day (Monday) up $14,271.21, his second-smallest green day of an exceptional month, though still a strong performance. Trading two leading gappers—NETE (letter of intent to merge catalyst) and EDSA (COVID-19 catalyst)—he managed several frustrating experiences: three separate occasions when he sized up to 6,000-12,000 shares anticipating dollar-plus moves that failed to materialize, stopping out breakeven each time. NETE proved highly choppy with multiple halt-downs and false breakouts as it oscillated between $11.12-$13.40 premarket then sold off intraday. He captured a $500 bounce on first resume, then suffered a -$1,000 loss on an attempted consolidation breakout at $11.75, before recovering with a $750 dip-bounce trade off $10.00 lows. EDSA, while showing promise with a $9.80 premarket high, delivered multiple VWAP rejections and a false breakout above $8.00 before rolling over; he still extracted +$3,400 by managing the pullbacks. GIN was a minor $250 premarket scalp. The market lacked the explosive trending conditions of prior week days (when 25-50k moves occurred), and he deliberately exited by 10:30 to avoid overstaying. Strategically, he discussed how consecutive-green-day mentality requires starting small and scaling with success, but inherently limits upside on slow-momentum days.
 
@@ -1763,6 +2364,15 @@ TRADES:
 | 3  | CUOI   | general | $3.77         | high-day-momo  | no   | micro pullback / dip buy                  | PROF: scaled at $4.10                 | +$8,000  | WIN     |
 | 4  | MCEP   | general | $8.00         | high-day-momo  | no   | break of whole dollar                     | PROF: scaled at $8.42                 | +$6,000  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | very-high | halt-resume | continuation / break of prev day high | scaled on multiple halts | - | $19.23+ | morning | - | extended |
+| 2 | - | - | very-high | gap-and-go | gap-and-go / bull flag breakout | scaled on momentum | - | $6.49+ | pre-market/morning | - | extended |
+| 3 | - | - | - | dip-buy | micro pullback / dip buy | scaled at $4.10 | - | $4.10+ | morning | - | short |
+| 4 | - | - | - | red-to-green | break of whole dollar | scaled at $8.42 | - | $8.42+ | morning | - | short |
+
 SUMMARY:
 Ross finished day 53 up $68,228.91, capitalizing on the hottest market conditions of his trading career. Trading four stocks across one of the month's strongest momentum environments, he remained green on all four and extracted significant profits from each setup. UONE, watched premarket as a continuation setup off the previous day's high of $8.00, proved the largest winner at +$29,000 through multiple dip-buy re-entries during five separate halt-ups and resumptions. He scaled aggressively: buying dips at $13.30-$13.40, watching the stock squeeze toward $19.23, and adding each pullback, demonstrating the dip-buying strategy he was teaching in summer school—described as higher-risk, requiring profitable-trader experience. ROSY, the market's leading gapper (despite having no news but riding energy sector momentum), opened near $5.20 and squeezed to $6.49 premarket before forming a five-minute bull flag on the break of $5.64; he captured +$25,000 through premarket scaling and early morning entries. CUOI and MCEP each contributed $8,000 and $6,000 respectively on quick gap-and-go entries that broke whole dollars and pulled back. The session reflected near-parabolic market conditions (1M+ premarket volume, V-shaped recovery off March lows driving record overall volatility), though Ross noted leaving potential additional gains on UONE by not staying aggressive longer. His year-to-date gross profit exceeded $1M; after ~$90k commissions, net topped $920k.
 
@@ -1789,6 +2399,15 @@ TRADES:
 | 2  | UONE   | general | $8.00         | watching       | yes  | gap-and-go continuation                  | PROF: multiple dip re-entries         | +$25,000  | WIN     |
 | 3  | IMTE   | general | unknown       | gap-scanner    | no   | breakout attempt                        | PROF: quick scalp                     | +$15,000  | WIN     |
 | 4  | AFH    | general | unknown       | gap-scanner    | no   | momentum squeeze                        | PROF: scaled                          | +$4,000   | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | very-high | dip-buy | dip-buy add strategy / break of VWAP | scaled through breakouts | - | $20+ | morning | - | extended |
+| 2 | - | - | - | gap-and-go | gap-and-go continuation | multiple dip re-entries | - | $8.00+ | morning | - | extended |
+| 3 | - | - | - | whole-dollar-break | breakout attempt | quick scalp | - | - | morning | - | scalp |
+| 4 | - | - | - | red-to-green | momentum squeeze | scaled | - | - | morning | - | scalp |
 
 SUMMARY:
 Ross finished day 54 with +$224,397.91, the best day of his entire trading career. The market presented an extraordinary environment with four-to-five stocks gapping up over 100%, driven by a catalyst highlighting Black-owned companies on Wall Street (CARV, UONE). CARV, the day's primary focus, formed the perfect storm: gapping from $8.00 toward $20+, it allowed multiple dip-buy entries where he added 10,000-share starter positions and scaled into 8,000-share breakout additions. With no margin available on this account (cash-only, capped at $254k buying power after resetting at $50k month-start), he deployed his full capital on aggressive add strategies throughout the day's 20-point run, capturing approximately $180,000 on CARV alone. UONE, yesterday's previous daily profit leader ($40+ move), was monitored but not traded at similar intensity. He also traded IMTE (+$15,000) and AFH (+$4,000) on related momentum. His commentary emphasized gratitude over greed, acknowledging he was leaving money on table by stopping early while simultaneously noting other traders (citing reports of $250k-$500k days on UONE alone) likely extracted larger profits. He philosophically discussed his strength as a teacher/communicator relative to raw trading skill, noting more aggressive traders holding 20,000-50,000 shares on such moves could capture multi-hundred-thousand-dollar trades. Gross profit for the year now exceeded $1M; year opened with $50k reset account now at $254k+.
@@ -1818,6 +2437,16 @@ TRADES:
 | 4  | CARV   | general | $unknown   | high-day-momo | no   | first candle to new high               | PROF: quick scalp                   | ~+$2,300  | WIN     |
 | 5  | AESE   | general | $4.00      | premarket-scan| no   | break over 4.00                        | STOP: reversal - pullback           | ~+$500    | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | halt-resume | dip re-entry / halt resume bounce | scaled $22.75-$23.25 | - | $22.75-$23.25 | morning | - | scalp |
+| 2 | - | - | - | abcd | first candle to new high / abcd pattern | dip trades | reversal dip trades failed | $13.16-$16.75+ | morning | - | extended |
+| 3 | - | - | high | gap-and-go | gap-and-go / momentum pop | scaled through momentum | - | $4.00 | morning | - | short |
+| 4 | - | - | - | whole-dollar-break | first candle to new high | quick scalp | - | - | morning | - | scalp |
+| 5 | - | - | - | whole-dollar-break | break over 4.00 | - | reversal pullback | $4.00+ | morning | - | scalp |
+
 SUMMARY:
 Ross closed the day up $153,000, the second-best day of his career and part of an exceptional hot streak that has included multiple $100,000+ days within the past two weeks. This marked his third major green day in six trading days. UONE was the featured trade, with a small halt-resume scalp producing roughly $1,000. His primary advantage trade was AEMD, a pre-market identified stock with breaking news that squeezed from $2.75 all the way to $4.00, generating approximately $20,000 profit on up to 20,000 shares with multiple adds during the momentum. This trade exemplified his hot-streak approach: identifying a catalyst early, scaling in aggressively as the stock confirmed strength, and exiting with partial takes into momentum surges. ALPN proved problematic, opening with an abcd pattern entry anticipating a breakover $13.16-$16.75, but instead failing and requiring multiple losing dip trades that totaled -$15,000, dropping from +$9,000 to -$4,500 on that single stock. CARV and AESE were smaller contributors. The session illustrated both Ross's confidence in the market's extreme volatility (with intraday moves of $10-$20 per share not uncommon) and his emerging risk awareness. While aggressive scaling on winners has been profitable, he specifically chose to exit by noon rather than risk afternoon secondary offering halts, knowing his largest position (18,000 shares of UONE) represented nearly $400,000 exposure. He emphasized the need to trade the market in front of you: when conditions are irrationally strong, be aggressive; when conditions cool, dial back size.
 
@@ -1842,6 +2471,13 @@ TRADES:
 |----|--------|---------|------------|---------------|------|----------------------------------------|-----------------------------------|-----------|---------|
 | 1  | HTGM   | biotech | $6.50-8.70 | premarket-scan| yes  | gap-and-go after-hours squeeze / first candle to new high retest | PROF: scaled through momentum to $10-11 | +$1,400   | WIN     |
 | 2  | ZIS    | general | $3.50-3.85 | high-day-momo | no   | sympathy surge on HTGM move / dip entry | PROF: quick exit on reversal      | +$3,331   | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go after-hours squeeze / first candle to new high retest | scaled through momentum to $10-11 | - | $10-11 | morning | - | short |
+| 2 | - | - | - | red-to-green | sympathy surge on HTGM move / dip entry | quick exit on reversal | reversal | $4.19 | morning | - | scalp |
 
 SUMMARY:
 Ross finished Friday (day 56) up $4,731, specifically ending the session early to avoid overextending after breaking back above the $100,000 threshold—his second time crossing that milestone in the 100K challenge. HTGM was the session's centerpiece: earnings the night before created a post-hours squeeze from $4 to $6.50, followed by a volatile open that tested his discipline. After being faked out multiple times in the first few candles (six times total across Thursday and Friday), he finally caught the legitimate first-candle-to-new-high pattern at $8.70 on the five-minute chart, scaling to only 2,000 shares due to prior losses of confidence. The stock eventually rallied to $11, but Ross had trimmed most of his position early and held just 250 shares, capturing the bulk through $10. Despite finishing +$1,400 on HTGM (a gain that could have been $20,000+ with normal sizing), he deliberately avoided further exposure to what he labeled an "expert level" stock. ZIS provided a sympathetic gain when HTGM spiked: Ross entered 10,000 shares at $3.50 anticipating a similar run, reached +$7,000 at $4.19 but saw a flush in the next candle and exited at $3.85 for +$3,331. He ended the week at $9,967 total profit and month-to-date at $22,444, remarking on the two-week red streak that preceded this recovery and accepting that $20,000 monthly runs are acceptable pace-building when hotter markets dry up.
@@ -1868,6 +2504,13 @@ TRADES:
 | 1  | APOP   | biotech | $9.88      | gap-scanner   | yes  | gap-and-go / dip entry 1min pullback   | PROF: scaled at $11, $12.25, $13.50| ~+$1,900  | WIN     |
 | 2  | GBR    | general | $2.50-3.40 | high-day-momo | no   | sympathy move on APOP strength         | PROF: first 5min to new high       | ~+$1,000  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 35% | - | gap-and-go | gap-and-go / dip entry 1min pullback | added at $12.25, $13.50 | - | $13.50+ | morning | - | short |
+| 2 | - | - | - | red-to-green | sympathy move on APOP strength / dip entry | added at $3.20 and $3.40 breakout | - | $3.40+ | morning | - | short |
+
 SUMMARY:
 Day 57 of the $583 challenge closed +$4,966, marking Ross's first trading day in "fresh territory" above $105,000 (having previously reached $100,100). The session reflected his refined post-red-streak strategy: abandoning aggressive chasing in favor of high-quality one-minute and five-minute pullback entries, even if arriving slightly late to moves. APOP gapped 35% on stem cell treatment news and exemplified this tension. The stock broke above pre-market highs of $8.75 immediately at the open and rocketed to $9, creating an extended setup that Ross deliberately avoided chasing despite recognizing opportunity. Instead, he waited for pullbacks, entering 1,000 shares at $9.88 on the first one-minute dip, adding at $12.25, and again at $13.50 for the break over resistance. His three trades on APOP yielded roughly $1,900, well below the $10,000+ potential traders with larger sizing captured, but reflecting his deliberate risk reduction. GBR was a sympathetic move off APOP strength, with no identified news catalyst. Ross took 7,500 shares at $2.50, added 7,500 more at $3.20 for the breakout, and captured one final trade on the first five-minute candle to new highs at $3.40 for roughly $1,000 total. The market context was hot with clear breakout setups, yet Ross remained disciplined about position sizing. He emphasized that his strategy refinement—focusing on pullbacks rather than chasing extended moves—has been the engine of his recent recovery from -$15,000 two weeks prior.
 
@@ -1892,6 +2535,13 @@ TRADES:
 |----|--------|---------|------------|---------------|------|----------------------------------------|-----------------------------------|-----------|---------|
 | 1  | CBIO   | biotech | $9.50      | high-day-momo | yes  | first candle to new high / halt resume| PROF: scaled at $10.24, added $15.10 | +$2,222   | WIN     |
 | 2  | IMUC   | biotech | $3.32-3.45 | high-day-momo | no   | sympathy move / first candle pattern   | STOP: reversal - double top        | ~+$300    | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | high | whole-dollar-break | first candle to new high / halt resume | added at $15.10 after halt | - | $16.10+ | morning | - | short |
+| 2 | - | - | - | red-to-green | sympathy move / first candle pattern | - | double top reversal | $3.60+ | morning | - | scalp |
 
 SUMMARY:
 Day 58 closed +$4,251, bringing the account to just under $110,000 and representing the ninth consecutive green day following the four-day -$15,000 red streak. Ross opened with detailed commentary on emotional discipline and risk management, having lost $155,000 in a single day trading impulsively (RGSC earlier in the year). CBIO gapped sharply pre-market, testing his resolve against emotional FOMO entries. Though he had orders ready at $8, when the stock popped to $8.39 right before the bell, he recognized the lack of proper risk-reward and waited. The stock spiked to $9.62 on the first candle. Rather than chase, he entered at $9.50 (high of the second candle) with 2,500 shares, capturing the move to $10.90 for roughly $1,400. A halt at $15.23 offered a second entry at $15.10 (size reduced to 500 shares due to connection issues), which he exited at $16.10 for an additional $500. Had he been more aggressive on the multiple one-minute pullbacks (which continued throughout the move), particularly after the halt, larger profits were possible. Still, by maintaining discipline and waiting for defined setups, he protected against the devastating losses that emotion-driven chasing produces. IMUC appeared as a sympathy play off CBIO momentum, popping to $3.60. Ross entered 332 shares as it spiked, anticipating the first one-minute candle to break above $3.60, but heavy selling at that level resulted in a double-top and forced exit around $3.50-$3.55 for roughly $300 gain. Ross emphasized the importance of discipline, particularly since he could have abandoned his rules chasing CBIO and still profited—but recognized that breaking rules works until it doesn't, as evidenced by his prior $155,000 single-day loss.
@@ -1918,6 +2568,14 @@ TRADES:
 | 1  | LMPX   | general | $16.50-17.00| premarket-scan| no   | resistance breakout / first minute move| PROF: scaled exits $17-$17.50       | ~+$90     | WIN     |
 | 2  | DPW    | general | $1.35      | high-day-momo | no   | micro pullback / first candle breakout| STOP: failed-breakout - flushed     | -$60      | LOSS    |
 | 3  | MYSC   | general | $3.90-4.15 | gap-scanner   | no   | red-to-green move / micro pullback    | STOP: reversal - failed to hold     | -$3       | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | whole-dollar-break | resistance breakout / first minute move | scaled exits $17-$17.50 | - | $17.50+ | morning | - | scalp |
+| 2 | - | - | - | micro-pullback | micro pullback / first candle breakout | - | failed-breakout flushed | $1.35+ | morning | - | scalp |
+| 3 | - | - | - | red-to-green | red-to-green move / micro pullback | - | reversal failed to hold | - | morning | - | scalp |
 
 SUMMARY:
 Day 6 of the Inner Circle Miami event (small account challenge day, trading from $520 starting balance) closed +$200 in simulator before commissions. This was a day trading live at an event with audience observation, which Ross noted created a deliberate shift toward conservative position sizing to manage risk in an unfamiliar environment. LMPX was a premarket-watch continuation play that had already moved from $6 to $16-$17 pre-event, tested Ross's conviction against FOMO for missing the gap-and-go phase. He entered 200 shares at $16.50 (break of premarket resistance), captured the move to $17.50 on two scalps with proper exit discipline. DPW appeared on the gap scanner and showed volatility, but Ross entered 300 shares at $1.35 on a micro-pullback anticipating a break over resistance, only to be flushed down to $1.15 for a -$60 loss. MYSC was a red-to-green entry at $3.90 expecting a continuation break, entered with micro-pullback confirmation, but the stock failed to sustain and was immediately exited on reversal for -$3. Ross emphasized throughout that his reduced position sizing reflected the unusual environment (live event, travel setup) and the desire to avoid catastrophic small-account blowups in front of audience. CEI, which was the leading gapper (up 100%+ pre-market with 26M volume), was deliberately avoided due to lack of prior trading experience and concern about trading pure gaps without conviction.
@@ -1946,6 +2604,15 @@ TRADES:
 | 3  | COOL   | general | $3.89-4.09 | high-day-momo | no   | momentum scalp / first candle breakout| STOP: failed-breakout / resistance | -$1,400   | LOSS    |
 | 4  | COOL   | general | $3.89      | high-day-momo | no   | dip entry / 10-cent profit target     | PROF: quick 10-cent scalp          | +$170     | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | halt-resume | halt resume breakout / momentum pop | dark pool routing exit | - | $14.98 | morning | - | short |
+| 2 | - | - | - | whole-dollar-break | first candle to new high / pullback | quick scalp | - | - | morning | - | scalp |
+| 3 | - | - | - | dip-buy | momentum scalp / first candle breakout | - | failed-breakout resistance | $4.15+ | morning | - | scalp |
+| 4 | - | - | - | dip-buy | dip entry / 10-cent profit target | quick 10-cent scalp | - | - | morning | - | scalp |
+
 SUMMARY:
 Day 6 (first $10,000+ winner of 2017) closed +$9,810 across two accounts: +$9,563 in speed Trader and +$247 in sh Trader. DFFN was the dominant trade, providing the bulk of profit. The stock gapped up overnight and was identified pre-market on the watchlist with a resistance level at $16.50. It broke through cleanly at open, spiking from $7.25 to $8.50 in a single candle, then hitting the high-day-momo scanner repeatedly through $9.50-$9. Ross bought 2,000 shares at $9 and the stock halted on a circuit breaker at $9.42. On resumption, it opened at an unexpected $15 (a significant gap), and Ross executed a dark pool routing order to exit 1,783 shares at $14.98, capturing an $11,050 profit. Later in the sh Trader account (after a technical connection issue resolved), he re-entered with 200 shares on the first pullback and captured a $136 scalp. COOL proved more challenging: an initial 10,000-share position on a high-day-momo alert at $3.89 anticipated a break over 200MA resistance, but the stock stalled at $4.15 (testing the moving average) and Ross took a -$1,400 loss (14 cents × 10,000 shares). His small account position of 2,000 shares at the same entry used a pre-set 10-cent profit target and was filled at $3.98 for +$170, limiting damage through scale discipline. Ross emphasized the importance of respecting risk, particularly on overextended moves, and the value of dark pool routing for achieving better exits on volatile stocks.
 
@@ -1970,6 +2637,13 @@ TRADES:
 |----|--------|---------|------------|---------------|------|----------------------------------------|-----------------------------------|-----------|---------|
 | 1  | JAM    | general | $3.20-4.05 | gap-scanner   | yes  | gap-and-go / break of resistance       | PROF: scaled through momentum      | ~+$4,200  | WIN     |
 | 2  | JAM    | general | $4.05-4.08 | high-day-momo | yes  | re-entry / break over 4.10             | STOP: reversal - failed hold       | -$1,000   | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 46% | - | gap-and-go | gap-and-go / break of resistance | scaled through momentum | - | $4.14+ | pre-market/morning | - | extended |
+| 2 | - | - | - | whole-dollar-break | re-entry / break over 4.10 | added aggressively at $4.08 | reversal | $4.10+ | morning | - | short |
 
 SUMMARY:
 Day 6 of the Martha's Vineyard traveling trading challenge closed +$4,217 (net ~$3,400 after estimated $800 commissions). JAM was a morning gap-and-go play, identified as the leading gapper (+46% pre-market) with news support. Trading pre-market, Ross captured the initial squeeze from $3.20 through various resistance levels (3.25, 3.35, 3.45, 3.55, 3.65) up to $3.75, pulling back and re-testing resistance around $3.66 before the open. At market open, he experienced another large squeeze through $3.75 all the way to $4.14, and was executing trades throughout the morning show (9:00-9:30 AM). His pre-market position was approximately 6,000 shares with profits around $4,200 by the time of the morning broadcast. When the stock re-tested the $4 level post-open with a break attempt over $4.10, he decided to add more aggressively (averaging up to 11,000 shares at ~$4.08), betting on continuation. The stock instead reversed, pulled back to $4.00, and he cut the position at $4.01 for a -$1,000 loss rather than holding through the breakdown to $3.82, demonstrating appropriate risk management. He noted the trade gave back roughly $1,000 of earlier profits but chose to exit completely and avoid further temptation to chase. Overall, his six-day Martha's Vineyard average is exceeding the $1,000/day goal significantly, with most days providing green closes and disciplined exits. Commissions are a notable drag at ~8% of gross profit due to the high trade frequency.
@@ -1998,6 +2672,15 @@ TRADES:
 | 3  | PM     | general | unknown    | high-day-momo | no   | scanner alert                          | unknown                            | unknown   | unknown |
 | 4  | AUO    | general | $5.20-5.37 | high-day-momo | no   | dip entry / added on strength           | STOP: reversal - consolidation fail| -$2,400   | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | chased gap-and-go / impulse entry | - | failed-breakout slippage | $9.95 | morning | - | scalp |
+| 2 | - | - | - | whole-dollar-break | first daily candle to new high | quick pop back to breakeven | reversal | $8.36+ | morning | - | scalp |
+| 3 | - | - | - | unknown | scanner alert | - | unknown | - | morning | - | unknown |
+| 4 | - | - | - | dip-buy | dip entry / added on strength | - | reversal consolidation fail | $5.40+ | morning | - | short |
+
 SUMMARY:
 Day 61 closed -$5,000 (net after slippage), marking a disappointing end to a volatile week where Ross struggled with emotional control and position sizing. He explicitly violated his own pre-market rule against chasing AKTX, a gapper that squeezed to $9.95 at the open. Despite stating he would "wait for the first one-minute candle pullback," he impulsively jumped in at $9.95 with 2,500 shares. The stock immediately dropped, and he bailed at $8.80 with 40 cents of slippage and a -$2,800 loss. Recognizing his mistake, he recovered by catching HTGM (first daily candle to new high) at $8.14 with 10,000 shares, capturing a quick pop to $8.36 and scaling out for roughly +$2,800, bringing him back to flat. Rather than walking away after the painful start and recovery, he continued trading and saw AUO on the scanner. On the five-minute chart, it showed a pullback following a $5.22 high, which he perceived as a breakout setup. He entered 10,000 shares at $5.20, aggressively added 2,000 more at $5.37 anticipating a break over $5.40, but the stock instead sold off to $5.06. Holding through consolidation and waiting for the first five-minute candle to new highs, he eventually took 20 cents of slippage on a 12,000-share exit for an additional -$2,400 loss. Ross articulated clear self-awareness: he was emotionally rattled from the AKTX loss, broke his own sizing rules (10,000+ shares when running hot), and failed to step back after getting knocked down.
 
@@ -2023,6 +2706,14 @@ TRADES:
 | 1  | PRAM   | general | $3.50-3.73 | high-day-momo | no   | first daily candle to new high / dip  | PROF: scaled exits $4.02-$4.05     | +$6,281   | WIN     |
 | 2  | APOP   | biotech | $10.00     | high-day-momo | no   | dip entry / quick scalp                | PROF: quick exit at breakeven      | +$200     | WIN     |
 | 3  | CYCC   | general | $5.50-6.00 | high-day-momo | no   | break of 5.50 / break of whole dollar | STOP: reversal - hidden seller     | -$64      | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | whole-dollar-break | first daily candle to new high / dip | scaled exits $4.02-$4.05 | - | $4.05 | morning | - | extended |
+| 2 | - | - | - | dip-buy | dip entry / quick scalp | quick exit at breakeven | reversal | breakeven | morning | - | scalp |
+| 3 | - | - | - | whole-dollar-break | break of 5.50 / break of whole dollar | - | reversal hidden seller | $5.50+ | morning | - | scalp |
 
 SUMMARY:
 Day 62 (first trading day of April) closed +$6,417, immediately recovering the prior day's -$5,000 loss and establishing momentum for the new month. PRAM was the anchor trade and exemplified proper risk management following Friday's emotional losses. Ross identified the stock as a former runner (having made a 275-to-458 move Thursday) and tracked it for a "first daily candle to new high" pattern—a strong reversal play when shorts are forced to cover. When the first green daily candle broke yesterday's $3.31 high, he entered aggressively: 5,000 shares at $3.50, doubled to 10,000 at $3.50, then added 2,500 in the 370s for an average of $3.57. This was deliberate scaling into strength—he added at the half-dollar ($3.50 psychological level) and then on the breakout of $3.70. The stock halted at a $3.65 high after squeezing 10% in two candles, resumed at $3.89, and he added another 2,500 shares anticipating a break to $4.10-$4.25. Recognizing increased selling volume and lacking the continuation he expected, he began exiting at $4.05-$4.02, trimming 12,000 shares and then selling the remainder at $3.77, capturing +$6,281. Had the move continued to $4.25-$4.50 as hoped, this could have been a $10,000 winner—his best year so far is $22,000—but he prioritized protecting profit given his 12,000-share size (losing 10 cents = -$1,500). APOP was a chase entry at $10 with only 1,000 shares (small size due to overextension), capturing a 6-cent pop to $10.60 before reversing and exiting breakeven at $10 for +$200. CYCC showed similar setup (break of $5.50, rally to $6.05) but encountered a hidden seller who continued pressing at $6.00, forcing a flush to $5.52 and an exit loss of -$64. Ross emphasized the importance of post-red-day discipline: his goal was not to chase back Friday's losses but simply to manage risk on every trade and trust that quality setups would follow.
@@ -2050,6 +2741,15 @@ TRADES:
 | 2  | CNTF   | general | $3.30      | gap-scanner   | no   | opening range breakout / red-to-green  | STOP: reversal / extended hold     | -$5,000   | LOSS    |
 | 3  | NADL   | general | $2.58      | high-day-momo | no   | red-to-green / dip entry               | STOP: breakeven exit on reversal   | +$7       | WIN     |
 | 4  | ADPT   | general | $1.95      | high-day-momo | no   | first 5min candle to new high / halt   | PROF: quick pop                    | +$369     | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go / anticipation breakout | - | failed-breakout fast flush | $8.00 | morning | - | scalp |
+| 2 | - | - | - | red-to-green | opening range breakout / red-to-green | - | reversal extended hold | $3.50+ | morning | - | extended |
+| 3 | - | - | - | red-to-green | red-to-green / dip entry | - | breakeven exit on reversal | $2.63 | morning | - | scalp |
+| 4 | - | - | - | whole-dollar-break | first 5min candle to new high / halt | quick pop | reversal | $3.00 | morning | - | scalp |
 
 SUMMARY:
 Day 69 closed -$7,424, one of the worst days of the year despite being up significantly for the month and year. All three opening trades (NOVVN, CNTF, and NADL within the first 10 minutes) were poor quality, setting a negative tone Ross should have recognized and exited. NOVVN was a gap-scanner stock sold at 7.80 in anticipation of a break to 8.00, but it collapsed immediately to 7.44 for a -$1,800 (35-cent) loss on 5,000 shares. Emotionally rattled from this quick loss, Ross overcompensated by jumping into CNTF with 10,000 shares at 3.30, targeting an opening range breakout and red-to-green move anticipated to 3.50+. The stock spiked to 3.45 briefly (up $1,500), but the underlying five-minute chart showed clear weakness (large red candle pre-open), signaling the reversal that followed. Instead of exiting the -$300 loss position at 3.00 or 3.19 (visible support breaks), Ross held through consolidation, unable to sell for a realized loss due to his 5K daily max loss rule, hoping to offset the loss with another trade. The stock eventually sank to 2.75 before he exited at the lows for a -$5,000 (50-cent) loss on 10,000 shares—his largest single trade loss. NADL was entered at 2.58 for a red-to-green scalp, ran to 2.89 (+$1,500 potential), but Ross refused to take the $1,000 profit, viewing it as insufficient to address his drawdown. Instead, it stopped out breakeven at 2.63 for +$7. ADPT presented a perfect setup (clean momentum, clean daily structure) but Ross couldn't trade it initially due to hitting max loss. Only after calling his broker to remove the daily max loss restriction was he able to enter at 1.95 on the first five-minute candle to new high, capturing a pop to 3.00 for +$369. Ross identified his core mistake: getting aggressive on low-quality red-to-green setups to compensate emotionally for NOVVN's loss, then being trapped by the max loss rule preventing clean exits and encouraging him to hold underwater positions. The max loss rule paradoxically encouraged emotional trading and extended hold times rather than cutting losses cleanly.
@@ -8600,6 +9300,15 @@ TRADES:
 | 3  | RDBX   | biotech | $10.85~$11.30 | watching      | no   | sized up for 11+ break            | STOP: reversal - pullback faded      | -$2,500   | LOSS    |
 | 4  | MICS   | general | ~$5.30        | watching      | no   | dip trade anticipating new high  | STOP: reversal - flush              | -$1,100   | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | unknown | unknown | n/a | n/a | unknown | - | unknown | scalp |
+| 2 | - | - | - | dip-buy | dip re-entry after false breakout | averaged down | reversal | $12.00 | - | unknown | short |
+| 3 | - | 11-15% | - | micro-pullback | sized up for 11+ break | n/a | reversal | $11.25-$11.35 | - | unknown | short |
+| 4 | - | - | - | dip-buy | dip trade anticipating new high | n/a | reversal flush | unknown | 4:30 AM | unknown | scalp |
+
 SUMMARY:
 Ross finished day seven of the Martha's Vineyard traveling challenge up $350 before commissions, or roughly $150 after fees—his worst day since Monday's near-flat performance. He started the morning up $7,000 profit through disciplined scalping on clean setups, but gave back the entire cushion across three late-morning trades. AERC was a strong runner from yesterday's $5-$8 momentum but he sized too heavy on the 12-dollar breakout attempt after averaging down, watching it reject back to $11.85 instead of breaking higher. RDBX showed similar pattern: after his AERC loss, he quickly jumped into the breakout expecting extension through $11.25-$11.35 with large position sizing, but the move faded and he gave back $2,500. MICS was his attempt to recover, but a quick flush at 4:30 AM left him stopped. What impressed him despite the losses was resisting the urge to FOMO into SYM's halt-up squeeze; he recognized the pattern would likely flush into a halt-down and protected himself by stopping at $1,527. He emphasized discipline meant walking away profitable rather than optimizing for maximum gain, especially while trading from poor internet connectivity during bad weather.
 
@@ -8624,6 +9333,13 @@ TRADES:
 |----|--------|---------|--------|---------------|------|----------------------------------|-----------------------------------|--------|---------|
 | 1  | SKLN   | general | $3.24  | premarket-scan | no   | gapper break over 3.25           | PROF: scaled partial 3.35 then full| +$110  | WIN     |
 | 2  | JEVO   | general | $4.36  | high-day-momo | no   | halt resume continuation scalp   | PROF: break over 4.50 partial exit| +$260  | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gapper break over $3.25 | n/a | n/a | $3.35-$3.50 | - | unknown | scalp |
+| 2 | - | - | - | halt-resume | halt resume continuation scalp | n/a | n/a | $4.50-$4.65 | - | unknown | scalp |
 
 SUMMARY:
 Ross finished day seven of the small account challenge up $268 after commissions, achieving his nineteenth consecutive winning trade—a remarkable streak for disciplined scalping despite commissions consuming 25 percent of gross profits. Market opened lackluster compared to prior day's parabolic runners (DFFN +$11k, SGNL +300%, IMU +100%) as those extended stocks rolled over at the bell. SKLN was a fresh gapper on premarket watchlist; he entered 2,000 shares at $3.24 anticipating break over the prior day's 3.45 high but took profits at 5-6 cents per share, selling in three separate executions to manage risk. JEVO halted mid-morning on unexpected spike from $3.95 to $4.50; he bought the resumption at $4.36 with 2,000 shares and sold the bounce at $4.55-$4.65 for roughly $260 total. The day demonstrated his scaling strategy working well (preventing losses through early profit-taking) but also highlighted commission friction in small accounts: 13 total executions on two trades cost $100+ in commissions on only $370 profit. He acknowledged this ramp-up period requires holding smaller account longer than anticipated but emphasized consistency beats account size.
@@ -8651,6 +9367,15 @@ TRADES:
 | 2  | NOOV   | general | $5.90  | gap-scanner   | no   | ORB break over 6.00 extended  | STOP: reversal - dropped to 5.37 | -$1,550| LOSS    |
 | 3  | SCOO   | general | $3.50  | gap-scanner   | no   | half-dollar break aggressive   | STOP: reversal - flushed to 3.20 | -$900  | LOSS    |
 | 4  | ROKA   | general | $4.50  | gap-scanner   | no   | half-dollar break anticipation | STOP: reversal - dropped to 4.10 | -$600  | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | whole-dollar-break | half-dollar breakout entry | n/a | failed-breakout | $4.75 | - | unknown | scalp |
+| 2 | - | - | - | whole-dollar-break | ORB break over $6.00 | n/a | reversal | $6.00+ | - | unknown | short |
+| 3 | - | - | - | whole-dollar-break | half-dollar break aggressive | n/a | reversal flush | $3.50+ | - | unknown | scalp |
+| 4 | - | - | - | whole-dollar-break | half-dollar break anticipation | n/a | reversal | $4.50+ | - | unknown | scalp |
 
 SUMMARY:
 Day 79 of the $583 challenge finished red after four consecutive losses, a stark reversal from yesterday's perfect 4-0 record. All four trades were gap-scanner stocks that broke out on opening range but failed to hold gains—each one reversed sharply after Ross entered at half-dollar or whole-dollar levels expecting parabolic continuations. SSKN broke 4.50 premarket consolidation but dropped 20 cents immediately; NOOV squeezed up to $6.05 before flushing back to $5.37, cutting the trade at 50-cent loss; SCOO popped to $3.54 but crashed back to $3.20; ROKA showed similar pattern. The frustration stemmed from following textbook setups that would have worked in January-February when momentum was strong, but failing repeatedly in choppy April conditions. Ross recognized the market had shifted—short-sellers were no longer covering aggressively, retail FOMO buying wasn't sustaining squeezes, and false breakouts now dominated. He acknowledged over-sizing into the 3rd and 4th trades trying to recover losses (revenge trading), exacerbated by account size making small losses feel meaningless. Decision made to withdraw $70,000-$75,000 from the $100k+ account down to $30k to restore psychological discipline.
@@ -8681,6 +9406,17 @@ TRADES:
 | 5  | NVTR   | general | $6.50  | gap-scanner   | no   | momentum ride into resistance    | PROF: into squeeze micro pullback | +$180  | WIN     |
 | 6  | THST   | general | unknown| unknown       | no   | unknown                          | PROF: unknown profit              | +$408  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | 1.6M | 46% | - | gap-and-go | gap-and-go at open | n/a | n/a | $4.75 | - | unknown | scalp |
+| 2 | - | 18% | - | momentum | momentum continuation scalp | n/a | n/a | $4.50-$4.70 | - | unknown | scalp |
+| 3 | - | - | - | micro-pullback | starter 2k then add at break | added to 5k | n/a | $6.25-$6.30 | - | unknown | extended |
+| 4 | - | - | - | whole-dollar-break | break of range partial fill | scaled out | n/a | $7.00+ | - | unknown | short |
+| 5 | - | - | - | momentum | momentum ride into resistance | n/a | n/a | $7.00 | - | unknown | scalp |
+| 6 | - | - | - | unknown | unknown | n/a | n/a | unknown | - | unknown | unknown |
+
 SUMMARY:
 Ross finished day eight of the small account challenge up $1,761.75, representing 92% daily gain on his opening balance of $1,896. This was his nineteenth consecutive green trade and the best day of the year in the small account. Market was hot with multiple big runners from prior sessions rolling over early (SGNL, DFFN, IMU, MYOS), forcing him to focus on fresh gappers. BSPM gapped 46% with 1.6M float; he entered at $4.50 anticipating 4.75 break but grabbed 5-cent quick profit. LEDS also gapped 18% from fresh list; similar micro-pullback scalp for $200. APOP was the main winner: gapped up pre-market, halted on circuit breaker, then squeezed from $4.50-$4.60 range all the way to $6.37; he sized aggressively (2k→5k) anticipating $4+ breakout, sold into the squeeze. BVXV ran $4-$7.50 but he got only partial fill; still captured $74. NVTR showed brief $6.50-$7 move before fading. Commissions totaled $126 on 25 trades (averaging 4 tickets per stock due to scaling strategy). Key insight: every $100 profit puts $600 more buying power in account, so position sizing grows geometrically with wins. He emphasized the need for patience and discipline: stayed focused on first 90 minutes of trading, avoided afternoon overtrading that destroyed profitability in prior sessions.
 
@@ -8710,6 +9446,17 @@ TRADES:
 | 5  | RDUS   | general | $43.05 | gap-scanner   | no   | short: reverse on extended high| PROF: covered at 42.47 partial  | +$289   | WIN     |
 | 6  | SNCR   | general | $14.35 | gap-scanner   | no   | long: consolidation breakout   | PROF: limited hold / early stop  | +$56    | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | whole-dollar-break | break of high day momentum | n/a | false-breakout | $9.39+ | - | unknown | short |
+| 2 | - | - | - | micro-pullback | first 5min candle to new high | n/a | reversal | $3.40+ | - | unknown | scalp |
+| 3 | - | - | - | dip-buy | 5min consolidation dip re-entry | n/a | unknown | $3.50+ | - | unknown | short |
+| 4 | - | - | - | whole-dollar-break | 5min setup over resistance | n/a | n/a | $2.40 | - | unknown | scalp |
+| 5 | - | - | - | unknown | short: reverse on extended high | n/a | n/a | $42.47 | - | unknown | short |
+| 6 | - | - | - | unknown | long: consolidation breakout | n/a | n/a | $15.00+ | - | unknown | short |
+
 SUMMARY:
 Day 80, the last trading day of April, finished down $185 after commissions on six trades—day three of "Trader Rehab" where Ross capped positions at 2,500 shares per trade. Market remained choppy; several gap-and-go attempts failed quickly (CENA false-breakout after break of high of day at $9.39, PRAN rejection after first 5-minute candle to new high at $3.40, SCOO similar pattern). The best trade was CCCR long: entered at $2.20 on 5-minute setup, rode squeeze to $2.40 for $550 profit. RDUS proved interesting as short trade: shorted at $43.05 after eight consecutive green candles hit the 200-moving average, covered at $42.47 (drop to $42.21 possible but stopped early), made $289; would have made $1,500+ if held, but he prioritized risk management over home-run potential. SNCR was his biggest frustration: entered long at $14.35 anticipating $15+ move after consolidation break; position doubled at $15 for max 2,500 shares; was up $750 but pulled back and he stopped out for $56 profit, only to watch it rally to $15.40 after exit. April final results: red $4,178 on month despite starting up $18,000 in first week. He withdrew $70,000 from account (now $31,000) to reset psychology away from large-account overtrading mindset.
 
@@ -8735,6 +9482,14 @@ TRADES:
 | 1  | APHB   | general | $2.70~$3.97   | gap-scanner   | no   | initial loss recovery / scalp | STOP: initial loss at 2.26       | -$370  | LOSS    |
 | 2  | APHB   | general | $3.97~$4.75   | gap-scanner   | no   | first dip micro pullback      | PROF: scaled momentum squeeze    | +$2,300| WIN     |
 | 3  | EXTR   | general | $7.20~$8.00   | gap-scanner   | no   | first 5min candle new high    | PROF: scalp 30 cents profit     | +$22   | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 150% | - | dip-buy | initial loss recovery / scalp | n/a | initial loss | $2.70 | - | unknown | scalp |
+| 2 | 1M+ | 150% | - | micro-pullback | first dip micro pullback | added aggressively | n/a | $4.75 | - | unknown | extended |
+| 3 | - | - | - | micro-pullback | first 5min candle new high | n/a | n/a | $8.00 | - | unknown | scalp |
 
 SUMMARY:
 Day 84, Ross finished up $1,861 after $450 commissions while traveling in Italy on "Trader Rehab," continuing conservative 2,500-share cap strategy. APHB was a 150% short squeeze (gapped and subsequently ripped from $2-$8), initially frustrating as it opened weak; his first entry at $2.70 flushed immediately to $2.26, stopping him out flat. But as momentum built through the morning, he re-entered aggressively at $3.97 on the first 5-minute candle to make a new high, rode the momentum through multiple bull flags up to $4.75, scaling partial exits at resistance levels. Final profit on APHB: $2,300 (bulk of day's gain). EXTR was secondary: first 5-minute candle to new high at $7.20; popped to $8.00 but didn't hold; sold at $7.65 for $22 quick scalp. The day demonstrated that after April's choppy month with zero home-run trades, May finally showed real momentum return. Average winners in April were half the size of February ($750 vs $1,500) due to weak market despite same 62% accuracy. He emphasized risk management first, stock selection second, pattern recognition third.
@@ -8762,6 +9517,14 @@ TRADES:
 | 2  | ARYO   | general | $3.77  | gap-scanner   | no   | extended 5min pullback long    | STOP: false-breakout           | -$30   | LOSS    |
 | 3  | ARYO   | general | $3.77  | gap-scanner   | no   | reversal short flip            | STOP: halt pop refusal         | -$65   | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | micro-pullback | micro pullback break / scaling | scaled to 10k | n/a | $3.84 | - | unknown | extended |
+| 2 | - | - | - | micro-pullback | extended 5min pullback long | n/a | false-breakout | $3.77+ | - | unknown | scalp |
+| 3 | - | - | - | red-to-green | reversal short flip | n/a | halt pop refusal | $3.77- | - | unknown | scalp |
+
 SUMMARY:
 Day 88, Ross finished up $3,939 from New York City—third consecutive strong day during May rebound. MTBC was the dominant trade: gapped with good earnings news, opening extended but showing strength through morning. Rather than chase immediately, he waited for first micro pullback at $3.00, then scaled aggressively (5k→10k) as it broke through resistance levels, riding momentum all the way up to $3.84 where he sold into the squeeze. Total profit: $4,000 on single trade (10,000 shares avg $3.25, sold $3.40-avg). Would have been $8,000 day if sympathy momentum had appeared on second stock (common pattern after big winners), but market didn't deliver. ARYO proved secondary attempt: extended off 9-moving average (red flag), entered long at $3.77 for pullback pattern, immediately rejected, stopped out $30 loss. Flipped short trying to catch reversal, got trapped by halt pop, covered with $65 loss. His discipline: rather than push after $4k cushion and two losses on ARYO, he respected the need to walk away after 11:00 AM and avoid decision fatigue.
 
@@ -8788,6 +9551,14 @@ TRADES:
 | 2  | XGTI   | general | $2.03  | gap-scanner   | yes  | half-dollar break anticipation | PROF: minimal scalp             | +$20   | WIN     |
 | 3  | SAL    | general | $98.40 | gap-scanner   | no   | breakout anticipation high risk| PROF: light position micro gain | +$33   | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | ORB micro pullback 2x add | scaled partial | n/a | $6.25+ | - | unknown | short |
+| 2 | - | - | - | whole-dollar-break | half-dollar break anticipation | n/a | n/a | $2.05 | - | unknown | scalp |
+| 3 | - | - | - | whole-dollar-break | breakout anticipation high risk | light position | n/a | $98.50 | - | unknown | scalp |
+
 SUMMARY:
 Day 89, Ross's first day trading with new Lightspeed Financial broker after switching from Sure Trader. Finished up $1,000 in first 30 minutes before departing for Las Vegas seminar. SORL was focus trade: former runner that squeezed $6.20 yesterday, pre-market high $6.09. Entered 5,000 at $6.10 ORB anticipating daily chart breakout; stock spiked to $6.20 but was extended off 9-moving average. Sold 2.5k partial at $6.25+ to lock profit, set 3/4 tight stop under $6.19 for rest. Stop order malfunctioned (hotkey typo), filled 500 shares on pop back to $6.17 for total $980 profit. XGTI had sudden squeeze $1.80-$2.05; entered 2k at $2.03 for anticipated $2.05 break but stock pulled back immediately; quick $20 profit. SAL (high-priced stock at $98) was light touch: 250 shares anticipating breakout at $98.50, only caught $33 on minor move. Commissions: $2.50/trade plus ECN fees under Lightspeed group rate negotiated with broker—savings vs Sure Trader offset by ECN charges (~$50 total). Platform adjustment smooth: 10 hotkeys pre-programmed, smart routing, two-step verification security enabled.
 
@@ -8812,6 +9583,13 @@ TRADES:
 |----|--------|---------|---------------|---------------|------|----------------------------------|-----------------------------------|--------|---------|
 | 1  | MIRM   | general | $12.70~$15+  | gap-scanner   | no   | multiple micro pullback entries | STOP: failed at 15 resistance    | -$1,000| LOSS    |
 | 2  | SIF    | general | $3.50~$4.20  | gap-scanner   | no   | opening range breakout / scalps | PROF: micro pullback scalps     | +$623  | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 44% | - | micro-pullback | multiple micro pullback entries | scaled aggressively | failed at $15 | $21.00+ | - | unknown | extended |
+| 2 | - | - | - | micro-pullback | opening range breakout / scalps | multiple scalp entries | false-breakout | $4.10-$4.20 | - | unknown | short |
 
 SUMMARY:
 Day 9 of small account challenge finished up $1,262.92 on $2,400 opening (50% gain)—his second consecutive 50%+ day. Retirement account +$2,013, main account -$1,300, demonstrating challenge of managing three accounts simultaneously (left hand trades small account, right hand trades big account). MIRM gapped 44% at $11.81, opened at $12.70; he hesitated initially (price higher than typical 3-8 range), entered gradually at first real strength break. Initial entries near $12.74-14.79 worked, but aggressive scaling on final push ($21-22 anticipating break) failed catastrophically: added 5,000 shares at $21.84 expecting $22+ breakout, stock reversed hard to $20.25, stopped out with $1,500 loss in big account alone. SIF was better execution: $3.50 gapper, opened below pre-market ($3.19 vs $3.40), waited for micro pullback at $3.75, got in for $4+ breakout, rode two separate micro-pullback dip entries with 200-300 share sizing, took profits at $4.10-$4.20. Total $623 profit in small account. Psychology note: had nightmare previous night about blowing up small account; subconsciously focused on "slow and steady" approach; wrote sticky note: "Account up 100%—marathon, not sprint." Account now at $3,600 (7x gain in 9 days). Tomorrow will have $35K buying power—approaching ability to trade main-account size.
@@ -8862,6 +9640,13 @@ TRADES:
 | 1  | COGT   | general | $7.25-$9.00   | high-day-momo  | no   | break of 7.25 / momentum long         | STOP: reversal - multiple stop outs   | -$5,600 | LOSS    |
 | 2  | COGT   | general | $8.50         | watching       | no   | short on break of 8.00                | STOP: reversal - covered on squeeze  | -$2,100 | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 75% | - | whole-dollar-break | break of $7.25 / momentum long | multiple stops | reversal | $9.00+ | - | unknown | extended |
+| 2 | - | 75% | - | red-to-green | short on break of $8.00 | n/a | reversal squeeze | $8.00- | - | unknown | short |
+
 SUMMARY:
 Ross finished day nine of his Martha's Vineyard trading challenge down $5,600 after commissions, bringing his nine-day total to approximately $9,000 profit ($1,000 daily goal achieved but with significant give-back). This was the second red day in a row following similar losses yesterday. The primary trade involved COGT, a stock up 75% that day. Ross initially traded it upside from $7.25 to $9.00, capturing early gains but then exhibited the key behavioral pattern he identified: after being up $3,000 in his retirement account, he went short on a break of $8.00 in his margin account, which resulted in a $2,100 squeeze loss. He then flip-flopped back long at $8.50 with a large position (averaging $8.80 after multiple adds), only to get stopped out twice as the stock failed to break higher. Ross self-identified significant emotional deviations over the past three trading days: Wednesday through Friday each showed the same pattern of building profit only to give it back through over-trading and chasing. He remained centered and profitable through day seven, then exhibited increasing FOMO trading, emotional decision-making, and lack of conviction. The session ended with him acknowledging the difficulty of maintaining emotional discipline despite years of trading experience.
 
@@ -8890,6 +9675,17 @@ TRADES:
 | 4  | APOP   | general | ~$6.90        | high-day-momo  | no   | momentum entry                       | PROF: bounce recovery               | +$100   | WIN     |
 | 5  | BIOP   | biotech | unknown       | unknown        | no   | momentum play                        | PROF: scalp                           | unknown | WIN     |
 | 6  | NAKD   | general | unknown       | unknown        | no   | momentum play                        | PROF: scalp                           | unknown | WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | 7600x | micro-pullback | first candle to make new high / apex | n/a | n/a | $3.20 | - | unknown | scalp |
+| 2 | - | - | 7600x | whole-dollar-break | second entry / breakup | n/a | n/a | $3.50+ | - | unknown | scalp |
+| 3 | - | - | high | momentum | multiple entries / high rel vol | n/a | halt-pending | unknown | - | unknown | short |
+| 4 | - | - | - | momentum | momentum entry | n/a | n/a | $6.90+ | - | unknown | scalp |
+| 5 | - | - | - | momentum | momentum play | n/a | n/a | unknown | - | unknown | scalp |
+| 6 | - | - | - | momentum | momentum play | n/a | n/a | unknown | - | unknown | scalp |
 
 SUMMARY:
 Ross completed day nine of his small account challenge, finishing up $799 on the day and $4,058 after nine trading days from a starting balance of $583. He reached his 29th consecutive winning trade, though he noted emotional nervousness about "Friday the 13th" and being due for a red day. The primary trading approach involved identifying high relative-volume momentum stocks (ND at 7,600x relative volume) and entering at apex points where he expected volume-driven breakouts. The ND trade was the largest on the day with a $3,000 loss after a halt for a secondary offering in the middle of the session, which caught him off guard since companies typically release such news after hours. He exited that trade due to the pending news uncertainty. Multiple smaller scalp trades (BIOP, NAKD, APOP, ND) resulted in small winners ranging from $50 to $100, with Ross consistently taking profits at 10-20 cent gains. His core strategy remained precision entry at exact price targets with tight 10-cent stops. He expressed superstitious worry about the hot streak (8 consecutive winning days prior) but maintained discipline, refusing to chase moves like the GBS 135% spike. His buying power had grown from $583 to $25,000 after recent wins, but he remained cautious about oversizing, noting that larger positions create larger losses if the setup fails.
@@ -8921,6 +9717,18 @@ TRADES:
 | 6  | BLNK   | tech    | $3.24-$3.44   | watching       | yes  | breakout continuation / pullback     | PROF: scaled into high 3.57          | +$1,500 | WIN     |
 | 7  | BLNK   | tech    | ~$3.83        | watching       | yes  | first 5-minute candle to new high    | STOP: reversal - stopped out at 3.56 | -$1,000 | LOSS    |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | low | - | - | gap-and-go | gap-and-go / break of $3.29 | scaled partial | n/a | $2.33-$2.27 | - | unknown | short |
+| 2 | low | - | - | micro-pullback | consolidation scalp | n/a | n/a | $4.50 | - | unknown | scalp |
+| 3 | - | - | - | momentum | squeeze continuation | scaled at resistance | n/a | $5.40-$4.40 | - | unknown | extended |
+| 4 | low | - | - | halt-resume | halt resume / continuation squeeze | scaled | n/a | $2.57 | - | unknown | short |
+| 5 | low | - | - | micro-pullback | micro pullback / first minute new high | scaled | n/a | $2.63-$2.58 | - | unknown | scalp |
+| 6 | low | - | - | micro-pullback | breakout continuation / pullback | scaled | n/a | $3.57 | - | unknown | extended |
+| 7 | low | - | - | micro-pullback | first 5-minute candle to new high | n/a | reversal | $3.56 | - | negative | scalp |
+
 SUMMARY:
 Ross finished day up $5,150 on the day, marking the fourth consecutive winning day in a strong May market. He opened cautiously, up only $2,000 in the first 30 minutes, contemplating whether to slow down after Wednesday's $29,000 day and Thursday's large win, but the market provided opportunity. BLNK was the primary trade off his premarket watchlist with news of a Whole Foods partnership for charging station placement. With low float and prior price levels (3.29-8.50), it had strong breakout potential. His approach used multiple partial exits and adds, scaling in on pullbacks and out into squeezes. He executed 13 trades total with 12 winners before taking his first loss at the end of the session on BLNK, maintaining his pattern of pushing hard until hitting a clear losing trade, then stopping. VVPR provided secondary opportunity with false breakouts and consolidations offering scalp opportunities. His execution showed discipline around the halt and resume on BLNK, as well as careful position management despite being tempted to chase extended moves. At day 80 of his $1 million challenge, he averages $3,387 daily and needs approximately $2,600 per day going forward to hit his annual goal.
 
@@ -8948,6 +9756,16 @@ TRADES:
 | 3  | BBAI    | general | $14.81-$16.00 | watching       | no   | actively traded upside / dips        | STOP: reversal - halt down near open  | unknown | LOSS    |
 | 4  | ADN     | general | unknown       | unknown        | no   | breakout attempts / dip trades       | STOP: reversal - multiple stops       | -$500   | LOSS    |
 | 5  | IOBT    | general | $9.73-$9.36   | watching       | no   | light volume pop / dip buy            | STOP: reversal - light volume fail    | -$2,400 | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 63% | - | gap-and-go | gap-and-go / leading gapper | actively traded | n/a | $2.55+ | - | unknown | extended |
+| 2 | - | - | - | whole-dollar-break | breakout continuation / blue sky | n/a | failed-breakout halt | $14.81+ | - | unknown | scalp |
+| 3 | - | - | - | micro-pullback | actively traded upside / dips | n/a | reversal halt | $16.00+ | - | unknown | extended |
+| 4 | - | - | - | micro-pullback | breakout attempts / dip trades | n/a | reversal | unknown | - | unknown | short |
+| 5 | - | - | - | dip-buy | light volume pop / dip buy | n/a | reversal halt | unknown | - | unknown | short |
 
 SUMMARY:
 Ross finished the day up $10,000 despite being up approximately $14,000 at his peak, giving back about a third of his intraday high. He was concerned about following a strong four-to-five-day run with inevitable red days, noting a pattern across January through March where he made substantial gains only to give them all back within weeks. MOBQ, the market's leading gapper at 63% up, was his best winner at approximately $3,800 after actively trading it from $2.39 through the $2.55 range. BBAI, a recent IPO similar in structure to SST from the prior day, initially resulted in a $100 loss before he re-entered and actively traded through its range to $16 before a hard-selling close and halt-down. ADN was choppy and offered multiple breakout attempts that failed, resulting in a $500 loss after he missed the initial move and became hesitant on subsequent entries. IOBT was his most painful trade, a light-volume pop where he bought dips at $9.73 and $9.36 expecting recovery, but instead took a $2,400 loss as the stock halted down. By his final two trades (ADN and IOBT losses), he recognized the shift and stopped trading, choosing to secure his $10,000 green day rather than chase further deteriorating market conditions.
@@ -8979,6 +9797,18 @@ TRADES:
 | 6  | CCG    | general | unknown       | unknown        | no   | consolidation breakout              | STOP: reversal - break even         | -$17      | BE      |
 | 7  | DTSS   | general | $5.15-$9.00   | gap-scanner    | no   | break of 5 / escalating adds       | PROF: halt up at 13+ / dip trades    | +$17,700  | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | early morning squeeze / break high | scaled partial | n/a | unknown | early AM | unknown | short |
+| 2 | - | - | - | dip-buy | dip trade / early flush | n/a | reversal | $9.00+ | early AM | unknown | short |
+| 3 | - | - | - | momentum | pop up / scalp trade | n/a | reversal | unknown | - | unknown | scalp |
+| 4 | - | - | - | micro-pullback | low price breakout | n/a | reversal | unknown | - | unknown | scalp |
+| 5 | - | - | - | momentum | low price momentum | n/a | reversal | unknown | - | unknown | scalp |
+| 6 | - | - | - | whole-dollar-break | consolidation breakout | n/a | reversal | unknown | - | unknown | scalp |
+| 7 | 1.8M | - | - | gap-and-go | break of $5 / escalating adds | dip trades, added | halt up | $13.00+ | 8:06 AM | unknown | extended |
+
 SUMMARY:
 Ross finished the day up $2,997 (approximately $3,000), with DTSS delivering $17,700 of the profit after a 1,200% intraday surge from early morning ($4 at 8 a.m.) to $20+. His initial trade on BREA (early morning surge on news, up $5,600) was followed by quick losses on COGT (-$841) and breakeven on lower-priced names (EWS, IINN, CCG totaling minimal profit). The critical shift came when DTSS broke the scanner at 8:06 a.m., breaking over $5 for his first entry. He deployed a measured approach: $1,000 initial profit on 6,000 shares, then dip-traded and added into breakouts systematically, reaching 7,000-9,000 share positions as confidence grew. Key patterns included a channel breakout around $8.20 with aggressive scaling (he added 4,500 shares for the break of $10.50), then again at open a halt-up at $13 forced him to exit ("remember to pay yourself"). He subsequently dip-traded the pullbacks, reducing share size as the stock extended to $18+. By 11 a.m. he reduced to hands-off, avoiding overleveraging. He noted the deliberate restraint: starting with medium-aggression ($6-9k shares) to secure a cushion, then sizing up only after proving trade quality.
 
@@ -9005,6 +9835,15 @@ TRADES:
 | 2  | PIK    | general | $3.57         | watching       | no   | dip trade / ascending support        | STOP: reversal - topping tail         | -$500   | LOSS    |
 | 3  | EIGR   | energy  | $0.55         | high-day-momo  | no   | breakout momentum / halt level      | STOP: reversal - hit halt level      | -$700   | LOSS    |
 | 4  | LITM   | general | $0.55-$0.94   | high-day-momo  | no   | dip buy / breakout through levels    | STOP: failed breakout / small loss   | -$800   | LOSS    |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | 112% | - | gap-and-go | gap-and-go / break of resistance | scaled at levels | n/a | $4.00+ | pre-open | unknown | extended |
+| 2 | - | 112% | - | dip-buy | dip trade / ascending support | n/a | reversal | $3.57+ | - | unknown | scalp |
+| 3 | - | - | - | momentum | breakout momentum / halt level | n/a | reversal | $0.55 | - | unknown | scalp |
+| 4 | - | - | - | dip-buy | dip buy / breakout through levels | n/a | failed breakout | unknown | - | unknown | short |
 
 SUMMARY:
 Ross completed a St. Patrick's Day live trading morning session up $6,466 by 10 a.m., trading during pre-market and opening bell hours on PIK (up 112% intraday, main driver), with supplemental trades on EIGR, LITM, and IMTE. PIK was the market's leading gapper, prompting early action. His approach demonstrated measured entry sizing: initial 3,000-share starter at $3.44, then building position with scale-in entries at $3.58, $3.65, $3.70 as the stock climbed toward $4. He executed multiple partial exits and re-entries, managing profit-taking at key resistance levels. Key challenge was the emergence of a topping-tail rejection candle around $3.65 which signaled potential failure—he took that as a cue to be more cautious. The subsequent trades (EIGR, LITM) both resulted in losses as secondary scanners (high-day momentum, halt levels) provided choppy, false-breakout setups that failed quickly. By 10 a.m., recognizing declining volume, choppy price action, and repeated false breakouts on new scanner candidates, he chose to lock profits and stop trading rather than chase deteriorating conditions. He emphasized the importance of profit-taking discipline, noting that on hot stocks already up 90%+, he doesn't chase extended moves.
@@ -9035,6 +9874,17 @@ TRADES:
 | 5  | OCG    | general | $4.00-$6.39   | high-day-momo  | no   | adding on breakout / chase entry     | STOP: reversal - flush on add        | -$2,500 | LOSS    |
 | 6  | HOO    | general | $4.20-$4.80   | premarket-scan | no   | dip and rip / high volatility        | PROF: dip trade only                  | +$1,400 | WIN     |
 
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | gap-and-go / early morning surge | n/a | failed-breakout | $4.28+ | early AM | unknown | short |
+| 2 | - | - | - | micro-pullback | micro pullback / momentum squeeze | scaled | n/a | $2.90 | - | unknown | scalp |
+| 3 | - | - | - | momentum | momentum break / scanner hit | scalps | n/a | $1.50+ | - | unknown | scalp |
+| 4 | - | - | - | whole-dollar-break | break of $2.50 / aggressively added | dip trades, holds | n/a | $6.39+ | - | unknown | extended |
+| 5 | - | - | - | whole-dollar-break | adding on breakout / chase entry | n/a | reversal flush | $6.39+ | - | unknown | short |
+| 6 | - | - | - | dip-buy | dip and rip / high volatility | dip trade only | n/a | $4.80 | - | unknown | scalp |
+
 SUMMARY:
 Ross completed his first trading day in St. Martin up $1,474 despite being forced to buy a new laptop after forgetting his charger. He opened with a -$247 loss on H2O (early gapper that rolled over at 7 a.m. when retail traders came online), recovered with smaller wins on SXTC (+$400) and LCN (+$600, a Chinese momentum stock). CPOP was the standout trade: he entered at $2.50 during high-day momentum scanner alert and systematically added from $2.18 dips all the way to $6.39, riding it to $8 briefly before scaling out across the range. He captured approximately $7,800 on this trade through active management, though a trader companion (Jess) managed $30,000 by holding rather than actively trading the chops. OCG presented a second opportunity at a similar structure, but resulted in a $2,500 loss when he aggressively added to $6.39 and the stock flushed hard back to $4.68. HOO was monitored throughout the morning with multiple halts and 100-point moves (eventually to nearly $100), but he only captured $1,400 on a dip-rip trade from $4.20-$4.80 before leaving due to personal commitments with his wife. He expressed notable FOMO about HOO's potential but maintained discipline given his strong day and risk management concerns about ultra-volatile names.
 
@@ -9053,6 +9903,9 @@ METADATA:
 
 FILE 0697 | TYPE: Educational
 ---
+
+TRADES: NO TRADES TAKEN
+
 
 TRADES: NO TRADES TAKEN
 
@@ -9077,6 +9930,18 @@ TRADES:
 | 5  | CPIX   | general | $3.00-$3.25   | high-day-momo  | no   | momentum entry / pullback ride      | STOP: reversal - huge red candle     | -$4,700 | LOSS    |
 | 6  | AMOD   | general | unknown       | high-day-momo  | yes  | momentum / news on lawsuit          | PROF: small scalp                    | +$300   | WIN     |
 | 7  | VCN    | biotech | ~$10.00       | high-day-momo  | yes  | breakout after pullback             | PROF: early move / halt pattern      | +$12,000| WIN     |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | gap-and-go | early morning squeeze / after-hours | n/a | n/a | $5.00+ | 7:00 AM | unknown | scalp |
+| 2 | - | - | - | micro-pullback | micro pullback / momentum squeeze | dip scalps | wall rejection | $7.00 | - | unknown | short |
+| 3 | - | - | - | momentum | momentum spike / high volume | dips and bounces | n/a | $10.00+ | - | unknown | extended |
+| 4 | - | - | - | unknown | re-entry | unknown | unknown | unknown | - | unknown | unknown |
+| 5 | - | - | - | micro-pullback | momentum entry / pullback ride | n/a | reversal | $3.25 | - | unknown | short |
+| 6 | - | - | - | momentum | momentum / news on lawsuit | small scalp | n/a | unknown | - | unknown | scalp |
+| 7 | - | - | - | whole-dollar-break | breakout after pullback | n/a | halt pattern | $10.00+ | - | unknown | extended |
 
 SUMMARY:
 Ross finished his birthday trading day up $32,000, bringing his monthly total over $50,000. He broke the ice with EVAC (+$826) on after-hours news at 7 a.m., then scaled aggressively on Q&M with a $2 per share move from $5 to $7 before hitting a heavy seller wall at $7.00 (gained ~$11,000). ACON provided solid base hits on volume ($8,800 across multiple dips). CPIX was his largest loss at -$4,700 on a quick rejection from $3.20 to $3.00-level on a 10-second red candle rejection (20,000 shares, 25-cent loss). He left small scalp trades on AMOD (lawsuit news, +$300) and traded the early part of VCN pre-halt for approximately $12,000 before the stock began halting repeatedly (every 10% due to closing above $3 prior day). By open, VCN became too choppy with rapid halts, so he avoided chasing it. His peak intraday was +$25,000 before the CPIX loss reduced him to +$20,000, from which he recovered via dip trades and VCN's early move. He noted the hot market encouraged larger starting sizes (20,000-30,000 shares) versus his typical patterns, and acknowledged he occasionally sizes up anticipating that one stock might deliver a $10+ per share move.
@@ -9104,6 +9969,15 @@ TRADES:
 | 2  | AL     | biotech | unknown       | high-day-momo  | yes  | momentum entry / glp1 news           | STOP: reversal - pullback stop        | -$1,500 | LOSS    |
 | 3  | PFX    | general | $3.63-$4.40   | high-day-momo  | yes  | micro pullback / acquisition news    | PROF: dip scalps / resistance test    | +$17,000| WIN     |
 | 4  | STI    | general | $2.60-$4.00   | high-day-momo  | no   | micro pullback continuation          | unknown                              | unknown | unknown |
+
+
+TRADE_MECHANICS:
+| # | FLOAT | GAP% | REL_VOL | PATTERN_TYPE | ENTRY_TRIGGER | ADD_ON_MECHANIC | STOP_CRITERIA | T1_TARGET | TIME_OF_ENTRY | MACD_STATE | HOLD_DURATION |
+|---|-------|------|---------|--------------|---------------|-----------------|---------------|-----------|---------------|------------|---------------|
+| 1 | - | - | - | whole-dollar-break | break of $6.00 / offering news | scaled at levels | n/a | $8.40 | early AM | negative | extended |
+| 2 | - | - | - | momentum | momentum entry / glp1 news | n/a | reversal | unknown | - | unknown | scalp |
+| 3 | - | - | - | micro-pullback | micro pullback / acquisition news | dip scalps | resistance test | $4.40 | - | unknown | extended |
+| 4 | - | - | - | micro-pullback | micro pullback continuation | unknown | unknown | $4.00+ | - | unknown | unknown |
 
 SUMMARY:
 Ross finished the morning session up approximately $28,000, maintaining his daily hot-market goal of $20,000 ($80,000 weekly target given the four-day week after Monday's market closure). The primary winner was SLDB (+$12,200), a biotech with initial clinical trial data that broke his 200-moving average resistance at $5.80. He initially skipped it at $5.00 fearing resistance, then entered on the break of $6.00 and scaled into the move through $8.40 by adding at $6.50, securing approximately $12,500 before dip-trading losses reduced the net gain. SLDB had announced a secondary offering at $4/share (pricing at market, softened by positive clinical news). AL was a quick -$1,500 loss on glp1-themed news despite strong sector momentum (a recent back-side play). PFX was the second major winner (+$17,000) on news of acquiring an AI Solar analytics platform (unexpected news pairing for a specialty pharma company), where he entered on micro pullback at $3.63, added at successive levels, and scalped the move through $4.40 against descending resistance. He noted SLDB's MACD was negative when he entered, acknowledged the higher-risk trade, but felt justified by account cushion and stock volatility. STI presented a strong micro-pullback setup ($2.60-$4.00) he observed but didn't fully capitalize on, indicating he stayed focused on his stated plan (biotech focus 6:45-9:30 a.m., <$10 stocks, <10M float).
