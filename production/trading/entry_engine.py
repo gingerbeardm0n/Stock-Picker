@@ -173,6 +173,7 @@ def evaluate_entry(
     relative_volume: float,     # Pre-calculated relative volume (time-of-day adjusted)
     scanner_config: ScannerConfig | None = None,  # Category A params; None = defaults
     entry_config: EntryConfig | None = None,      # Category B params; None = defaults
+    temperature=None,           # TemperatureState | None — gates min_confidence on COLD/CHOP
 ) -> EntrySignal | None:
     """
     Full entry evaluation pipeline. Returns EntrySignal if all gates pass, else None.
@@ -283,6 +284,14 @@ def evaluate_entry(
     if signal.stop_distance <= 0:
         return None
     if ecfg.enable_rr and signal.risk_reward_ratio < ecfg.min_rr_ratio:
+        return None
+
+    # ── Gate 5.5: Market temperature quality gate ─────────────────────────────
+    # COLD/CHOP days require A+ setups only (confidence 5/5).
+    # HOT days allow lower-quality patterns (confidence 3/5+).
+    # Source: concept_market_temperature.md §4 "Setup Selection: A+ Only"
+    # TODO: cold-day news catalyst gate (requires news API integration)
+    if temperature is not None and signal.confidence < temperature.min_confidence:
         return None
 
     # All gates passed — return entry signal

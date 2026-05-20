@@ -177,6 +177,39 @@ class ExitConfig:
     volume_dry_up_qty_pct: float = 0.50
 
 
+# ── Category D: Market Temperature thresholds ────────────────────────────────
+
+@dataclass
+class MarketTemperatureConfig:
+    """
+    Category D parameters — market temperature detection and per-regime overrides.
+
+    Detection thresholds control how premarket signals are classified into
+    HOT / NEUTRAL / COLD / CHOP. The per-temperature param overrides let Optuna
+    tune position sizing and trade limits per regime independently.
+
+    Source: concept_market_temperature.md §6
+    """
+    # ── Detection thresholds ──────────────────────────────────────────────────
+    hot_gapper_threshold: float = 50.0    # Leading gapper % → HOT (with enough symbols)
+    warm_gapper_threshold: float = 20.0   # Leading gapper % → NEUTRAL (below = COLD)
+    hot_symbols_min: int = 3              # Min qualifying symbols on scanner → HOT
+    cold_symbols_max: int = 2             # Max qualifying symbols → COLD (above = NEUTRAL)
+
+    # ── Per-temperature position size overrides ───────────────────────────────
+    # Set to 0.0 to use the built-in defaults from market_temperature._PARAMS
+    hot_max_position_pct: float = 20.0
+    neutral_max_position_pct: float = 15.0
+    cold_max_position_pct: float = 10.0
+    chop_max_position_pct: float = 5.0
+
+    # ── Per-temperature max trades overrides ──────────────────────────────────
+    hot_max_trades: int = 10
+    neutral_max_trades: int = 5
+    cold_max_trades: int = 3
+    chop_max_trades: int = 1
+
+
 @dataclass
 class PatternSignal:
     """

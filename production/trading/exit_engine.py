@@ -41,11 +41,12 @@ _DEFAULTS = ExitConfig()
 
 
 def evaluate_exit(
-    position,               # Trade object (from simulator/simulation_engine.py)
+    position,               # Trade object (from trading/trading_engine.py)
     current_bar: dict,      # Current minute bar for the position's symbol
     indicators: dict,       # See keys below
     current_time: datetime, # UTC timestamp of the current bar
     config: ExitConfig | None = None,
+    temperature=None,       # TemperatureState | None — COLD/CHOP exits full position at T1
 ) -> ExitSignal | None:
     """
     Evaluate whether the current position should be exited or scaled.
@@ -98,9 +99,24 @@ def evaluate_exit(
     # Scale out target1_qty_pct of original position; move stop to breakeven.
     # Use original_stop_loss (not stop_loss) — stop_loss moves to breakeven after T1,
     # which would zero out the stop distance and corrupt T2 calculation.
+    #
+    # COLD/CHOP exception (concept_market_temperature.md §4):
+    # On cold or chop days, exit the FULL position at T1. Do not hold for T2.
+    # Ross: "Take profits at first target, do not hold for T2 or T3."
     stop_distance = position.entry_price - position.original_stop_loss
     t1_price = position.entry_price + stop_distance * cfg.target1_ratio
     if current_price >= t1_price and shares_remaining == position.shares:
+        from trading.market_temperature import Temperature
+        cold_day = (
+            temperature is not None and
+            temperature.temperature in (Temperature.COLD, Temperature.CHOP)
+        )
+        if cold_day:
+            return ExitSignal(
+                reason='TARGET_1_COLD',
+                price=current_price,
+                qty=shares_remaining,  # Full exit on cold day
+            )
         qty = max(1, int(position.shares * cfg.target1_qty_pct))
         return ExitSignal(
             reason='TARGET_1',
