@@ -679,7 +679,7 @@ class SimulationRunner:
                         'qty': exit_signal.qty,
                         'pnl': round(pnl, 2),
                     })
-                    # Notify portfolio manager of every fill (observer only — no enforcement)
+                    # Notify portfolio manager of every fill — rules enforced in Step 3
                     self.portfolio_manager.update(
                         current_time=current_time,
                         pnl_delta=pnl,
@@ -697,8 +697,20 @@ class SimulationRunner:
                         )
 
         # Step 3: Entry scan
+        # Portfolio rules (DAILY_MAX_LOSS, GREEN_TO_RED, GIVE_BACK_HALF) block
+        # all new entries once fired — enforced here, not just observed.
         if self.position_manager.can_enter_trade():
-            self._scan_for_entry(current_time, bars)
+            if self.portfolio_manager.any_rule_fired():
+                if self.verbose:
+                    rule = next(
+                        r for r, fired in self.portfolio_manager._rule_fired.items() if fired
+                    )
+                    et_str = current_time.astimezone(ET).strftime('%H:%M')
+                    logger.info(
+                        f"  {et_str} [HALTED] {rule} fired — no new entries today"
+                    )
+            else:
+                self._scan_for_entry(current_time, bars)
 
     def _scan_for_entry(self, current_time, bars):
         """Evaluate all symbols and enter on the best signal.

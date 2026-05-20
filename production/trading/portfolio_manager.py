@@ -1,19 +1,18 @@
 """
 Portfolio Manager
 =================
-Observes portfolio-level state and records when daily risk rules WOULD have fired.
+Tracks portfolio-level daily risk rules and enforces them via any_rule_fired().
 
-This is an OBSERVER — it never stops a trade or changes simulation behavior.
-It logs counterfactual events so we can analyze:
-  - Would the daily max loss rule have triggered on this day?
-  - Would the green-to-red rule have fired? Did it save or cost us money?
-  - Would the give-back-half rule have protected gains?
+Rules tracked and ENFORCED (simulation_engine checks any_rule_fired() before every entry):
+    DAILY_MAX_LOSS   — Loss exceeds daily_max_loss_pct of account → halt all new entries
+    GREEN_TO_RED     — Was profitable today, then dipped negative → halt all new entries
+    GIVE_BACK_HALF   — Hit daily profit target, gave back >50% of peak → halt all new entries
 
-By comparing pnl_at_fire vs final_day_pnl we can determine, for each rule:
-  - saved_or_cost > 0 → following the rule would have SAVED money
-  - saved_or_cost < 0 → following the rule would have COST money (exited too early)
+Once a rule fires, any_rule_fired() returns True for the rest of the day.
+The simulator's Step 3 entry gate checks this before calling _scan_for_entry().
 
-This lets us answer the question: does an automated algorithm even need these rules?
+get_daily_summary() still computes saved_or_cost analysis for each rule (useful for
+validating rule calibration: did enforcing the rule save or cost money on this day?).
 
 Usage (in simulation loop):
     pm = PortfolioManager(account_size=5000, daily_max_loss_pct=3.0, daily_profit_target=150.0)
@@ -23,6 +22,10 @@ Usage (in simulation loop):
 
     # After every trade fill (closed or scaled):
     new_events = pm.update(current_time, pnl_delta, trades_completed_count)
+
+    # Before each entry decision:
+    if pm.any_rule_fired():
+        skip_entry()
 
     # At end of trading day:
     summary = pm.get_daily_summary(final_realized_pnl)

@@ -41,7 +41,7 @@ class ScannerConfig:
     enable_premarket_gain: bool = True
     enable_relative_volume: bool = True
     enable_buying_volume: bool = False
-    enable_float_filter: bool = False   # Pillar 4 disabled — see distribution query after Finnhub refresh
+    enable_float_filter: bool = True    # Pillar 4: float <= 20M shares. Graceful degradation if no data.
     enable_market_cap_filter: bool = False
     enable_spread_filter: bool = False
     enable_last_5min_volume: bool = False
@@ -63,7 +63,7 @@ class EntryConfig:
 
     # Gate toggles (feature selection)
     enable_ema9: bool = False
-    enable_macd: bool = False
+    enable_macd: bool = True   # MACD line (EMA12-EMA26) > 0 = front-side gate. Exempt: gap-and-go.
     enable_trend: bool = True
     enable_rr: bool = True
     enable_gap_and_go: bool = True      # Gap and Go — #1 pattern by frequency (1,177 trades, 69% win rate)

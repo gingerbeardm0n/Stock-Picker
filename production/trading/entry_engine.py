@@ -225,7 +225,8 @@ def evaluate_entry(
 
     indicators = {
         'ema9': ema9,
-        'macd_histogram': macd_data['histogram'] if macd_data else None,
+        'macd_line': macd_data['macd'] if macd_data else None,          # EMA12 - EMA26 (RC's gate)
+        'macd_histogram': macd_data['histogram'] if macd_data else None, # for exit engine / logging
         'trending_up': is_trending_up(all_bars_so_far),
         'vol_up_dominates': volume_on_up_bars_dominates(all_bars_so_far),
         # Gap-and-go: premarket high level and bar count since open
@@ -241,31 +242,39 @@ def evaluate_entry(
     if ecfg.enable_ema9 and ema9 is not None and current_price < ema9:
         return None
 
-    # MACD histogram must be positive (requires 35+ bars to be valid).
-    # NOTE: This gate is disabled by default (enable_macd=False).
-    # If re-enabled, be aware it MUST NOT block gap-and-go — that pattern
-    # explicitly does not require MACD (96% of gap-and-go trades = unknown MACD
-    # state). See concept_gap_and_go.md. Patterns that require MACD (e.g.
-    # dip_buy) enforce it internally in their own detector.
-    if ecfg.enable_macd and macd_data is not None and indicators['macd_histogram'] <= 0:
-        return None
-
     # Stock must be in an uptrend
     if ecfg.enable_trend and not indicators['trending_up']:
         return None
 
     # ── Gate 4: Pattern detection ─────────────────────────────────────────────
-    # Try patterns in priority order (data-derived from 1,800 session analysis).
-    # Gap-and-go first: #1 by frequency (1,177 trades, 23% of all trades, 69% win rate).
-    signal: PatternSignal | None = (
-        (detect_gap_and_go(all_bars_so_far, indicators, ecfg) if ecfg.enable_gap_and_go else None)     or
-        (detect_vwap_reclaim(all_bars_so_far, indicators, ecfg) if ecfg.enable_vwap_reclaim else None) or
-        (detect_bull_flag(all_bars_so_far, indicators, ecfg) if ecfg.enable_bull_flag else None)       or
-        (detect_micro_pullback(all_bars_so_far, indicators, ecfg) if ecfg.enable_micro_pullback else None) or
-        (detect_abcd_pattern(all_bars_so_far, ecfg) if ecfg.enable_abcd else None)                  or
-        (detect_dip_buy(all_bars_so_far, indicators, ecfg) if ecfg.enable_dip_buy else None)         or
-        (detect_flat_top_breakout(all_bars_so_far, ecfg) if ecfg.enable_flat_top else None)
-    )
+    # Gap-and-go is tried FIRST and is exempt from the MACD gate.
+    # RC concept_gap_and_go.md: 96% of gap-and-go trades = unknown MACD state
+    # (< 35 bars at open). Requiring MACD would eliminate nearly all gap-and-go
+    # entries. The pattern's own entry logic (break of premarket high on volume)
+    # is sufficient confirmation for front-side momentum.
+    #
+    # All other patterns require MACD line > 0 (front-side gate) before detection.
+    signal: PatternSignal | None = None
+
+    if ecfg.enable_gap_and_go:
+        signal = detect_gap_and_go(all_bars_so_far, indicators, ecfg)
+
+    if signal is None:
+        # MACD LINE > 0 gate applies to all non-gap-and-go patterns.
+        # RC rule: "MACD line below zero = back side = hard veto."
+        # MACD line = EMA12 - EMA26. Skipped if insufficient history (< 35 bars).
+        if ecfg.enable_macd and indicators['macd_line'] is not None:
+            if indicators['macd_line'] <= 0:
+                return None
+
+        signal = (
+            (detect_vwap_reclaim(all_bars_so_far, indicators, ecfg) if ecfg.enable_vwap_reclaim else None) or
+            (detect_bull_flag(all_bars_so_far, indicators, ecfg) if ecfg.enable_bull_flag else None)       or
+            (detect_micro_pullback(all_bars_so_far, indicators, ecfg) if ecfg.enable_micro_pullback else None) or
+            (detect_abcd_pattern(all_bars_so_far, ecfg) if ecfg.enable_abcd else None)                  or
+            (detect_dip_buy(all_bars_so_far, indicators, ecfg) if ecfg.enable_dip_buy else None)         or
+            (detect_flat_top_breakout(all_bars_so_far, ecfg) if ecfg.enable_flat_top else None)
+        )
 
     if signal is None:
         return None
@@ -278,7 +287,8 @@ def evaluate_entry(
 
     # All gates passed — return entry signal
     pillar_data['ema9'] = round(ema9, 4) if ema9 else None
-    pillar_data['macd_histogram'] = round(indicators['macd_histogram'], 6) if indicators['macd_histogram'] else None
+    pillar_data['macd_line'] = round(indicators['macd_line'], 6) if indicators['macd_line'] is not None else None
+    pillar_data['macd_histogram'] = round(indicators['macd_histogram'], 6) if indicators['macd_histogram'] is not None else None
     pillar_data['pattern'] = signal.pattern_type
 
     return EntrySignal(
