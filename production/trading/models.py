@@ -62,7 +62,7 @@ class EntryConfig:
     stop_buffer: float = 0.076          # $ below pattern low for all stop prices (Trial 193)
 
     # Gate toggles (feature selection)
-    enable_ema9: bool = False
+    enable_ema9: bool = True             # Price > EMA-9 = trend confirmation at entry
     enable_macd: bool = True   # MACD line (EMA12-EMA26) > 0 = front-side gate. Exempt: gap-and-go.
     enable_trend: bool = True
     enable_rr: bool = True
@@ -146,7 +146,7 @@ class ExitConfig:
     trailing_stop_distance: float = 0.262  # Trial 193: 26.2-cent trailing stop; 0.0 = disabled
 
     # ── Time decay ────────────────────────────────────────────────────────────
-    time_decay_hour: int = 12            # Primary: exit profitable positions after 12 PM ET
+    time_decay_hour: int = 11            # Primary: exit profitable positions after 11 AM ET (RC: 11am = dead zone)
     # Early exit: if no "major gains" by early_time_decay_hour:early_time_decay_minute
     # Set early_time_decay_hour = 0 to disable.
     early_time_decay_hour: int = 0       # 0 = disabled; e.g. 10 = 10:xx AM

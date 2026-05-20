@@ -250,7 +250,8 @@ class SimulationRunner:
                  daily_max_loss_pct=3.0, daily_profit_target=None,
                  exit_config=None, scanner_config=None, entry_config=None,
                  debug=False, cache_data=False, cache_dir: str | None = None,
-                 symbol_universe: list | None = None):
+                 symbol_universe: list | None = None,
+                 max_trades_per_day: int = 3):
         if isinstance(date, str):
             date = datetime.strptime(date, '%Y-%m-%d').date()
 
@@ -305,6 +306,8 @@ class SimulationRunner:
 
         # Persistent DB connection kept open during simulation loop
         self._db = None
+
+        self.max_trades_per_day = max_trades_per_day
 
         # Track symbols that exited via TIME_DECAY to prevent re-entry same day
         self.time_decay_exits = set()
@@ -700,6 +703,7 @@ class SimulationRunner:
         # Portfolio rules (DAILY_MAX_LOSS, GREEN_TO_RED, GIVE_BACK_HALF) block
         # all new entries once fired — enforced here, not just observed.
         if self.position_manager.can_enter_trade():
+            completed_today = len(self.position_manager.trades_completed)
             if self.portfolio_manager.any_rule_fired():
                 if self.verbose:
                     rule = next(
@@ -708,6 +712,12 @@ class SimulationRunner:
                     et_str = current_time.astimezone(ET).strftime('%H:%M')
                     logger.info(
                         f"  {et_str} [HALTED] {rule} fired — no new entries today"
+                    )
+            elif completed_today >= self.max_trades_per_day:
+                if self.verbose:
+                    et_str = current_time.astimezone(ET).strftime('%H:%M')
+                    logger.info(
+                        f"  {et_str} [HALTED] max trades/day reached ({completed_today}/{self.max_trades_per_day})"
                     )
             else:
                 self._scan_for_entry(current_time, bars)
