@@ -105,12 +105,16 @@ class PositionManager:
     """Manages capital, open position, and daily risk rules."""
 
     # GAP-11: Float-bucket hard caps on position value.
-    # Source: concept_float_analysis.md — low-float stocks need smaller positions
-    # because spreads/slippage compound fast and thin books cause outsized losses.
-    # sub-1M float: max $5K position; 1M-3M float: max $15K; 3M+ float: max_position_pct applies.
+    # Source: concept_position_sizing.md §3 + concept_float_analysis.md.
+    # Low-float stocks need smaller positions: spreads widen fast, thin books cause
+    # outsized slippage losses. Upper buckets (3M-20M) added in GAP-N.
+    # The scanner already blocks float > 20M, so no 20M+ entry needed.
+    # List must be ascending — loop breaks on first match.
     FLOAT_BUCKET_CAPS = [
-        (1_000_000,  5_000.0),   # sub-1M float  → hard cap $5K
-        (3_000_000, 15_000.0),   # 1M–3M float   → hard cap $15K
+        (1_000_000,  5_000.0),   # sub-1M float   → hard cap $5K  (2K-5K shares @ $1-$2.50)
+        (3_000_000, 15_000.0),   # 1M–3M float    → hard cap $15K (3K-15K shares @ $1-$5)
+        (10_000_000, 8_000.0),   # 3M–10M float   → hard cap $8K  (concept: ≤9K shares; tighter spread)
+        (20_000_000, 5_000.0),   # 10M–20M float  → hard cap $5K  (concept: ≤5K shares; smaller edge)
     ]
 
     def __init__(self, account_size, risk_per_trade_pct=2.0,

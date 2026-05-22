@@ -127,6 +127,8 @@ def evaluate_exit(
 
     # ── 4. Target 2 ────────────────────────────────────────────────────────────
     # Scale out target2_qty_pct of original position (from the post-T1 remainder).
+    # After T2, migrate stop up to T1 price — locks T1 gains on any remaining shares.
+    # concept_stop_management.md §6.2: "After T2: stop moves to T1 entry price."
     t2_price = position.entry_price + stop_distance * cfg.target2_ratio
     t1_qty = int(position.shares * cfg.target1_qty_pct)
     after_t1_shares = position.shares - t1_qty
@@ -138,6 +140,7 @@ def evaluate_exit(
             reason='TARGET_2',
             price=current_price,
             qty=qty,
+            new_stop_price=t1_price,   # Lock T1 gains on the remaining runner
         )
 
     # ── Soft exits — only triggered when the position is profitable ────────────
@@ -160,13 +163,17 @@ def evaluate_exit(
 
     # ── 6. MACD histogram flip (Phase 3) ──────────────────────────────────────
     # Fire when histogram crosses from positive to negative while profitable.
+    # concept_stop_management.md §5.6: "Negative MACD at or near highs = close
+    # 75% or more of position immediately." The signal leads price; waiting for
+    # price confirmation is too late — sell macd_flip_qty_pct (default 75%) now
+    # and tighten stop on the remainder to breakeven.
     if cfg.enable_macd_flip_exit and in_profit:
         macd_now = indicators.get('macd_histogram')
         macd_prev = indicators.get('macd_histogram_prev')
         if (macd_prev is not None and macd_now is not None
                 and macd_prev > 0 and macd_now <= 0):
-            # Tighten stop only (no immediate sell)
-            qty = 0
+            qty = max(1, int(shares_remaining * cfg.macd_flip_qty_pct))
+            qty = min(qty, shares_remaining)
             new_stop = max(position.stop_loss, position.entry_price)
             return ExitSignal(
                 reason='MACD_FLIP',

@@ -178,7 +178,7 @@ class ExitConfig:
     # ── MACD flip exit (Phase 3) ──────────────────────────────────────────────
     # Fire when MACD histogram flips from positive to negative while profitable.
     enable_macd_flip_exit: bool = False
-    macd_flip_qty_pct: float = 0.50     # Fraction to sell on MACD flip
+    macd_flip_qty_pct: float = 0.75     # Fraction to sell on MACD flip (concept: "close 75%+")
 
     # ── Resistance / prior-day-high exit (Phase 3) ────────────────────────────
     # Fire when stock tests prior-day high N times (each bounce = likely reversal).

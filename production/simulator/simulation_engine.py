@@ -159,7 +159,7 @@ class SimulationRunner:
 
         self.max_trades_per_day = max_trades_per_day
 
-        # Market temperature — classifies HOT/NEUTRAL/COLD/CHOP at 9:15 AM ET
+        # Market temperature — classifies HOT/NEUTRAL/COLD/CHOP at 9:25 AM ET
         # and adjusts max_position_pct, max_trades_per_day, session_stop_time dynamically.
         self.temp_config: MarketTemperatureConfig = temp_config or MarketTemperatureConfig()
         self.temp_state: TemperatureState = TemperatureState()  # Starts COLD (safe default)
@@ -535,8 +535,11 @@ class SimulationRunner:
         """
         et_time = current_time.astimezone(ET)
 
-        # ── Temperature: classify at 9:15 AM ET (once per session) ───────────
-        if (et_time.hour == 9 and et_time.minute == 15
+        # ── Temperature: classify at 9:25 AM ET (once per session) ───────────
+        # concept_market_temperature.md: "Snapshot Time: 9:25 AM — 5 minutes before
+        # open. Pre-market volume has fully ramped, final watchlist is clear, signal
+        # quality is meaningfully better than 9:15."
+        if (et_time.hour == 9 and et_time.minute == 25
                 and not self.temp_state.premarket_classified):
             self.temp_state = classify_premarket(
                 self.hot_symbols,
@@ -550,7 +553,7 @@ class SimulationRunner:
             self.position_manager.max_position_pct = self.temp_state.max_position_pct
             if self.verbose:
                 logger.info(
-                    f"  09:15 [TEMP] {self.temp_state.temperature.value}"
+                    f"  09:25 [TEMP] {self.temp_state.temperature.value}"
                     f"  gapper={self.temp_state.leading_gapper_pct:.0f}%"
                     f"  symbols={self.temp_state.qualifying_symbols_count}"
                     f"  → max_pos={self.temp_state.max_position_pct:.0f}%"
