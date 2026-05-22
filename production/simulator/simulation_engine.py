@@ -27,9 +27,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from utils.query_helpers import StockDataDB
 from trading.entry_engine import evaluate_entry
 from trading.exit_engine import evaluate_exit
+from trading.add_on_engine import evaluate_add_on, AddOnSignal
 from trading.indicators import get_current_ema, calculate_macd, estimate_buy_sell_volume
 from trading.portfolio_manager import PortfolioManager
-from trading.models import ExitConfig, ScannerConfig, EntryConfig, MarketTemperatureConfig, ExitSignal
+from trading.models import ExitConfig, ScannerConfig, EntryConfig, MarketTemperatureConfig, AddOnConfig, ExitSignal
 from trading.trading_engine import Trade, PositionManager
 from trading.market_temperature import (
     TemperatureState, classify_premarket, update_from_trade_result, is_session_over
@@ -68,6 +69,7 @@ class SimulationRunner:
                  max_position_pct=20, verbose=True,
                  daily_max_loss_pct=3.0, daily_profit_target=None,
                  exit_config=None, scanner_config=None, entry_config=None,
+                 add_on_config=None,
                  debug=False, cache_data=False, cache_dir: str | None = None,
                  symbol_universe: list | None = None,
                  max_trades_per_day: int = 3,
@@ -92,6 +94,7 @@ class SimulationRunner:
         self.exit_config = exit_config       # ExitConfig | None; None = all defaults
         self.scanner_config = scanner_config  # ScannerConfig | None; None = all defaults
         self.entry_config = entry_config      # EntryConfig | None; None = all defaults
+        self.add_on_config = add_on_config    # AddOnConfig | None; None = all defaults
         self.debug = debug
         self.cache_data = cache_data
         self.cache_dir = Path(cache_dir) if cache_dir else None
@@ -542,8 +545,10 @@ class SimulationRunner:
 
                 # Build enriched indicators dict
                 macd_hist = macd['histogram'] if macd else None
+                macd_line = macd['macd_line'] if macd else None
                 indicators = {
                     'ema9': ema9,
+                    'macd_line': macd_line,
                     'macd_histogram': macd_hist,
                     'macd_histogram_prev': self._last_macd_histogram[pos.symbol],
                     'prior_day_high': self.prior_day_high.get(pos.symbol),
@@ -605,6 +610,58 @@ class SimulationRunner:
                             f"@ ${exit_signal.price:.2f} x{exit_signal.qty} "
                             f"P&L ${pnl:+.2f}"
                         )
+
+        # Step 2b: Add-on check
+        # Runs only when a position survived the exit check this bar.
+        # evaluate_add_on() checks profitability, time window, and trigger gates.
+        # After evaluation (add or no-add), advance session_high_at_add watermark.
+        if self.position_manager.position:
+            pos = self.position_manager.position
+            pos_bar = next((b for b in bars if b['symbol'] == pos.symbol), None)
+            if pos_bar:
+                history = self.bar_history.get(pos.symbol, [])
+                # Compute indicators for add-on evaluation
+                prices = [float(b['close']) for b in history]
+                ema9_ao = get_current_ema(prices, 9)
+                macd_ao = calculate_macd(prices)
+                indicators_ao = {
+                    'ema9': ema9_ao,
+                    'macd_line': macd_ao['macd_line'] if macd_ao else None,
+                }
+
+                add_on_sig = evaluate_add_on(
+                    position=pos,
+                    current_bar=pos_bar,
+                    bar_history=history[:-1],   # exclude current (no lookahead)
+                    indicators=indicators_ao,
+                    current_time=current_time,
+                    config=self.add_on_config,
+                    temperature=self.temp_state,
+                )
+                if add_on_sig:
+                    added_qty = self.position_manager.apply_add_on(add_on_sig, current_time)
+                    if added_qty > 0:
+                        self.trade_log.append({
+                            'time': current_time,
+                            'action': f'ADD_ON_{add_on_sig.reason}',
+                            'symbol': pos.symbol,
+                            'price': add_on_sig.price,
+                            'qty': added_qty,
+                            'pnl': 0.0,  # Buy — no realized P&L yet
+                        })
+                        if self.verbose:
+                            et_str = current_time.astimezone(ET).strftime('%H:%M')
+                            logger.info(
+                                f"  {et_str} ADD_ON [{add_on_sig.reason:16}] "
+                                f"{pos.symbol:6} @ ${add_on_sig.price:.2f} "
+                                f"x{added_qty} (add #{pos.add_on_count}) "
+                                f"new_stop=${add_on_sig.new_stop:.2f}"
+                            )
+
+                # Always advance high watermark after evaluation (regardless of add)
+                bar_high = float(pos_bar.get('high', pos_bar['close']))
+                if bar_high > pos.session_high_at_add:
+                    pos.session_high_at_add = bar_high
 
         # Step 3: Entry scan
         # Portfolio rules (DAILY_MAX_LOSS, GREEN_TO_RED, GIVE_BACK_HALF) block

@@ -35,12 +35,19 @@ class Trade:
         self.exit_price = None
         self.exit_reason = None
         self.shares_remaining = shares
-        self.fills = []  # List of {qty, price, reason, time}
+        self.fills = []  # List of {qty, price, reason, time} — exit fills only
 
         # Tracking for exit_engine features
         self.original_stop_loss = stop_loss            # Immutable — stop_loss moves after T1
         self.highest_price_since_entry = entry_price   # Updated each bar; used by trailing stop
         self.resistance_touches = 0                    # Count of prior-day-high touch events
+
+        # Add-on / pyramid tracking (GAP-03)
+        self.initial_shares = shares                   # Immutable — used to size each add tier
+        self.add_on_count = 0                          # Number of adds executed this trade
+        self.add_on_fills = []                         # List of {qty, price, reason, time} — buy fills
+        self.t1_hit = False                            # True after first TARGET_1 partial exit fires
+        self.session_high_at_add = entry_price         # High watermark for NEW_HIGH gate
 
     def scale_out(self, qty, price, reason, time):
         """Record a partial exit."""
@@ -59,9 +66,31 @@ class Trade:
         self.exit_reason = reason
         self.shares_remaining = 0
 
+    def apply_add_on(self, qty, price, new_stop, reason, time):
+        """Record an add-on buy: increase position size and tighten stop."""
+        self.add_on_fills.append({'qty': qty, 'price': price, 'reason': reason, 'time': time})
+        self.shares += qty
+        self.shares_remaining += qty
+        self.add_on_count += 1
+        if new_stop > self.stop_loss:
+            self.stop_loss = new_stop
+        # Advance high watermark so next bar must break even higher
+        if price > self.session_high_at_add:
+            self.session_high_at_add = price
+
     def get_pnl(self):
-        """Total realized P&L across all fills."""
-        return sum(f['qty'] * (f['price'] - self.entry_price) for f in self.fills)
+        """
+        Total realized P&L across all exit fills, corrected for add-on cost basis.
+
+        Without correction, all exit fills would be priced as if bought at entry_price,
+        overstating gains on add-on shares that were actually bought at higher prices.
+        Correction: subtract the extra cost premium paid for each add-on lot.
+        """
+        raw = sum(f['qty'] * (f['price'] - self.entry_price) for f in self.fills)
+        add_on_premium = sum(
+            a['qty'] * (a['price'] - self.entry_price) for a in self.add_on_fills
+        )
+        return raw - add_on_premium
 
     def get_exit_time_minutes(self):
         if not self.exit_time:
@@ -198,6 +227,10 @@ class PositionManager:
             if pnl < 0:
                 self.daily_loss += abs(pnl)
 
+            # GAP-03: mark T1 hit so add-on engine knows a partial has been taken
+            if exit_signal.reason in ('TARGET_1', 'TARGET_1_COLD'):
+                pos.t1_hit = True
+
             if exit_signal.move_stop_to_breakeven:
                 pos.stop_loss = pos.entry_price
             if exit_signal.new_stop_price is not None:
@@ -213,6 +246,35 @@ class PositionManager:
                 self.position = None
 
         return pnl
+
+    def apply_add_on(self, add_on_signal, current_time) -> int:
+        """
+        Apply an AddOnSignal from add_on_engine.evaluate_add_on().
+
+        Returns the number of shares actually added (may be less than requested if
+        the add would push position value over max_position_pct cap).
+        Returns 0 if add was skipped entirely.
+        """
+        if not self.position:
+            return 0
+        pos = self.position
+        qty = add_on_signal.qty
+        if qty <= 0:
+            return 0
+
+        # Cap: don't exceed 3× initial_shares total (concept page: "max_position_size * 3")
+        # We use shares (not dollar value) for this cap — the position has already grown
+        # in value and using a dollar cap would block all adds after any price increase.
+        if pos.shares >= pos.initial_shares * 3:
+            return 0
+        max_add = pos.initial_shares * 3 - pos.shares
+        qty = min(qty, max_add)
+        if qty <= 0:
+            return 0
+
+        pos.apply_add_on(qty, add_on_signal.price, add_on_signal.new_stop,
+                         add_on_signal.reason, current_time)
+        return qty
 
     def get_stats(self):
         trades = self.trades_completed

@@ -181,6 +181,40 @@ class ExitConfig:
     volume_dry_up_qty_pct: float = 0.50
 
 
+# ── Category E: Add-on / Pyramid mechanics ───────────────────────────────────
+
+@dataclass
+class AddOnConfig:
+    """
+    Category E parameters — add-on (pyramid) mechanics.
+
+    Controls when and how much to add to an existing profitable position.
+    Source: concept_add_on_mechanics.md — 2,593 add-on trades across 1,049 sessions.
+    Add-ons present in 52.3% of all Ross Cameron trades.
+    """
+    # ── Gate toggles ───────────────────────────────────────────────────────────
+    enable_new_high: bool = True          # Gate 1: add on new session high break (42.8% of add triggers)
+    enable_micro_pb_add: bool = True      # Gate 2: add on micro-pullback resumption (26.4%)
+    enable_vwap_retest: bool = True       # Gate 3: add on VWAP hold from above (6.5%)
+    enable_whole_dollar_add: bool = True  # Gate 4: add on whole-dollar break + positive MACD
+    # Note: Gate 5 (halt-resume add, 6.6%) requires halt feed — not implementable in backtest.
+
+    # ── Preconditions ──────────────────────────────────────────────────────────
+    max_add_ons: int = 4                  # Max additions per trade (rarely > 4 in corpus)
+    time_cutoff_hour: int = 10            # Add-on window: only before 10:30 ET
+    time_cutoff_minute: int = 30
+
+    # ── Sizing (fraction of initial_shares at each tier) ───────────────────────
+    add_pct_tier1: float = 0.25           # Add 1: 25% of initial position
+    add_pct_tier2: float = 0.25           # Add 2: 25%
+    add_pct_tier3: float = 0.20           # Add 3: 20%
+    add_pct_tier4: float = 0.10           # Add 4: 10% (rare; only on halting-up momentum)
+    hot_market_multiplier: float = 1.25   # Scale add size by this in HOT temperature
+
+    # ── Stop adjustment ────────────────────────────────────────────────────────
+    stop_buffer: float = 0.076            # $ below breakout/pullback-low for updated stop
+
+
 # ── Category D: Market Temperature thresholds ────────────────────────────────
 
 @dataclass

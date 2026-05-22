@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from trading.broker.base import BrokerInterface, OrderResult
 from trading.trading_engine import Trade
 from trading.models import EntrySignal, ExitSignal
+from trading.add_on_engine import AddOnSignal
 
 logger = logging.getLogger(__name__)
 
@@ -281,6 +282,67 @@ class LiveTradeManager:
         logger.info(f"EXIT {exit_signal.reason}: {fill_qty} {trade.symbol} "
                     f"@ ${fill_price:.2f} | trade P&L: ${pnl:+.2f}")
         return pnl
+
+    def execute_add_on(self, add_on_signal: AddOnSignal,
+                       current_time: datetime) -> int:
+        """
+        Execute an add-on signal from add_on_engine.evaluate_add_on().
+
+        Places a marketable limit buy for add_on_signal.qty more shares,
+        waits for fill, updates the Trade record, and re-places the stop
+        at add_on_signal.new_stop covering the full (enlarged) position.
+
+        Returns the number of shares actually added (0 if failed).
+        """
+        if not self.active_trade:
+            logger.warning("execute_add_on called but no active trade")
+            return 0
+
+        trade = self.active_trade
+        qty   = add_on_signal.qty
+        if qty <= 0:
+            return 0
+
+        logger.info(
+            f"ADD-ON {add_on_signal.reason}: buying {qty} {trade.symbol} "
+            f"@ ~${add_on_signal.price:.2f} (add #{trade.add_on_count + 1})"
+        )
+
+        # Cancel existing stop before adding — broker may block buy while stop is live
+        if self.stop_order_id:
+            self.executor.cancel_order(self.stop_order_id)
+            self.stop_order_id = None
+            time.sleep(0.3)
+
+        # Place marketable limit buy (same buffer as entry orders)
+        result = self.executor.place_entry(trade.symbol, qty, add_on_signal.price)
+        filled = self._wait_for_fill(result.order_id)
+
+        if filled is None:
+            logger.warning(f"Add-on buy order for {trade.symbol} timed out — re-placing stop at original level")
+            # Re-place stop at existing level to keep protection active
+            stop_result       = self.executor.place_stop(trade.symbol, trade.shares_remaining, trade.stop_loss)
+            self.stop_order_id = stop_result.order_id
+            return 0
+
+        fill_price = filled.filled_price
+        fill_qty   = filled.filled_qty
+
+        # Record in the Trade object
+        trade.apply_add_on(fill_qty, fill_price, add_on_signal.new_stop,
+                           add_on_signal.reason, current_time)
+
+        # Re-place stop covering the full enlarged position at new stop level
+        new_stop = trade.stop_loss  # apply_add_on already moved this
+        stop_result       = self.executor.place_stop(trade.symbol, trade.shares_remaining, new_stop)
+        self.stop_order_id = stop_result.order_id
+
+        logger.info(
+            f"ADD-ON FILLED: {fill_qty} {trade.symbol} @ ${fill_price:.2f} | "
+            f"total position: {trade.shares_remaining} shares | "
+            f"new stop: ${new_stop:.2f}"
+        )
+        return fill_qty
 
     def get_unrealized_pnl(self, current_price: float) -> float:
         """Unrealized P&L on open position for monitoring / display."""
