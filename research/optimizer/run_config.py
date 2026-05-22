@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../production')))  # production/
 
 from dataclasses import dataclass, field, asdict
-from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig
+from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig
 
 
 @dataclass
@@ -40,11 +40,13 @@ class RunConfig:
         A — ScannerConfig  : stock pre-screen thresholds (price, gain, rel-vol, float, ...)
         B — EntryConfig    : pattern detection thresholds and gate toggles
         C — ExitConfig     : exit signal thresholds (targets, trailing stop, time decay, ...)
+        E — AddOnConfig    : add-on / pyramid mechanics (max adds, sizing tiers, triggers)
         F — ScoringConfig  : composite entry score weights and temperature thresholds
     """
     scanner: ScannerConfig = field(default_factory=ScannerConfig)
     entry: EntryConfig     = field(default_factory=EntryConfig)
     exit_: ExitConfig      = field(default_factory=ExitConfig)
+    add_on: AddOnConfig    = field(default_factory=AddOnConfig)
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
 
     # Simulation meta (not tuned)
@@ -61,7 +63,7 @@ class RunConfig:
         """
         Flatten all params into a single dict for SQLite storage.
 
-        Keys are prefixed by category: a_<field>, b_<field>, c_<field>, f_<field>.
+        Keys are prefixed by category: a_<field>, b_<field>, c_<field>, e_<field>, f_<field>.
         """
         d = {}
         for k, v in asdict(self.scanner).items():
@@ -70,6 +72,8 @@ class RunConfig:
             d[f'b_{k}'] = v
         for k, v in asdict(self.exit_).items():
             d[f'c_{k}'] = v
+        for k, v in asdict(self.add_on).items():
+            d[f'e_{k}'] = v
         for k, v in asdict(self.scoring).items():
             d[f'f_{k}'] = v
         d['account_size']     = self.account_size
@@ -83,11 +87,13 @@ class RunConfig:
         scanner_fields = {k[2:]: v for k, v in d.items() if k.startswith('a_')}
         entry_fields   = {k[2:]: v for k, v in d.items() if k.startswith('b_')}
         exit_fields    = {k[2:]: v for k, v in d.items() if k.startswith('c_')}
+        add_on_fields  = {k[2:]: v for k, v in d.items() if k.startswith('e_')}
         scoring_fields = {k[2:]: v for k, v in d.items() if k.startswith('f_')}
         return cls(
             scanner=ScannerConfig(**scanner_fields),
             entry=EntryConfig(**entry_fields),
             exit_=ExitConfig(**exit_fields),
+            add_on=AddOnConfig(**add_on_fields) if add_on_fields else AddOnConfig(),
             scoring=ScoringConfig(**scoring_fields) if scoring_fields else ScoringConfig(),
             account_size=d.get('account_size', 5000.0),
             risk_pct=d.get('risk_pct', 2.0),

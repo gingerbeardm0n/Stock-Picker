@@ -87,6 +87,7 @@ def run_date_range(
             exit_config=config.exit_,
             scanner_config=config.scanner,
             entry_config=config.entry,
+            add_on_config=getattr(config, 'add_on', None),
             scoring_config=getattr(config, 'scoring', None),
             debug=debug,
             cache_data=cache_data,

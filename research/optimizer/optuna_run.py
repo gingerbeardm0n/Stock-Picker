@@ -43,7 +43,7 @@ except ImportError:
 from optimizer.run_config import RunConfig
 from optimizer.results_db import init_db, write_run
 from optimizer.simulate_one import run_date_range
-from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig
+from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig
 
 
 # ── Adaptive trend controller ─────────────────────────────────────────────────
@@ -244,57 +244,70 @@ def _build_config_from_trial(
                 'abcd',
                 'dip_buy',
                 'flat_top',
+                'vwap_break_curl',
             ],
         )
         enable_ema9 = False
         enable_macd = False
         enable_trend = False
         enable_rr = False
-        enable_bull_flag = b_indicator == 'bull_flag'
-        enable_micro_pullback = b_indicator == 'micro_pullback'
-        enable_abcd = b_indicator == 'abcd'
-        enable_dip_buy = b_indicator == 'dip_buy'
-        enable_flat_top = b_indicator == 'flat_top'
+        enable_bull_flag       = b_indicator == 'bull_flag'
+        enable_micro_pullback  = b_indicator == 'micro_pullback'
+        enable_abcd            = b_indicator == 'abcd'
+        enable_dip_buy         = b_indicator == 'dip_buy'
+        enable_flat_top        = b_indicator == 'flat_top'
+        enable_vwap_break_curl = b_indicator == 'vwap_break_curl'
     else:
         enable_ema9 = _bool('b_enable_ema9')
         enable_macd = _bool('b_enable_macd')
         enable_trend = _bool('b_enable_trend')
         enable_rr = base_entry.enable_rr
 
-        enable_bull_flag = _bool('b_enable_bull_flag')
-        enable_micro_pullback = _bool('b_enable_micro_pullback')
-        enable_abcd = _bool('b_enable_abcd')
-        enable_dip_buy = _bool('b_enable_dip_buy')
-        enable_flat_top = _bool('b_enable_flat_top')
+        enable_bull_flag       = _bool('b_enable_bull_flag')
+        enable_micro_pullback  = _bool('b_enable_micro_pullback')
+        enable_abcd            = _bool('b_enable_abcd')
+        enable_dip_buy         = _bool('b_enable_dip_buy')
+        enable_flat_top        = _bool('b_enable_flat_top')
+        enable_vwap_break_curl = _bool('b_enable_vwap_break_curl')
 
     if mode == 'gates-only':
-        min_rr_ratio = base_entry.min_rr_ratio
-        stop_buffer = base_entry.stop_buffer
-        bull_flag_light_vol = base_entry.bull_flag_light_vol
-        bull_flag_pole_vol_min = base_entry.bull_flag_pole_vol_min
-        bull_flag_breakout_vol_min = base_entry.bull_flag_breakout_vol_min
-        micro_pb_green_pct = base_entry.micro_pb_green_pct
-        micro_pb_light_vol = base_entry.micro_pb_light_vol
-        micro_pb_swing_tol = base_entry.micro_pb_swing_tol
-        abcd_min_pullback_pct = base_entry.abcd_min_pullback_pct
-        abcd_d_light_vol = base_entry.abcd_d_light_vol
-        dip_buy_light_vol = base_entry.dip_buy_light_vol
-        flat_top_resistance_tol = base_entry.flat_top_resistance_tol
+        min_rr_ratio              = base_entry.min_rr_ratio
+        stop_buffer               = base_entry.stop_buffer
+        bull_flag_light_vol       = base_entry.bull_flag_light_vol
+        bull_flag_pole_vol_min    = base_entry.bull_flag_pole_vol_min
+        bull_flag_breakout_vol_min= base_entry.bull_flag_breakout_vol_min
+        micro_pb_green_pct        = base_entry.micro_pb_green_pct
+        micro_pb_light_vol        = base_entry.micro_pb_light_vol
+        micro_pb_swing_tol        = base_entry.micro_pb_swing_tol
+        abcd_min_pullback_pct     = base_entry.abcd_min_pullback_pct
+        abcd_d_light_vol          = base_entry.abcd_d_light_vol
+        # dip_buy_support_tolerance replaces legacy dip_buy_light_vol (GAP-A rewrite)
+        dip_buy_support_tolerance = base_entry.dip_buy_support_tolerance
+        flat_top_resistance_tol   = base_entry.flat_top_resistance_tol
         flat_top_vol_increase_tol = base_entry.flat_top_vol_increase_tol
+        vwap_break_curl_lookback  = base_entry.vwap_break_curl_lookback
+        vwap_curl_tolerance       = base_entry.vwap_curl_tolerance
+        vwap_break_vol_min        = base_entry.vwap_break_vol_min
     else:
-        min_rr_ratio = _float('b_min_rr_ratio', 1.5, 4.0)
-        stop_buffer = _float('b_stop_buffer', 0.01, 0.10)
-        bull_flag_light_vol = _float('b_bull_flag_light_vol', 0.40, 0.90) if enable_bull_flag else base_entry.bull_flag_light_vol
-        bull_flag_pole_vol_min = _float('b_bull_flag_pole_vol_min', 0.50, 1.00) if enable_bull_flag else base_entry.bull_flag_pole_vol_min
+        min_rr_ratio   = _float('b_min_rr_ratio', 1.5, 4.0)
+        stop_buffer    = _float('b_stop_buffer', 0.01, 0.10)
+        bull_flag_light_vol        = _float('b_bull_flag_light_vol',        0.40, 0.90) if enable_bull_flag else base_entry.bull_flag_light_vol
+        bull_flag_pole_vol_min     = _float('b_bull_flag_pole_vol_min',     0.50, 1.00) if enable_bull_flag else base_entry.bull_flag_pole_vol_min
         bull_flag_breakout_vol_min = _float('b_bull_flag_breakout_vol_min', 0.50, 1.00) if enable_bull_flag else base_entry.bull_flag_breakout_vol_min
-        micro_pb_green_pct = _float('b_micro_pb_green_pct', 0.40, 0.90) if enable_micro_pullback else base_entry.micro_pb_green_pct
-        micro_pb_light_vol = _float('b_micro_pb_light_vol', 0.40, 0.90) if enable_micro_pullback else base_entry.micro_pb_light_vol
-        micro_pb_swing_tol = _float('b_micro_pb_swing_tol', 0.90, 1.00) if enable_micro_pullback else base_entry.micro_pb_swing_tol
-        abcd_min_pullback_pct = _float('b_abcd_min_pullback_pct', 0.05, 0.30) if enable_abcd else base_entry.abcd_min_pullback_pct
-        abcd_d_light_vol = _float('b_abcd_d_light_vol', 0.50, 1.00) if enable_abcd else base_entry.abcd_d_light_vol
-        dip_buy_light_vol = _float('b_dip_buy_light_vol', 0.40, 0.90) if enable_dip_buy else base_entry.dip_buy_light_vol
-        flat_top_resistance_tol = _float('b_flat_top_resistance_tol', 0.01, 0.10) if enable_flat_top else base_entry.flat_top_resistance_tol
-        flat_top_vol_increase_tol = _float('b_flat_top_vol_increase_tol', 1.00, 2.00) if enable_flat_top else base_entry.flat_top_vol_increase_tol
+        micro_pb_green_pct         = _float('b_micro_pb_green_pct',  0.40, 0.90) if enable_micro_pullback else base_entry.micro_pb_green_pct
+        micro_pb_light_vol         = _float('b_micro_pb_light_vol',  0.40, 0.90) if enable_micro_pullback else base_entry.micro_pb_light_vol
+        micro_pb_swing_tol         = _float('b_micro_pb_swing_tol',  0.90, 1.00) if enable_micro_pullback else base_entry.micro_pb_swing_tol
+        abcd_min_pullback_pct      = _float('b_abcd_min_pullback_pct', 0.05, 0.30) if enable_abcd else base_entry.abcd_min_pullback_pct
+        abcd_d_light_vol           = _float('b_abcd_d_light_vol',    0.50, 1.00) if enable_abcd else base_entry.abcd_d_light_vol
+        # GAP-A: dip_buy_light_vol is no longer used by detect_dip_buy (rewritten to use support levels).
+        # Tune dip_buy_support_tolerance (8% tolerance for named support level match) instead.
+        dip_buy_support_tolerance  = _float('b_dip_buy_support_tolerance', 0.03, 0.15) if enable_dip_buy else base_entry.dip_buy_support_tolerance
+        flat_top_resistance_tol    = _float('b_flat_top_resistance_tol',   0.01, 0.10) if enable_flat_top else base_entry.flat_top_resistance_tol
+        flat_top_vol_increase_tol  = _float('b_flat_top_vol_increase_tol', 1.00, 2.00) if enable_flat_top else base_entry.flat_top_vol_increase_tol
+        # GAP-K: VWAP break/curl pattern — 78.1% win rate, highest dollar EV.
+        vwap_break_curl_lookback   = _int(  'b_vwap_break_curl_lookback', 3, 8)          if enable_vwap_break_curl else base_entry.vwap_break_curl_lookback
+        vwap_curl_tolerance        = _float('b_vwap_curl_tolerance',       0.005, 0.030) if enable_vwap_break_curl else base_entry.vwap_curl_tolerance
+        vwap_break_vol_min         = _float('b_vwap_break_vol_min',        0.80, 1.50)   if enable_vwap_break_curl else base_entry.vwap_break_vol_min
 
     entry = EntryConfig(
         min_rr_ratio=min_rr_ratio,
@@ -307,7 +320,7 @@ def _build_config_from_trial(
         micro_pb_swing_tol=micro_pb_swing_tol,
         abcd_min_pullback_pct=abcd_min_pullback_pct,
         abcd_d_light_vol=abcd_d_light_vol,
-        dip_buy_light_vol=dip_buy_light_vol,
+        dip_buy_support_tolerance=dip_buy_support_tolerance,
         flat_top_resistance_tol=flat_top_resistance_tol,
         flat_top_vol_increase_tol=flat_top_vol_increase_tol,
         enable_ema9=enable_ema9,
@@ -319,11 +332,17 @@ def _build_config_from_trial(
         enable_abcd=enable_abcd,
         enable_dip_buy=enable_dip_buy,
         enable_flat_top=enable_flat_top,
+        enable_vwap_break_curl=enable_vwap_break_curl,
+        vwap_break_curl_lookback=vwap_break_curl_lookback,
+        vwap_curl_tolerance=vwap_curl_tolerance,
+        vwap_break_vol_min=vwap_break_vol_min,
     )
 
-    exit_macd = base_exit.enable_macd_flip_exit
-    exit_resistance = base_exit.enable_resistance_exit
-    exit_volume_dry = base_exit.enable_volume_dry_up_exit
+    # In full/gates-only mode these are explored (not locked to False).
+    # GAP-L fixed MACD flip to actually sell 75% — now worth exploring.
+    exit_macd        = _bool('c_enable_macd_flip_exit') if mode != 'single-indicator' else base_exit.enable_macd_flip_exit
+    exit_resistance  = base_exit.enable_resistance_exit
+    exit_volume_dry  = base_exit.enable_volume_dry_up_exit
 
     if mode == 'single-indicator':
         # Category C: choose exactly ONE profit-exit strategy.
@@ -378,18 +397,21 @@ def _build_config_from_trial(
         )
     else:
         exit_ = ExitConfig(
-            target1_ratio           = _float('c_target1_ratio',            1.0, 3.0),
-            target2_ratio           = _float('c_target2_ratio',            2.0, 5.0),
-            target1_qty_pct         = _float('c_target1_qty_pct',          0.20, 0.80),
-            target2_qty_pct         = _float('c_target2_qty_pct',          0.10, 0.50),
-            trailing_stop_distance  = _float('c_trailing_stop_distance',   0.00, 0.50),
-            time_decay_hour         = _int(  'c_time_decay_hour',          10,   13),
-            early_time_decay_hour   = 0,    # Phase 4 — disabled for now
-            selling_pressure_ratio  = _float('c_selling_pressure_ratio',   1.20, 4.00),
-            selling_pressure_qty_pct= _float('c_selling_pressure_qty_pct', 0.20, 1.00),
-            enable_macd_flip_exit   = exit_macd,
-            enable_resistance_exit  = exit_resistance,
-            enable_volume_dry_up_exit = exit_volume_dry,
+            target1_ratio            = _float('c_target1_ratio',            1.0, 3.0),
+            target2_ratio            = _float('c_target2_ratio',            2.0, 5.0),
+            target1_qty_pct          = _float('c_target1_qty_pct',          0.20, 0.80),
+            target2_qty_pct          = _float('c_target2_qty_pct',          0.10, 0.50),
+            trailing_stop_distance   = _float('c_trailing_stop_distance',   0.00, 0.50),
+            time_decay_hour          = _int(  'c_time_decay_hour',          10,   13),
+            early_time_decay_hour    = 0,    # Phase 4 — disabled for now
+            selling_pressure_ratio   = _float('c_selling_pressure_ratio',   1.20, 4.00),
+            selling_pressure_qty_pct = _float('c_selling_pressure_qty_pct', 0.20, 1.00),
+            enable_macd_flip_exit    = exit_macd,
+            # GAP-L: MACD flip now sells macd_flip_qty_pct (default 75%) immediately.
+            # Tune when enabled; use corpus-derived default (0.75) when disabled.
+            macd_flip_qty_pct        = _float('c_macd_flip_qty_pct', 0.40, 1.00) if exit_macd else base_exit.macd_flip_qty_pct,
+            enable_resistance_exit   = exit_resistance,
+            enable_volume_dry_up_exit= exit_volume_dry,
         )
 
     # ── Scoring (Category F) — composite entry score weights ─────────────────
@@ -437,7 +459,37 @@ def _build_config_from_trial(
             # the threshold/size/relvol/news tuning converges.
         )
 
-    return RunConfig(scanner=scanner, entry=entry, exit_=exit_, scoring=scoring)
+    # ── Add-on / Pyramid (Category E) ────────────────────────────────────────
+    # 52.3% of all Ross Cameron trades used add-ons (2,593/4,959).
+    # Source: concept_add_on_mechanics.md.
+    # Tune gate toggles and sizing tiers. Halt-resume add is excluded (no halt feed).
+    base_add_on = AddOnConfig()
+
+    if mode == 'gates-only':
+        add_on = base_add_on
+    else:
+        add_on = AddOnConfig(
+            # Gate toggles — which trigger types are active
+            enable_new_high        = _bool('e_enable_new_high'),         # 42.8% of triggers
+            enable_micro_pb_add    = _bool('e_enable_micro_pb_add'),     # 26.4% of triggers
+            enable_vwap_retest     = _bool('e_enable_vwap_retest'),      # 6.5% of triggers
+            enable_whole_dollar_add= _bool('e_enable_whole_dollar_add'), # 2.4% of triggers
+
+            # Max adds per trade (corpus: 87% = 1 add, 11% = 2 adds, 2% = 3+)
+            max_add_ons            = _int('e_max_add_ons', 1, 4),
+
+            # Morning window cutoff (corpus: <1% of adds after 10:30 ET)
+            time_cutoff_minute     = _int('e_time_cutoff_minute', 15, 30),
+
+            # Add sizing tiers (fraction of initial_shares per add)
+            add_pct_tier1          = _float('e_add_pct_tier1', 0.10, 0.50),
+            add_pct_tier2          = _float('e_add_pct_tier2', 0.10, 0.40),
+
+            # HOT market add size multiplier (concept: 25-50% more in hot market)
+            hot_market_multiplier  = _float('e_hot_market_multiplier', 1.00, 1.75),
+        )
+
+    return RunConfig(scanner=scanner, entry=entry, exit_=exit_, add_on=add_on, scoring=scoring)
 
 
 # ── Seed helper ───────────────────────────────────────────────────────────────
