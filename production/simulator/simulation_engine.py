@@ -30,7 +30,7 @@ from trading.exit_engine import evaluate_exit
 from trading.add_on_engine import evaluate_add_on, AddOnSignal
 from trading.indicators import get_current_ema, calculate_macd, estimate_buy_sell_volume
 from trading.portfolio_manager import PortfolioManager
-from trading.models import ExitConfig, ScannerConfig, EntryConfig, MarketTemperatureConfig, AddOnConfig, ExitSignal
+from trading.models import ExitConfig, ScannerConfig, EntryConfig, MarketTemperatureConfig, AddOnConfig, ScoringConfig, ExitSignal
 from trading.trading_engine import Trade, PositionManager
 from trading.market_temperature import (
     TemperatureState, classify_premarket, update_from_trade_result, is_session_over
@@ -70,6 +70,7 @@ class SimulationRunner:
                  daily_max_loss_pct=3.0, daily_profit_target=None,
                  exit_config=None, scanner_config=None, entry_config=None,
                  add_on_config=None,
+                 scoring_config=None,
                  debug=False, cache_data=False, cache_dir: str | None = None,
                  symbol_universe: list | None = None,
                  max_trades_per_day: int = 3,
@@ -95,6 +96,7 @@ class SimulationRunner:
         self.scanner_config = scanner_config  # ScannerConfig | None; None = all defaults
         self.entry_config = entry_config      # EntryConfig | None; None = all defaults
         self.add_on_config = add_on_config    # AddOnConfig | None; None = all defaults
+        self.scoring_config = scoring_config  # ScoringConfig | None; None = all defaults
         self.debug = debug
         self.cache_data = cache_data
         self.cache_dir = Path(cache_dir) if cache_dir else None
@@ -816,6 +818,10 @@ class SimulationRunner:
                 scanner_config=self.scanner_config,
                 entry_config=self.entry_config,
                 temperature=self.temp_state,
+                # news_tier: defaults to 'unknown' (4 pts) — backtest graceful degradation.
+                # Wire live news pre-cache here when news API is enabled.
+                news_tier='unknown',
+                scoring_config=self.scoring_config,
             )
 
             if entry_signal is None:
@@ -834,9 +840,22 @@ class SimulationRunner:
                 self._stats['entries_found'] += 1
             pat = best_signal.pattern
             fund = self.fundamentals.get(best_signal.symbol, {})
-            # GAP-14: 1st stop-out → half-size re-entry; 0 stop-outs → full size
+
+            # Composite size multiplier = score × GAP-14 cooldown
+            # Score drives temperature-adjusted initial sizing (HOT=1.0, COLD=0.5, etc.)
+            # GAP-14 further halves on first re-entry after stop-out on same symbol.
             stop_hit_n = self.stop_hit_counts.get(best_signal.symbol, 0)
-            size_mult = 0.5 if stop_hit_n == 1 else 1.0
+            gap14_mult = 0.5 if stop_hit_n == 1 else 1.0
+
+            score_mult = 1.0
+            if best_signal.entry_score is not None:
+                scfg = self.scoring_config if self.scoring_config is not None else ScoringConfig()
+                score_mult = best_signal.entry_score.size_multiplier(
+                    self.temp_state.temperature.value, scfg
+                )
+
+            size_mult = gap14_mult * score_mult
+
             trade = self.position_manager.enter_position(
                 symbol=best_signal.symbol,
                 entry_price=pat.entry_price,

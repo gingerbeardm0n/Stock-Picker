@@ -7,6 +7,68 @@ logger = logging.getLogger(__name__)
 # Articles tagged with more symbols than this are likely roundups/listicles
 MAX_SYMBOLS_FOR_SPECIFIC_NEWS = 5
 
+# ── Keyword sets for news tier classification ─────────────────────────────────
+# Source: concept_news_catalyst.md Tier 1/2/3 taxonomy
+# Checked in order: first match wins. Headlines/summaries searched case-insensitive.
+
+_TIER1_KEYWORDS = [
+    'fda', 'approval', 'approved', 'clearance', 'cleared',  # FDA / regulatory
+    'acquisition', 'merger', 'buyout', 'acquired',          # M&A
+    'earnings beat', 'beat estimates', 'raised guidance',    # Earnings
+    'reverse split', 'reverse stock split',                  # Float mechanics
+    'short squeeze', 'days to cover',                        # Squeeze confirmation
+    'bankruptcy', 'chapter 11',                              # Distress catalyst
+]
+_TIER2_KEYWORDS = [
+    'contract', 'partnership', 'agreement', 'collaboration',  # Business deals
+    'phase 2', 'phase 3', 'clinical trial', 'ind application', 'inda',  # Biotech
+    'government contract', 'defense contract', 'military',    # Gov / defense
+    'insider buy', 'form 4', 'director purchase',             # Insider activity
+    'uplisted', 'uplisting', 'nasdaq listing',                # Exchange listing
+]
+_TIER3_KEYWORDS = [
+    'sympathy', 'sector', 'industry move',     # Sector plays
+    'reddit', 'twitter', 'social media', 'wsb', 'wallstreetbets',  # Social
+    'strategic review', 'exploring options',   # Vague corporate language
+]
+
+
+def classify_news_tier(articles: list) -> str:
+    """
+    Classify the quality tier of a symbol's news from fetched article data.
+
+    Checks headline + summary text for tier-specific keywords in priority order.
+    Only counts articles tagged with ≤ MAX_SYMBOLS_FOR_SPECIFIC_NEWS tickers
+    (filters out roundup/listicle content).
+
+    Returns one of:
+        'tier1'    — hard catalyst (FDA, M&A, earnings beat, short squeeze)
+        'tier2'    — medium catalyst (contract, biotech data, insider buy)
+        'tier3'    — weak catalyst (sector sympathy, social media driven)
+        'presence' — news present but no tier keywords matched
+        'none'     — no specific articles found
+    """
+    specific = [a for a in articles if a.get('is_specific', True)]
+    if not specific:
+        return 'none'
+
+    all_text = ' '.join(
+        f"{a.get('headline', '')} {a.get('summary', '')}"
+        for a in specific
+    ).lower()
+
+    for kw in _TIER1_KEYWORDS:
+        if kw in all_text:
+            return 'tier1'
+    for kw in _TIER2_KEYWORDS:
+        if kw in all_text:
+            return 'tier2'
+    for kw in _TIER3_KEYWORDS:
+        if kw in all_text:
+            return 'tier3'
+
+    return 'presence'  # news found, just doesn't match known tier keywords
+
 class NewsFetcher:
     def __init__(self):
         from alpaca.data.historical import NewsClient

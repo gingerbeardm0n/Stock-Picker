@@ -23,7 +23,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import pytz
 from datetime import datetime
 
-from trading.models import PatternSignal, EntrySignal, ScannerConfig, EntryConfig
+from trading.models import PatternSignal, EntrySignal, ScannerConfig, EntryConfig, ScoringConfig
+from trading.scoring_engine import compute_entry_score
 from trading.indicators import (
     calculate_ema,
     calculate_macd,
@@ -174,9 +175,11 @@ def evaluate_entry(
     prior_close: float | None,  # Previous day's close price
     current_time: datetime,     # UTC datetime of the current bar
     relative_volume: float,     # Pre-calculated relative volume (time-of-day adjusted)
-    scanner_config: ScannerConfig | None = None,  # Category A params; None = defaults
-    entry_config: EntryConfig | None = None,      # Category B params; None = defaults
-    temperature=None,           # TemperatureState | None — gates min_confidence on COLD/CHOP
+    scanner_config: ScannerConfig | None = None,    # Category A params; None = defaults
+    entry_config: EntryConfig | None = None,        # Category B params; None = defaults
+    temperature=None,           # TemperatureState | None — gates score threshold on COLD/CHOP
+    news_tier: str = 'unknown', # 'tier1','tier2','tier3','presence','none','unknown'
+    scoring_config: ScoringConfig | None = None,    # Category F score weights; None = defaults
 ) -> EntrySignal | None:
     """
     Full entry evaluation pipeline. Returns EntrySignal if all gates pass, else None.
@@ -303,24 +306,44 @@ def evaluate_entry(
     if ecfg.enable_rr and signal.risk_reward_ratio < ecfg.min_rr_ratio:
         return None
 
-    # ── Gate 5.5: Market temperature quality gate ─────────────────────────────
-    # COLD/CHOP days require A+ setups only (confidence 5/5).
-    # HOT days allow lower-quality patterns (confidence 3/5+).
-    # Source: concept_market_temperature.md §4 "Setup Selection: A+ Only"
-    # TODO: cold-day news catalyst gate (requires news API integration)
-    if temperature is not None and signal.confidence < temperature.min_confidence:
-        return None
-
-    # All gates passed — return entry signal
+    # ── Gate 5.5: Composite entry score gate ─────────────────────────────────
+    # Replaces the crude min_confidence (1-5 stars) check with a full 0-100
+    # score that incorporates pattern quality, rel-vol magnitude, float tier,
+    # gap %, news catalyst tier, MACD state, and time of day.
+    #
+    # Temperature sets the minimum threshold:
+    #   HOT ≥ 40 | NEUTRAL ≥ 55 | COLD ≥ 70 | CHOP ≥ 80
+    # Score above threshold also scales initial position size (see EntryScore).
+    #
+    # Source: concept_market_temperature.md, concept_news_catalyst.md
     pillar_data['ema9'] = round(ema9, 4) if ema9 else None
     pillar_data['macd_line'] = round(indicators['macd_line'], 6) if indicators['macd_line'] is not None else None
     pillar_data['macd_histogram'] = round(indicators['macd_histogram'], 6) if indicators['macd_histogram'] is not None else None
     pillar_data['pattern'] = signal.pattern_type
+    pillar_data['news_tier'] = news_tier
+
+    score = compute_entry_score(
+        pattern=signal,
+        pillar_data=pillar_data,
+        indicators=indicators,
+        current_time=current_time,
+        news_tier=news_tier,
+        config=scoring_config,
+    )
+    pillar_data['entry_score'] = score.total
+    pillar_data['score_components'] = score.components
+
+    # Apply temperature threshold gate
+    temp_name = temperature.temperature.value if temperature is not None else 'NEUTRAL'
+    scfg = scoring_config if scoring_config is not None else ScoringConfig()
+    if not score.passes_threshold(temp_name, scfg):
+        return None
 
     return EntrySignal(
         symbol=symbol,
         pattern=signal,
         pillar_data=pillar_data,
+        entry_score=score,
     )
 
 

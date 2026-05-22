@@ -279,6 +279,137 @@ class PatternSignal:
 
 
 @dataclass
+class ScoringConfig:
+    """
+    Category F parameters — composite entry score weights and temperature thresholds.
+
+    Each component contributes points (0 to max) to a 0-100 total score.
+    Temperature sets the minimum score to enter and the base position size.
+    All weights are Optuna-tunable — defaults are corpus-informed starting points.
+
+    Source: concept_news_catalyst.md, concept_entry_trigger_taxonomy.md,
+            concept_float_analysis.md, concept_market_temperature.md
+    """
+    # ── Pattern base points (max 25) ──────────────────────────────────────────
+    # Ordered by corpus win rate (entry_trigger_taxonomy.md):
+    # gap-and-go 78.2%, micro-pullback 74.3%, vwap-reclaim 72.0%, ORB 70.8%, etc.
+    pattern_gap_and_go: int = 25
+    pattern_micro_pullback: int = 23
+    pattern_vwap_reclaim: int = 22
+    pattern_orb: int = 21
+    pattern_bull_flag: int = 20
+    pattern_flat_top: int = 20
+    pattern_red_to_green: int = 18
+    pattern_dip_buy: int = 17
+    pattern_whole_dollar: int = 17
+    pattern_abcd: int = 15
+    pattern_default: int = 15          # fallback for any unlisted pattern
+
+    # ── Relative volume magnitude (max 20) ────────────────────────────────────
+    # Binary 5x gate remains in ScannerConfig; this grades the MAGNITUDE of vol.
+    relvol_pts_100x: int = 20          # 100x+ = institutional panic / squeeze
+    relvol_pts_25x: int = 16           # 25-100x = very strong conviction
+    relvol_pts_10x: int = 12           # 10-25x = solid
+    relvol_pts_5x: int = 8             # 5-10x = meets minimum gate, modest edge
+
+    # ── News catalyst tier (max 20) ───────────────────────────────────────────
+    # Source: concept_news_catalyst.md — +12.7pp win rate, 4.4x EV with news
+    # NOT a hard gate — no news = 0 pts, not a reject.
+    news_tier1_pts: int = 20           # FDA, earnings beat, M&A, short squeeze
+    news_tier2_pts: int = 15           # contract, partnership, biotech data
+    news_tier3_pts: int = 10           # sector sympathy, social media driven
+    news_presence_pts: int = 8         # news present but tier not classified
+    news_none_pts: int = 0             # no catalyst (still tradeable, just lower score)
+    news_unknown_pts: int = 4          # no data available (backtest / API unavailable)
+
+    # ── Float quality (max 15) ────────────────────────────────────────────────
+    # Source: concept_float_analysis.md — sub-5M = maximum squeeze dynamics
+    float_sub1m_pts: int = 15          # sub-1M: extreme moves, tight stop required
+    float_1m_5m_pts: int = 12          # 1M-5M: core target zone
+    float_5m_20m_pts: int = 6          # 5M-20M: acceptable, slower moves
+    float_20m_plus_pts: int = 0        # 20M+: strategy's soft ceiling
+    float_unknown_pts: int = 6         # unknown float: half credit (graceful degradation)
+
+    # ── Gap % magnitude (max 10) ──────────────────────────────────────────────
+    gap_40pct_pts: int = 10            # 40%+ gap = explosive, short-squeeze territory
+    gap_20pct_pts: int = 7             # 20-40% = strong
+    gap_10pct_pts: int = 4             # 10-20% = meets minimum gate
+
+    # ── MACD state (max 5) ────────────────────────────────────────────────────
+    macd_positive_pts: int = 5         # MACD line > 0 = confirmed front-side
+    macd_unknown_pts: int = 2          # < 35 bars (early open) — half credit
+    macd_negative_pts: int = 0         # back-side; already blocked by entry gate
+
+    # ── Time of day (max 5) ───────────────────────────────────────────────────
+    time_930_945_pts: int = 5          # Best window: opening momentum peak
+    time_945_1000_pts: int = 4
+    time_1000_1030_pts: int = 2
+    time_after_1030_pts: int = 0       # Also blocked by entry window gate at 11
+
+    # ── Temperature entry thresholds (min score to enter) ─────────────────────
+    threshold_hot: int = 40            # Aggressive: many setups qualify
+    threshold_neutral: int = 55        # Base-hit: standard quality
+    threshold_cold: int = 70           # Defensive: A+ only
+    threshold_chop: int = 80           # Exceptional: near-perfect setup required
+
+    # ── Temperature base position size multipliers ────────────────────────────
+    size_hot: float = 1.0              # Full size in hot market
+    size_neutral: float = 0.75         # Slightly reduced in neutral
+    size_cold: float = 0.50            # Half size on cold days
+    size_chop: float = 0.25            # Quarter size on chop days
+    # Score bonus: each 10 pts above threshold adds this fraction (capped at +0.5)
+    size_bonus_per_10pts: float = 0.10
+
+
+@dataclass
+class EntryScore:
+    """
+    Per-signal composite entry score (0–100).
+    Computed by scoring_engine.compute_entry_score() after all hard gates pass.
+    Drives position sizing and temperature-adjusted entry threshold.
+    """
+    total: int                  # 0-100 composite score
+    components: dict            # breakdown for logging and Optuna analysis
+
+    def passes_threshold(self, temperature_name: str, config: 'ScoringConfig') -> bool:
+        """Return True if score meets the minimum for the current temperature."""
+        thresholds = {
+            'HOT': config.threshold_hot,
+            'NEUTRAL': config.threshold_neutral,
+            'COLD': config.threshold_cold,
+            'CHOP': config.threshold_chop,
+        }
+        return self.total >= thresholds.get(temperature_name, config.threshold_cold)
+
+    def size_multiplier(self, temperature_name: str, config: 'ScoringConfig') -> float:
+        """
+        Position size multiplier combining temperature base × score bonus.
+
+        Formula:
+            base = temperature base (HOT=1.0, NEUTRAL=0.75, COLD=0.5, CHOP=0.25)
+            bonus = floor((score - threshold) / 10) × 0.10, capped at +0.50
+        Returns 0.0 if score is below the entry threshold (should not enter).
+        """
+        if not self.passes_threshold(temperature_name, config):
+            return 0.0
+        base = {
+            'HOT': config.size_hot,
+            'NEUTRAL': config.size_neutral,
+            'COLD': config.size_cold,
+            'CHOP': config.size_chop,
+        }.get(temperature_name, config.size_cold)
+        thresholds = {
+            'HOT': config.threshold_hot,
+            'NEUTRAL': config.threshold_neutral,
+            'COLD': config.threshold_cold,
+            'CHOP': config.threshold_chop,
+        }
+        threshold = thresholds.get(temperature_name, config.threshold_cold)
+        bonus = min(0.50, ((self.total - threshold) // 10) * config.size_bonus_per_10pts)
+        return round(base + bonus, 2)
+
+
+@dataclass
 class EntrySignal:
     """
     A confirmed entry signal — all gates passed (5 pillars, technicals, pattern, R/R).
@@ -287,6 +418,7 @@ class EntrySignal:
     symbol: str
     pattern: PatternSignal
     pillar_data: dict = field(default_factory=dict)  # rel_vol, pct_change, float, etc.
+    entry_score: 'EntryScore | None' = None          # composite conviction score (GAP scoring)
 
 
 @dataclass
