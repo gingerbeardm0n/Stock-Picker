@@ -57,6 +57,30 @@ _DATA_CACHE = {}
 _PERSIST_CACHE_VERSION = "v2"  # bumped: added rel_vol_30d column
 
 
+def _cushion_size_multiplier(daily_pnl: float, daily_goal: float) -> float:
+    """
+    Cushion-anchored position size modifier.
+    Source: concept_position_sizing.md — Ross scales position size based on
+    how much daily P&L cushion he has earned, not just market temperature.
+
+    in-drawdown  (daily_pnl < 0):              0.50× — protect from further losses
+    no-cushion   (daily_pnl < 50% of goal):    0.75× — cautious, building cushion
+    cushion-ok   (daily_pnl >= 50% of goal):   1.00× — cushion established, full size
+
+    Intentionally capped at 1.0: temperature + score already scale up HOT/high-score
+    days. Adding >1.0 here would compound with those multipliers and risk oversize.
+    When daily_goal <= 0, returns 1.0 (no goal configured — standard size).
+    """
+    if daily_pnl < 0:
+        return 0.50   # In drawdown: half size (behavioral_deviation: 43.8% deviation rate in drawdown)
+    if daily_goal <= 0:
+        return 1.00   # No daily goal configured
+    cushion_pct = daily_pnl / daily_goal
+    if cushion_pct < 0.50:
+        return 0.75   # Cushion building: slightly reduced
+    return 1.00       # Cushion established: standard size
+
+
 class SimulationRunner:
     """
     Minute-by-minute backtesting harness.
@@ -74,7 +98,8 @@ class SimulationRunner:
                  debug=False, cache_data=False, cache_dir: str | None = None,
                  symbol_universe: list | None = None,
                  max_trades_per_day: int = 3,
-                 temp_config=None):
+                 temp_config=None,
+                 enable_news_cache: bool = True):
         if isinstance(date, str):
             date = datetime.strptime(date, '%Y-%m-%d').date()
 
@@ -150,6 +175,12 @@ class SimulationRunner:
         # Pre-computed set of symbols that pass price/gain filters for this day.
         # Built once at load time to avoid iterating all ~4000 symbols every minute.
         self.hot_symbols: set = set()
+
+        # News tier cache: symbol → 'tier1'|'tier2'|'tier3'|'presence'|'none'|'unknown'
+        # Populated by _prefetch_news() after hot_symbols is built.
+        # enable_news_cache=False disables the Alpaca API call (for fast offline backtests).
+        self.news_cache: dict[str, str] = {}
+        self.enable_news_cache: bool = enable_news_cache
 
     # ── Data Loading ──────────────────────────────────────────────────────────
 
@@ -385,11 +416,62 @@ class SimulationRunner:
             self._stats['fundamentals_count'] = len(self.fundamentals)
             self._stats['historical_load_seconds'] = time.perf_counter() - t0
 
+    # ── News Pre-Cache ────────────────────────────────────────────────────────
+
+    def _prefetch_news(self):
+        """
+        Pre-fetch and classify news for all hot_symbols at simulation-day start.
+
+        Populates self.news_cache[symbol] = tier string so _scan_for_entry() can
+        pass a real news_tier to evaluate_entry() instead of 'unknown'.
+
+        Graceful degradation: any symbol that fails (API error, rate limit, etc.)
+        falls back to 'unknown' (4/20 scoring pts — partial credit).
+
+        Disabled when enable_news_cache=False (fast offline backtests).
+        """
+        if not self.enable_news_cache or not self.hot_symbols:
+            return
+
+        try:
+            from backend.news_fetcher import NewsFetcher, classify_news_tier
+            fetcher = NewsFetcher()
+        except Exception as e:
+            logger.warning(f"  [NEWS] Init failed — {e}. All symbols defaulting to 'unknown'.")
+            return
+
+        t0 = time.perf_counter()
+        symbols = list(self.hot_symbols)
+        success = 0
+        for symbol in symbols:
+            try:
+                articles = fetcher.get_news_for_symbol(
+                    symbol, as_of_date=self.date, hours_back=48
+                )
+                self.news_cache[symbol] = classify_news_tier(articles)
+                success += 1
+            except Exception:
+                self.news_cache[symbol] = 'unknown'
+
+        elapsed = time.perf_counter() - t0
+        if self.verbose:
+            tier_counts: dict[str, int] = {}
+            for t in self.news_cache.values():
+                tier_counts[t] = tier_counts.get(t, 0) + 1
+            logger.info(
+                f"  [NEWS] Cached {success}/{len(symbols)} symbols in {elapsed:.1f}s"
+                f"  tiers={tier_counts}"
+            )
+
     # ── Simulation Loop ───────────────────────────────────────────────────────
 
     def run(self):
         if not self.load_minute_bars():
             return False
+
+        # Pre-fetch news tiers for hot_symbols (populates self.news_cache).
+        # Skipped when enable_news_cache=False or Alpaca news API unavailable.
+        self._prefetch_news()
 
         if self.verbose:
             logger.info(f"\n{'='*80}")
@@ -818,9 +900,9 @@ class SimulationRunner:
                 scanner_config=self.scanner_config,
                 entry_config=self.entry_config,
                 temperature=self.temp_state,
-                # news_tier: defaults to 'unknown' (4 pts) — backtest graceful degradation.
-                # Wire live news pre-cache here when news API is enabled.
-                news_tier='unknown',
+                # news_tier: pre-cached by _prefetch_news() if enable_news_cache=True.
+                # Falls back to 'unknown' (4/20 pts) when cache is empty or API unavailable.
+                news_tier=self.news_cache.get(symbol, 'unknown'),
                 scoring_config=self.scoring_config,
             )
 
@@ -841,9 +923,11 @@ class SimulationRunner:
             pat = best_signal.pattern
             fund = self.fundamentals.get(best_signal.symbol, {})
 
-            # Composite size multiplier = score × GAP-14 cooldown
-            # Score drives temperature-adjusted initial sizing (HOT=1.0, COLD=0.5, etc.)
-            # GAP-14 further halves on first re-entry after stop-out on same symbol.
+            # Composite size multiplier = score × GAP-14 cooldown × cushion
+            # score_mult  — temperature-adjusted sizing from entry score (HOT=1.0, COLD=0.5+)
+            # gap14_mult  — 0.5× on first re-entry after stop-out same symbol
+            # cushion_mult — 0.5× in drawdown, 0.75× building cushion, 1.0× cushion ok
+            #                (concept_position_sizing.md: cushion-anchored sizing)
             stop_hit_n = self.stop_hit_counts.get(best_signal.symbol, 0)
             gap14_mult = 0.5 if stop_hit_n == 1 else 1.0
 
@@ -854,7 +938,12 @@ class SimulationRunner:
                     self.temp_state.temperature.value, scfg
                 )
 
-            size_mult = gap14_mult * score_mult
+            cushion_mult = _cushion_size_multiplier(
+                daily_pnl=self.portfolio_manager.daily_pnl,
+                daily_goal=self.portfolio_manager.daily_profit_target,
+            )
+
+            size_mult = gap14_mult * score_mult * cushion_mult
 
             trade = self.position_manager.enter_position(
                 symbol=best_signal.symbol,

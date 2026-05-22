@@ -87,10 +87,15 @@ def run_date_range(
             exit_config=config.exit_,
             scanner_config=config.scanner,
             entry_config=config.entry,
+            scoring_config=getattr(config, 'scoring', None),
             debug=debug,
             cache_data=cache_data,
             cache_dir=cache_dir,
             symbol_universe=day_symbols,
+            # News cache disabled in optimizer runs: adds ~30s/day of API latency.
+            # Re-enable with enable_news_cache=True once news tiers are pre-cached
+            # to disk (future work: daily news cache files per hot_symbol).
+            enable_news_cache=False,
         )
 
         success = runner.run()

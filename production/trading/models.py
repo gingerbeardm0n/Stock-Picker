@@ -92,6 +92,18 @@ class EntryConfig:
     vwap_reclaim_min_below: int = 1         # Min bars below VWAP required before reclaim
     vwap_reclaim_breakout_vol_min: float = 1.2  # Reclaim bar >= 1.2x recent avg vol
 
+    # ── VWAP Break/Curl ────────────────────────────────────────────────────────
+    # Source: concept_entry_trigger_taxonomy.md — 78.1% win rate, highest dollar EV
+    # Anticipatory VWAP entry: fires at or before the full reclaim candle.
+    #   Break variant: previous bar closed below VWAP, current is first bar above.
+    #   Curl variant:  price still below VWAP but approaching within tolerance,
+    #                  last 3 bars show successively higher closes (momentum curl).
+    # Entry is EARLIER than vwap_reclaim (which requires confirmed hold above).
+    enable_vwap_break_curl: bool = True
+    vwap_break_curl_lookback: int = 4        # Bars to look back for below-VWAP setup
+    vwap_curl_tolerance: float = 0.015       # Curl fires when within 1.5% of VWAP
+    vwap_break_vol_min: float = 1.1          # Break/curl bar volume >= 1.1× recent avg
+
     # ── Bull Flag ──────────────────────────────────────────────────────────────
     bull_flag_light_vol: float = 0.70        # Flag bars: volume < X × pole avg
     bull_flag_pole_vol_min: float = 0.80     # Pole: must have >= X × reference avg
@@ -107,7 +119,8 @@ class EntryConfig:
     abcd_d_light_vol: float = 0.80       # D bars: volume < X × C-phase avg
 
     # ── Dip Buy ────────────────────────────────────────────────────────────────
-    dip_buy_light_vol: float = 0.65      # Pullback bars: volume < X × ref avg
+    dip_buy_light_vol: float = 0.65      # Legacy — retained for Optuna compat; no longer used in detector
+    dip_buy_support_tolerance: float = 0.08  # Dip low must be within X% of a named support level
 
     # ── Flat Top ───────────────────────────────────────────────────────────────
     flat_top_resistance_tol: float = 0.03   # Highs within $X = same resistance
@@ -292,8 +305,9 @@ class ScoringConfig:
     """
     # ── Pattern base points (max 25) ──────────────────────────────────────────
     # Ordered by corpus win rate (entry_trigger_taxonomy.md):
-    # gap-and-go 78.2%, micro-pullback 74.3%, vwap-reclaim 72.0%, ORB 70.8%, etc.
+    # gap-and-go 78.2%, vwap-break/curl 78.1%, micro-pullback 74.3%, vwap-reclaim 72.0%, ORB 70.8%
     pattern_gap_and_go: int = 25
+    pattern_vwap_break_curl: int = 25   # 78.1% win rate — tied with gap-and-go
     pattern_micro_pullback: int = 23
     pattern_vwap_reclaim: int = 22
     pattern_orb: int = 21

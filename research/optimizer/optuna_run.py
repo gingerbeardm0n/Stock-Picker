@@ -43,7 +43,7 @@ except ImportError:
 from optimizer.run_config import RunConfig
 from optimizer.results_db import init_db, write_run
 from optimizer.simulate_one import run_date_range
-from trading.models import ScannerConfig, EntryConfig, ExitConfig
+from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig
 
 
 # ── Adaptive trend controller ─────────────────────────────────────────────────
@@ -392,7 +392,52 @@ def _build_config_from_trial(
             enable_volume_dry_up_exit = exit_volume_dry,
         )
 
-    return RunConfig(scanner=scanner, entry=entry, exit_=exit_)
+    # ── Scoring (Category F) — composite entry score weights ─────────────────
+    # Only the high-leverage params are tuned; pattern weights are fixed at corpus-
+    # derived defaults (tuning 30+ dims needs far more trials than A/B/C alone).
+    #
+    # Thresholds: minimum score to enter, per temperature.
+    # Size multipliers: base position size, per temperature.
+    # Component weights: the three largest scoring contributors.
+    base_scoring = ScoringConfig()
+
+    if mode == 'gates-only':
+        # Gates-only mode: keep scoring at defaults — only gate toggles matter.
+        scoring = base_scoring
+    else:
+        scoring = ScoringConfig(
+            # ── Temperature score thresholds (min score to enter) ─────────────
+            threshold_hot    = _int('f_threshold_hot',    20, 55),
+            threshold_neutral = _int('f_threshold_neutral', 40, 65),
+            threshold_cold   = _int('f_threshold_cold',   55, 80),
+            threshold_chop   = _int('f_threshold_chop',   65, 90),
+
+            # ── Base size multipliers per temperature ─────────────────────────
+            size_hot     = _float('f_size_hot',     0.60, 1.50),
+            size_neutral = _float('f_size_neutral', 0.40, 1.20),
+            size_cold    = _float('f_size_cold',    0.20, 0.80),
+            size_chop    = _float('f_size_chop',    0.10, 0.50),
+            size_bonus_per_10pts = _float('f_size_bonus_per_10pts', 0.00, 0.25),
+
+            # ── Relative volume score points ──────────────────────────────────
+            relvol_pts_100x = _int('f_relvol_pts_100x', 14, 20),
+            relvol_pts_25x  = _int('f_relvol_pts_25x',  10, 18),
+            relvol_pts_10x  = _int('f_relvol_pts_10x',   6, 14),
+            relvol_pts_5x   = _int('f_relvol_pts_5x',    2,  8),
+
+            # ── News tier score points ────────────────────────────────────────
+            news_tier1_pts   = _int('f_news_tier1_pts',   12, 20),
+            news_tier2_pts   = _int('f_news_tier2_pts',    8, 16),
+            news_none_pts    = _int('f_news_none_pts',     0,  4),
+            news_unknown_pts = _int('f_news_unknown_pts',  2,  8),
+
+            # ── Fixed at corpus-derived defaults (not yet tuned) ─────────────
+            # Pattern weights, float pts, gap pts, MACD pts, time-of-day pts
+            # are left at ScoringConfig defaults. Add to search space after
+            # the threshold/size/relvol/news tuning converges.
+        )
+
+    return RunConfig(scanner=scanner, entry=entry, exit_=exit_, scoring=scoring)
 
 
 # ── Seed helper ───────────────────────────────────────────────────────────────

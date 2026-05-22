@@ -43,16 +43,17 @@ _DEFAULTS = ScoringConfig()
 
 # Map pattern_type strings to ScoringConfig field names
 _PATTERN_FIELD = {
-    'GAP_AND_GO':      'pattern_gap_and_go',
-    'MICRO_PULLBACK':  'pattern_micro_pullback',
-    'VWAP_RECLAIM':    'pattern_vwap_reclaim',
-    'ORB':             'pattern_orb',
-    'BULL_FLAG':       'pattern_bull_flag',
-    'FLAT_TOP':        'pattern_flat_top',
-    'RED_TO_GREEN':    'pattern_red_to_green',
-    'DIP_BUY':         'pattern_dip_buy',
-    'WHOLE_DOLLAR':    'pattern_whole_dollar',
-    'ABCD':            'pattern_abcd',
+    'GAP_AND_GO':        'pattern_gap_and_go',
+    'MICRO_PULLBACK':    'pattern_micro_pullback',
+    'VWAP_RECLAIM':      'pattern_vwap_reclaim',
+    'VWAP_BREAK_CURL':   'pattern_vwap_break_curl',
+    'ORB':               'pattern_orb',
+    'BULL_FLAG':         'pattern_bull_flag',
+    'FLAT_TOP':          'pattern_flat_top',
+    'RED_TO_GREEN':      'pattern_red_to_green',
+    'DIP_BUY':           'pattern_dip_buy',
+    'WHOLE_DOLLAR':      'pattern_whole_dollar',
+    'ABCD':              'pattern_abcd',
 }
 
 # Valid news tier strings

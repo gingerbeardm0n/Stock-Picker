@@ -245,6 +245,124 @@ def detect_vwap_reclaim(bars: list[dict], indicators: dict,
     )
 
 
+# ── 0c. VWAP Break / Curl ─────────────────────────────────────────────────────
+
+def detect_vwap_break_curl(bars: list[dict], indicators: dict,
+                           config: EntryConfig | None = None) -> PatternSignal | None:
+    """
+    VWAP Break / Curl — 78.1% win rate, +$7,126 avg, highest dollar EV.
+    Source: concept_entry_trigger_taxonomy.md vwap-break/curl category.
+
+    Anticipatory VWAP entry — fires EARLIER than vwap_reclaim (which requires
+    confirmed hold above VWAP). Two detection variants:
+
+    BREAK variant (higher confidence):
+        - At least 1 bar in lookback window was below VWAP.
+        - Previous bar closed BELOW VWAP.
+        - Current bar is the FIRST close ABOVE VWAP (the break candle itself).
+        - Green bar, volume >= vwap_break_vol_min × recent avg.
+
+    CURL variant (anticipatory — lower confidence):
+        - Price is below VWAP but within vwap_curl_tolerance (default 1.5%).
+        - Last 3 bars each have a strictly higher close (ascending curl toward VWAP).
+        - Current bar is green with volume >= vwap_break_vol_min × recent avg.
+
+    Priority vs vwap_reclaim: vwap_reclaim is checked first in entry_engine. This
+    pattern fires on the break candle itself or the curl approach — before reclaim
+    has confirmed. They complement rather than overlap.
+
+    Entry:  current bar close
+    Stop:   lowest low of the curl/approach phase − stop_buffer
+    T1/T2:  VWAP + 2R / prior session high
+    """
+    cfg = config if config is not None else _DEFAULTS
+
+    vwap = indicators.get('vwap')
+    if vwap is None or vwap <= 0:
+        return None
+
+    if len(bars) < cfg.vwap_break_curl_lookback + 1:
+        return None
+
+    current = bars[-1]
+    prev    = bars[-2]
+
+    current_close = _close(current)
+
+    if not _is_green(current):
+        return None
+
+    # Lookback window: bars before current
+    lookback = bars[-(cfg.vwap_break_curl_lookback + 1):-1]
+
+    # Need at least one prior bar below VWAP in the lookback (confirms we came from below)
+    had_below = any(_close(b) < vwap for b in lookback)
+    if not had_below:
+        return None
+
+    # Volume confirmation: current bar must exceed recent average
+    avg_vol = sum(_vol(b) for b in lookback) / len(lookback) if lookback else 0.0
+    if avg_vol > 0 and _vol(current) < avg_vol * cfg.vwap_break_vol_min:
+        return None
+
+    # ── Determine variant ─────────────────────────────────────────────────────
+    variant = None
+
+    if current_close > vwap and _close(prev) <= vwap:
+        # BREAK variant: first bar to close above VWAP (previous was at or below)
+        variant = 'BREAK'
+
+    elif current_close <= vwap:
+        # CURL variant: still below VWAP but approaching with momentum
+        dist_pct = (vwap - current_close) / vwap
+        if dist_pct > cfg.vwap_curl_tolerance:
+            return None  # Too far below VWAP — not a valid curl setup
+
+        # Need 3 bars of strictly ascending closes (momentum building toward VWAP)
+        if len(bars) < 4:
+            return None
+        b1, b2, b3 = bars[-4], bars[-3], bars[-2]  # three bars before current
+        if not (_close(b3) > _close(b2) > _close(b1)):
+            return None  # No clear ascending curl
+        variant = 'CURL'
+
+    if variant is None:
+        return None  # Neither break nor curl
+
+    # ── Build signal ──────────────────────────────────────────────────────────
+    # Stop below the lowest low of the approach/curl phase
+    approach_bars = bars[-4:-1] if len(bars) >= 4 else bars[:-1]
+    curl_low = min(_low(b) for b in approach_bars)
+
+    entry    = current_close
+    stop     = curl_low - cfg.stop_buffer
+    stop_dist = entry - stop
+    if stop_dist <= 0:
+        return None
+
+    target1 = entry + stop_dist * 2
+    # T2: use prior session high as natural target (same logic as dip_buy)
+    lookback_full = bars[-21:-1]
+    prior_high = max(_high(b) for b in lookback_full) if lookback_full else entry + stop_dist * 3
+    target2 = max(prior_high, entry + stop_dist * 3)
+
+    reasoning = (
+        f"VWAP {variant}: VWAP ${vwap:.2f}, entry ${entry:.2f} "
+        f"({'above' if current_close > vwap else f'{(vwap-current_close)/vwap*100:.1f}% below'} VWAP), "
+        f"stop ${stop:.2f} (curl low ${curl_low:.2f}), "
+        f"vol {_vol(current):,.0f}"
+    )
+    return PatternSignal(
+        pattern_type='VWAP_BREAK_CURL',
+        confidence=5,
+        entry_price=entry,
+        stop_price=stop,
+        target1=target1,
+        target2=target2,
+        reasoning=reasoning,
+    )
+
+
 # ── 1. Bull Flag ──────────────────────────────────────────────────────────────
 
 def detect_bull_flag(bars: list[dict], indicators: dict,
@@ -588,83 +706,120 @@ def detect_abcd_pattern(bars: list[dict],
 def detect_dip_buy(bars: list[dict], indicators: dict,
                    config: EntryConfig | None = None) -> PatternSignal | None:
     """
-    Dip Buy using Ross Cameron's 3 Tricks — 3 stars.
+    Dip Buy — Ross Cameron's 3 Tricks (concept_dip_buy.md).
 
-    Requires valid EMA-9 and MACD in indicators dict (needs 26+ bars history).
+    Trick 1: Real news catalyst.
+        - has_news=False  → hard block (no news, no dip buy)
+        - has_news=None   → allowed (backtest graceful degradation — news unknown)
+        - has_news=True   → passes
 
-    The 3 Tricks:
-        1. Price above 9 EMA
-        2. MACD histogram positive (green bars)
-        3. Light volume on the pullback candles
+    Trick 2: MACD line > 0 (front side confirmed).
+        - Skipped if macd_line is None (< 26 bars — too early in session).
+        - macd_line <= 0 → hard block (back side, no dip buy).
 
-    Current bar: green (first green after the pullback = entry)
+    Trick 3: Dip tested a named support level.
+        - Requires 4+ bars in the dip from a prior high.
+        - Dip low must be within dip_buy_support_tolerance (default 8%) of:
+              (1) premarket high  ← highest priority
+              (2) VWAP
+              (3) nearest half-dollar level
+              (4) nearest whole-dollar level
+        - Current bar: first green close above that support level.
 
-    Entry : Current bar close
-    Stop  : Lowest low of last 3 bars - stop_buffer
-    Note  : This is the "requires skill" pattern — use only when all 3 are confirmed.
+    Entry:  current bar close
+    Stop:   support_level − stop_buffer
+    T1:     2R above entry
+    T2:     prior session high (morning high from lookback window)
     """
     cfg = config if config is not None else _DEFAULTS
-    if len(bars) < 8:
+    if len(bars) < 6:
         return None
 
-    ema9 = indicators.get('ema9')
-    # GAP-04 fix: use MACD line (EMA12 − EMA26), not the histogram.
-    # Histogram = MACD line − signal line, which can be negative even on a rising trend.
-    # MACD line > 0 confirms upward momentum; histogram > 0 only means faster than signal.
-    macd_line = indicators.get('macd_line')
+    # ── Trick 1: News catalyst ─────────────────────────────────────────────────
+    # Explicit False = confirmed no news → reject.
+    # None = unknown (backtest / news API unavailable) → allow.
+    has_news = indicators.get('has_news')
+    if has_news is False:
+        return None
 
-    # Both indicators must be valid
-    if ema9 is None or macd_line is None:
+    # ── Trick 2: MACD line > 0 (front side) ───────────────────────────────────
+    macd_line = indicators.get('macd_line')
+    if macd_line is not None and macd_line <= 0:
         return None
 
     current = bars[-1]
+    current_price = _close(current)
 
-    # Current bar must be green
+    # Current bar must be green (first recovery candle)
     if not _is_green(current):
         return None
 
-    current_price = _close(current)
-
-    # Trick 1: Price above 9 EMA
-    if current_price <= ema9:
+    # ── Find prior high and verify 4+ bar dip ─────────────────────────────────
+    # Search last 20 bars (before current) for the session high that started the dip.
+    # Need: 1 peak bar + 4 dip bars = 5 bars minimum in lookback window.
+    lookback = bars[-21:-1]
+    if len(lookback) < 5:
         return None
 
-    # Trick 2: MACD line positive (bullish momentum — EMA12 > EMA26)
-    if macd_line <= 0:
+    peak_idx = max(range(len(lookback)), key=lambda i: _high(lookback[i]))
+    prior_high = _high(lookback[peak_idx])
+
+    # Bars from peak to current are the dip phase.
+    dip_bars_list = lookback[peak_idx + 1:]
+    if len(dip_bars_list) < 4:
+        return None  # Fewer than 4 bars → micro-pullback territory, use that detector
+
+    dip_low = min(_low(b) for b in dip_bars_list)
+
+    # ── Trick 3: Dip tested a named support level ─────────────────────────────
+    support_tol = cfg.dip_buy_support_tolerance  # default 0.08 (8%)
+
+    # Candidate levels in priority order (concept_dip_buy.md support hierarchy):
+    pm_high = indicators.get('premarket_high')
+    vwap    = indicators.get('vwap')
+    whole_dollar = float(int(current_price))
+    half_dollar  = whole_dollar + 0.50
+
+    candidates = []
+    if pm_high and pm_high > 0:
+        candidates.append((pm_high,      'PM_HIGH'))
+    if vwap and vwap > 0:
+        candidates.append((vwap,         'VWAP'))
+    if half_dollar > 0:
+        candidates.append((half_dollar,  'HALF_$'))
+    if whole_dollar > 0:
+        candidates.append((whole_dollar, 'WHOLE_$'))
+
+    support_level = None
+    support_label = ''
+    for level, label in candidates:
+        if abs(dip_low - level) / level <= support_tol:
+            support_level = level
+            support_label = label
+            break  # First match wins — highest-priority support level
+
+    if support_level is None:
+        return None  # No named support level tested — skip unanchored dips
+
+    # Current close must be above the support (recovery confirmed above level)
+    if current_price <= support_level:
         return None
 
-    # Trick 3: Light volume on last 2-3 pullback bars
-    pullback_bars = bars[-4:-1]  # 3 bars before current
-    if len(pullback_bars) < 2:
-        return None
-
-    ref_bars = bars[-10:-4]  # reference: 6 bars before pullback
-    if len(ref_bars) < 3:
-        return None
-
-    # Pullback bars should show lower closes (actual dip)
-    if not any(_close(b) < _close(bars[-4]) for b in pullback_bars[1:]):
-        return None  # No actual dip happened
-
-    # Pullback must be on light volume
-    if not all(is_light_volume(b, ref_bars, threshold=cfg.dip_buy_light_vol)
-               for b in pullback_bars):
-        return None
-
-    # ── Build signal ──────────────────────────────────────────────────────
-    entry = current_price
-    dip_low = min(_low(b) for b in pullback_bars + [current])
-    stop = dip_low - cfg.stop_buffer
+    # ── Build signal ──────────────────────────────────────────────────────────
+    entry     = current_price
+    stop      = support_level - cfg.stop_buffer
     stop_dist = entry - stop
     if stop_dist <= 0:
         return None
 
-    target1 = entry + stop_dist * 2
-    target2 = entry + stop_dist * 3
+    target1 = entry + stop_dist * 2   # 2R
+    target2 = prior_high              # Prior morning high as T2
 
+    macd_str = f"MACD {macd_line:.4f}, " if macd_line is not None else ""
     reasoning = (
-        f"Dip Buy (3 Tricks): price ${current_price:.2f} > EMA9 ${ema9:.2f}, "
-        f"MACD line {macd_line:.4f}, light vol pullback to ${dip_low:.2f}"
+        f"Dip Buy: {len(dip_bars_list)}-bar dip tested {support_label} "
+        f"${support_level:.2f} (low ${dip_low:.2f}), {macd_str}"
+        f"recovery close ${current_price:.2f}"
     )
     return PatternSignal(
         pattern_type='DIP_BUY',

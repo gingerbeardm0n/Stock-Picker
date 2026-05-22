@@ -36,6 +36,7 @@ from trading.indicators import (
 from trading.patterns import (
     detect_gap_and_go,
     detect_vwap_reclaim,
+    detect_vwap_break_curl,
     detect_bull_flag,
     detect_micro_pullback,
     detect_abcd_pattern,
@@ -285,8 +286,12 @@ def evaluate_entry(
         )
 
         signal = (
-            (detect_vwap_reclaim(all_bars_so_far, indicators, ecfg) if ecfg.enable_vwap_reclaim else None)      or
-            (detect_bull_flag(all_bars_so_far, indicators, ecfg) if ecfg.enable_bull_flag else None)            or
+            (detect_vwap_reclaim(all_bars_so_far, indicators, ecfg) if ecfg.enable_vwap_reclaim else None)           or
+            # VWAP break/curl: anticipatory entry (before full reclaim confirms).
+            # 78.1% win rate, highest dollar EV. Checked after reclaim to avoid overlap:
+            # reclaim takes priority when both would fire on the same bar.
+            (detect_vwap_break_curl(all_bars_so_far, indicators, ecfg) if ecfg.enable_vwap_break_curl else None) or
+            (detect_bull_flag(all_bars_so_far, indicators, ecfg) if ecfg.enable_bull_flag else None)                or
             (detect_micro_pullback(all_bars_so_far, indicators, ecfg) if micro_pullback_ok else None)           or
             (detect_abcd_pattern(all_bars_so_far, ecfg) if ecfg.enable_abcd else None)                         or
             (detect_dip_buy(all_bars_so_far, indicators, ecfg) if ecfg.enable_dip_buy else None)                or
