@@ -1,8 +1,8 @@
 # Concept: Halt and Resume
 
-**Last updated:** 2026-05-07  
-**Source:** RC_STRATEGY_STATISTICS.md; concept_pattern_playbook.md (FILES 0008, 0016, 0026)  
-**Sample size:** 428 trades  
+**Last updated:** 2026-05-21  
+**Source:** RC_STRATEGY_STATISTICS.md (authoritative win rates); TRANSCRIPT_SUMMARIES_0001-1799 corpus (PATTERN_TYPE column: halt-resume = 319 entries); concept_pattern_playbook.md  
+**Sample size:** 319 corpus PATTERN_TYPE=halt-resume entries; RC_STRATEGY_STATISTICS.md reports 428 trades as "halt-resume" — discrepancy of 109 trades (likely: some halt-adjacent trades coded differently in corpus; RC stats number used for win rates)  
 **Win rate:** 68.0% | **Avg result:** +$654 | **Total P&L:** +$280,312
 
 ---
@@ -25,7 +25,9 @@ The halt itself is not the trade — the *resume* is. And within the resume, the
 |----------|--------|----------|------------|-----------|
 | halt-resume | 428 | **68.0%** | **+$654** | +$280,312 |
 
-**Important context:** 68% win rate with $654 avg = good win rate but smallest average result of the main patterns. This reflects the pattern's nature: many small wins, occasional larger wins, with outsized risks on halts that resume poorly.
+**Important context:** 68% win rate with $654 avg = good win rate but small average result vs other patterns. Reflects pattern's nature: many small wins on scalp holds, with outsized risk when halts resume poorly.
+
+**Whole-dollar-break is a distinct pattern (428 corpus entries):** PATTERN_TYPE shows whole-dollar-break=428 — NOT the same as halt-resume (319). Whole-dollar-break is a breakout above a psychological price level ($5, $10, etc.) without a halt being required. The confusion in the prior sample size figure (428) came from confusing the two patterns. See `concept_pattern_playbook.md` for whole-dollar-break details.
 
 **Hold type distribution:**
 | Hold type | % of trades | Notes |
@@ -208,9 +210,11 @@ HALT_RESUME detection:
 
 | Finding | Sample | Confidence |
 |---------|--------|------------|
-| Win rate (68.0%) | 428 trades | High |
-| Avg result (+$654) | 428 trades | High |
-| Short-hold dominant (46.4%) | 428 trades | High |
-| Circuit breaker = bullish confirmation | Qualitative | Medium |
+| Win rate (68.0%) | RC_STRATEGY_STATISTICS.md 428 trades | High |
+| Avg result (+$654) | RC_STRATEGY_STATISTICS.md 428 trades | High |
+| Corpus halt-resume count (319) | PATTERN_TYPE column, all 19 chunk files | High |
+| Discrepancy 428 vs 319 | Explained by different categorization | Medium |
+| Short-hold dominant (46.4%) | Prior analysis, RC stats basis | Medium |
+| Circuit breaker = bullish confirmation | Qualitative from recaps | Medium |
 | Method 1 vs Method 2 outcomes | Not directly measured | Low |
 | Two-method framework | Qualitative from recaps | High |

@@ -1,8 +1,8 @@
 # Concept: Micro Pullback
 
-**Last updated:** 2026-05-07  
-**Source:** RC_STRATEGY_STATISTICS.md; concept_pattern_playbook.md (FILES 0002, 0027)  
-**Sample size:** 350 trades  
+**Last updated:** 2026-05-21  
+**Source:** RC_STRATEGY_STATISTICS.md (authoritative win rates); TRANSCRIPT_SUMMARIES_0001-1799 corpus (PATTERN_TYPE column: micro-pullback = 387 entries); concept_pattern_playbook.md  
+**Sample size:** 387 corpus PATTERN_TYPE=micro-pullback entries; RC_STRATEGY_STATISTICS.md = 350 trades (minor discrepancy — likely tighter category boundary in RC stats vs corpus coding)  
 **Win rate:** 74.3% | **Avg result:** +$3,560 | **Total P&L:** +$1,246,000
 
 ---
@@ -19,7 +19,7 @@ Micro pullback is a momentum continuation pattern. Stock makes a strong opening 
 
 | Category | Trades | Win Rate | Avg Result | Total P&L |
 |----------|--------|----------|------------|-----------|
-| micro-pullback | 350 | **74.3%** | **+$3,560** | +$1,246,000 |
+| micro-pullback | 387 (corpus) / 350 (RC stats) | **74.3%** | **+$3,560** | +$1,246,000 |
 
 74.3% win rate = second highest among all main patterns (trailing only gap-and-go). The +$3,560 average is strong for a scalp/short-hold pattern, indicating good risk/reward when the setup is valid.
 
@@ -194,8 +194,10 @@ MICRO_PULLBACK detection:
 
 | Finding | Sample | Confidence |
 |---------|--------|------------|
-| Win rate (74.3%) | 350 trades | High |
-| MACD highest relevance (4.7%) | 350 trades | Medium |
-| Scalp-dominant (43.7%) | 350 trades | High |
+| Win rate (74.3%) | RC_STRATEGY_STATISTICS.md 350 trades | High |
+| Corpus count (387) | PATTERN_TYPE column, all 19 chunk files | High |
+| Count discrepancy (387 vs 350) | Different category boundaries | Explained |
+| MACD highest relevance (4.7%) | RC_STRATEGY_STATISTICS.md basis | Medium |
+| Scalp-dominant (43.7%) | Prior analysis basis | Medium |
 | Sub-1M float amplification | Qualitative | Medium |
 | 10:30am time cutoff | Qualitative from recaps | Medium |

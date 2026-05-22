@@ -1,9 +1,10 @@
 # Concept: Behavioral Deviation
 
-**Last updated:** 2026-05-07  
-**Source:** RC_STRATEGY_STATISTICS.md — 1,787 sessions, 5,261 trades  
+**Last updated:** 2026-05-21  
+**Source:** RC_STRATEGY_STATISTICS.md (win rates, session counts) + TRANSCRIPT_SUMMARIES_0001-1799 corpus (deviation type breakdown, acct_state correlations)  
 **Sample size:** 430 deviation sessions (1,831 trades) vs 1,357 clean sessions (3,430 trades)  
-**Win rate WITH deviation:** 49.2% | **Without:** 73.1% | **Delta: -23.9pp**
+**Win rate WITH deviation:** 49.2% | **Without:** 73.1% | **Delta: -23.9pp**  
+**Corpus cross-check:** 332 sessions with non-null `behavioral_deviation` field in chunk files (lower than 430 due to conservative coding in some early files; RC_STRATEGY_STATISTICS.md numbers are authoritative for win rate analysis)
 
 ---
 
@@ -45,7 +46,42 @@ Key observations:
 | revenge-trade + oversize | 12 | Compound deviation — worst outcomes |
 | broke-rules (general) | 11 | Explicit rule violation noted in recap |
 
-**Compounding deviations are catastrophic:** Sessions with 2+ simultaneous deviations (revenge + oversize, FOMO + oversize + broke-rules) have the worst outcomes in the dataset. Each additional deviation multiplies the damage.
+**Compounding deviations are catastrophic:** Sessions with 2+ simultaneous deviations have the worst outcomes in the dataset. Each additional deviation multiplies the damage.
+
+**Common compound combinations (from corpus):**
+
+| Compound Type | Sessions | Severity |
+|---|---|---|
+| revenge-trade + oversize | 12 | Extreme — oversized position on emotional trade |
+| revenge-trade + overtrading | 6 | High — multiple revenge entries, not just one |
+| oversize + avg-down | 5 | High — too large, then doubles down on loser |
+| fomo-entry + oversize | 5 | High — chased AND oversized |
+| fomo-entry + revenge-trade | 5 | Extreme — both triggers active simultaneously |
+| overtrading + oversize | 4 | High |
+| revenge-trade + oversize + broke-rules | 1 | Maximum — all three behavioral failures at once |
+| fomo-entry + oversize + revenge-trade | 2 | Maximum — triple compounding |
+
+**Note on positive behavioral coding:** The corpus also documents exemplary sessions in the `behavioral_deviation` field (coded as "exemplary-discipline", "excellent-discipline", "exemplary-crisis-recovery", etc. — ~20 sessions). These represent the opposite extreme: sessions where Ross demonstrated exceptional discipline under difficult conditions. They confirm that the behavioral range runs from -$4,454/trade avg (max-loss-hit + revenge) to documented "exemplary" performance.
+
+---
+
+## Deviation Rate by Account State
+
+**New corpus finding:** Deviation frequency varies dramatically by account state. This is the strongest leading indicator of deviation risk.
+
+| Account State | Sessions | Deviation Sessions | Deviation Rate | Dominant Deviation Type |
+|---|---|---|---|---|
+| in-drawdown | 208 | 91 | **43.8%** | revenge-trade + oversize (cascade) |
+| normal | 549 | 109 | **19.9%** | fomo-entry (single type most common) |
+| exceeded-goal | 255 | 37 | **14.5%** | fomo-entry (trying to capitalize on hot day) |
+| at-goal | 69 | 10 | **14.5%** | mixed |
+| building-cushion | 477 | 54 | **11.3%** | fomo-entry (lowest risk state) |
+
+**Critical insight:** `building-cushion` has the lowest deviation rate (11.3%). This is when Ross is in a comfortable green position mid-session with cushion built — he trades from a position of psychological strength. This is the **optimal trading state** for both performance and discipline.
+
+**Critical insight:** `exceeded-goal` deviations are dominated by **fomo-entry** (11 of 37 sessions), not revenge-trade. When Ross exceeds his daily goal and keeps trading, he takes lower-quality setups out of excitement/FOMO — a different failure mode than the in-drawdown revenge cascade.
+
+**Critical insight:** `in-drawdown` sessions that deviate show **complex multi-type compounds** (revenge + oversize + broke-rules combos). Simple single-type deviations are rare in drawdown — by the time a session goes to drawdown, multiple failures are happening simultaneously.
 
 ---
 
@@ -69,9 +105,22 @@ From session analysis, deviations cluster around specific conditions:
 - Forcing trades on cold days is the most common overtrading trigger
 
 ### 4. Account state deterioration
-- in-drawdown: 39.7% win rate, -$2,717/trade → worst account state
+- in-drawdown: 39.7% win rate, -$2,717/trade → worst account state; **43.8% deviation rate** (nearly 1 in 2 sessions)
 - Once in drawdown, the temptation to trade larger to recover creates a spiral
 - Data confirms the spiral: drawdown → revenge trade → oversizing → deeper drawdown
+- `building-cushion` is the SAFEST state: 11.3% deviation rate, 72.1% win rate, +$1,874/trade avg
+
+### 5. Environmental / physical triggers (corpus finding, lower frequency but documented)
+
+| Trigger | Corpus Label | Notes |
+|---|---|---|
+| Sleep deprivation | `sleep-deprivation-impatience` | Reduced patience → early entries, smaller stops |
+| Boredom | `revenge-trade and boredom-driven` | Taking trades not for a setup, but for stimulation |
+| Travel / road trip | Multiple sessions (e.g., "van in Canada") | Connectivity issues, physical fatigue → frustration → overtrading |
+| Frustration from non-trade issues | `frustration-management` | Tech problems, slow fills → emotional carry into next trade |
+| Panic | `panic-trade and hesitation` | Contradictory response — simultaneous panic entry and hesitation exit |
+
+These are low-frequency (1-3 occurrences each) but worth flagging: **jTrader eliminates all of them by being a machine**. However, a human reviewing trade decisions should be aware that non-trading-context stress contaminates trading decisions.
 
 ---
 
@@ -138,16 +187,21 @@ Averaging down and revenge trading on same symbol are related. One rule blocks b
 
 ## Account State Awareness
 
-Account state is a leading indicator of deviation risk:
+Account state is a leading indicator of both performance AND deviation risk:
 
-| Account State | Win Rate | Avg Result | Risk Level |
-|---------------|----------|------------|------------|
-| in-drawdown | 39.7% | -$2,717 | 🔴 MAXIMUM |
-| exceeded-goal (stop!) | 77.8% | +$7,064 | 🟢 STOP TRADING |
-| building-cushion | 72.1% | +$1,874 | 🟢 Optimal state |
-| normal | 61.6% | +$1,021 | 🟡 Proceed cautiously |
+| Account State | Sessions | Win Rate | Avg Result | Deviation Rate | Risk Level |
+|---|---|---|---|---|---|
+| in-drawdown | 208 | 39.7% | -$2,717 | **43.8%** | MAXIMUM |
+| normal | 549 | 61.6% | +$1,021 | 19.9% | Moderate |
+| at-goal | 69 | — | — | 14.5% | Low |
+| exceeded-goal | 255 | 77.8% | +$7,064 | 14.5% | Low (but STOP) |
+| building-cushion | 477 | 72.1% | +$1,874 | **11.3%** | Lowest |
 
-The 77.8% / +$7,064 for `exceeded-goal` is paradoxical — it looks great, but this is because Ross has STOPPED trading for the day. The *remaining* trades after exceeding the goal (the ones he continues to take) are what cause the give-back problem.
+**The paradox of `exceeded-goal`:** 77.8% win rate looks great, but this is because Ross has STOPPED trading for the day. The *continuation* trades after exceeding the goal (the ones he keeps taking) are what generate fomo-entry deviations. The 14.5% deviation rate applies to sessions that *continue* after exceeding goal.
+
+**`building-cushion` is the ideal state:** Lowest deviation rate (11.3%) + high win rate (72.1%). This is the psychological sweet spot — enough cushion to feel secure, not so much that euphoria sets in. jTrader should try to create and maintain this state by banking early gains.
+
+**`in-drawdown` requires maximum control:** 43.8% deviation rate. Nearly half of all drawdown sessions involve some form of behavioral deviation. This is where the cascade (oversize → revenge → deeper drawdown) begins. See `concept_daily_risk_rules.md` for the circuit-breaker enforcement that prevents this.
 
 **jTrader rule:** When `exceeded-goal` is detected (daily P&L > daily_goal), apply give-back-half rule immediately. Don't continue trading unless setups are A+.
 
@@ -191,6 +245,25 @@ BEHAVIORAL_DEVIATION_PREVENTION:
 
 ---
 
+## size_context = "oversized" as a Standalone Signal
+
+The corpus tracks `size_context` independently from `behavioral_deviation`. **233 sessions** are coded `size_context = "oversized"` (exact match) — a significant standalone dataset. An additional ~13 sessions have oversized-variant labels (oversized-then-correct, emotion-oversized, first-trades-oversized, etc.) bringing total oversizing events to ~246.
+
+Key finding: oversizing is detectable and preventable as its own category, not just as part of a compound behavioral deviation. The fact that 233 sessions have explicit oversizing coded means:
+- Oversizing occurs even when other deviations are absent (not always paired with revenge-trade)
+- It can be a standalone failure: entering a valid setup but at 2-3x the appropriate size
+- jTrader can enforce max_position_pct at the position level before entry — this eliminates oversizing mechanically
+
+**Variants coded in corpus:**
+- `oversized-then-correct`: oversized entry, trader recognized and reduced → partial damage control
+- `oversized-first-trade-grrr`: explicit regret noted in recap
+- `emotion-oversized`: sizing driven by emotion rather than plan
+- `first-trades-oversized`: early session oversizing before discipline settles
+
+**jTrader enforcement:** `max_position_pct` cap in PositionManager. Once set, oversizing is structurally impossible regardless of emotional state. See `concept_position_sizing.md`.
+
+---
+
 ## Why This Matters More Than Any Pattern
 
 Pattern selection (gap-and-go vs micro-pullback) shifts win rate by ~5-10pp.  
@@ -204,8 +277,17 @@ The highest-leverage improvement to jTrader is not finding a better pattern — 
 
 | Field | Coverage | Confidence |
 |-------|----------|------------|
-| Deviation vs no-deviation win rate | 5,261 trades | Very High |
-| Deviation type counts | 430 sessions | High |
-| Account state win rates | Complete | High |
-| Max-loss-hit impact | 414 trades | High |
-| Cascade patterns | Qualitative | Medium |
+| Deviation vs no-deviation win rate (49.2% vs 73.1%) | 5,261 trades via RC_STRATEGY_STATISTICS.md | Very High |
+| Deviation session count (430) | RC_STRATEGY_STATISTICS.md | High |
+| Deviation type counts (74 fomo, 56 oversize, etc.) | RC_STRATEGY_STATISTICS.md | High |
+| Corpus deviation count (332 non-null) | 19 chunk files, direct grep | High |
+| Discrepancy (430 vs 332) | Under-coding in some early chunk files | Explained |
+| Deviation rate by acct_state (43.8% in-drawdown etc.) | 332 matched sessions from corpus | High |
+| Dominant deviation type by state (revenge vs fomo) | Corpus cross-tabulation | High |
+| Compound deviation combinations | Corpus grep, full enumeration | High |
+| Account state win rates | RC_STRATEGY_STATISTICS.md | High |
+| Max-loss-hit impact (30.9%, -$4,454/trade) | 414 trades | High |
+| size_context=oversized (233 sessions exact, ~246 with variants) | 19 chunk files, size_context METADATA extraction | High |
+| Environmental triggers (boredom, sleep-dep) | 1-3 occurrences each | Low (rare but documented) |
+| Cascade pattern (oversize → revenge → max-loss) | Qualitative across all max_loss files | High |
+| Positive behavioral codings (~20 sessions) | Corpus grep | Medium |

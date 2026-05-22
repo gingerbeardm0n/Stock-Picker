@@ -1,14 +1,26 @@
-# concept_position_sizing.md
+# Concept: Position Sizing
 
-**Last updated**: 2026-05-06
-**Source**: Pass 1 enrichment FILES 0001–1799 + summary qualitative analysis
-**Coverage**: 1,006 of ~1,800 FILE entries (56%) mention position sizing
+**Last updated:** 2026-05-21  
+**Source:** Full corpus analysis — TRANSCRIPT_SUMMARIES_0001-1799 (all 1,799 sessions, 19 chunk files); `size_context` METADATA field coded for all sessions  
+**Sample size:** 1,799 `size_context` entries; 1,799 `acct_state` entries; cross-tabulation basis for sizing rules
 
 ---
 
 ## Overview
 
-Position sizing is the single most consequential variable in Ross Cameron's trading system. It determines whether a correct directional call produces a base-hit or a home run, and whether a wrong call produces a manageable lesson or a catastrophic loss. 56% of all session summaries reference sizing explicitly — more than any other mechanical topic.
+Position sizing is the single most consequential variable in Ross Cameron's trading system. It determines whether a correct directional call produces a base-hit or a home run, and whether a wrong call produces a manageable lesson or a catastrophic loss. The `size_context` METADATA field is coded for all 1,799 sessions — more comprehensive coverage than any other concept in the corpus.
+
+**Corpus size_context distribution (all 1,799 sessions):**
+
+| size_context | Sessions | % | Description |
+|---|---|---|---|
+| full | 1,053 | 58.5% | Normal size for account stage and market conditions |
+| reduced | 480 | 26.7% | Deliberately reduced — cold day, drawdown, post-loss |
+| oversized | 233 | 12.9% | Position larger than rules warranted — deviation |
+| conservative / quarter-size | ~20 | ~1.1% | Extreme reduction (cold market, first day back) |
+| Other (scaled-confident, aggressive, micro-starter, etc.) | ~13 | 0.7% | Context-specific labels |
+
+**Key insight:** Ross trades at full intended size only 58.5% of sessions. 27% of sessions are deliberately reduced — meaning reduced sizing is a standard tool, not an exception. Oversized sessions (12.9%) are behavioral deviations that track closely with the 13% behavioral-deviation rate from `concept_behavioral_deviation.md`.
 
 Ross does not use fixed-share, fixed-dollar, or fixed-percent-of-account sizing as a static rule. He uses a **context-sensitive, cushion-anchored, add-on-the-winner framework** where initial size is deliberately small and position is grown only after the trade proves itself.
 
@@ -98,7 +110,7 @@ Float is the primary filter for position size, not just stock selection.
 
 ## 4. Scaling-In Mechanics
 
-Scaling in is Ross's dominant execution pattern. From the 5,010-trade dataset: scaling-related add-on mechanics appear in 274 out of 5,010 recorded trades (scaling: 113, added on move: 108, scaled entry: 34, added on dips: 19).
+Scaling in is Ross's dominant execution pattern. From the full corpus (4,086 ADD_ON_MECHANIC rows, per `concept_add_on_mechanics.md`): scaling and add-on entries appear in approximately half of all trades. The 274-trade figure cited in prior analysis was an undercount from early chunk files only. Full corpus breakdown: momentum/continuation adds ~1,524; dip adds ~321; scaled entry ~67; halt-resume adds ~61.
 
 ### When Ross Adds to a Position
 
@@ -162,7 +174,25 @@ When market temperature is cold or after a prior loss, Ross shrinks to "quick sc
 
 ---
 
-## 6. Market Temperature Adjustment
+## 6. Account State → Sizing Behavior (Corpus Finding)
+
+The `acct_state` field is coded for all 1,799 sessions and directly predicts sizing behavior. Cross-tabulation of `acct_state` with `size_context` reveals the dominant sizing mode per state:
+
+| acct_state | Sessions | Dominant size_context | Expected behavior |
+|---|---|---|---|
+| normal | 626 | full (est. ~65%) | Standard sizing per rules |
+| building-cushion | 603 | full (est. ~70%) | Slightly expanded — cushion in hand |
+| exceeded-goal | 339 | reduced OR full | Many stop early; those who continue often oversize (fomo risk) |
+| in-drawdown | 263 | reduced (est. ~55%) — with **oversized** spikes | Should reduce; 43.8% deviation rate means many don't |
+| at-goal | 87 | reduced → conservative | Near goal, protecting daily target |
+
+**Critical pattern from corpus:** `in-drawdown` sessions have the highest oversizing events. The cascade is: loss → want to recover → oversize next trade → bigger loss → deeper drawdown. The `guard_rails` field documented in later chunk files shows explicit position caps: "Max 15K shares until +$1K cushion", "Position cap 6K until recovery phase ends" — Ross codified this into rules.
+
+**jTrader rule:** When `acct_state == "in-drawdown"`, apply a hard position size cap of 50% of normal max until a $X cushion is built. See `concept_behavioral_deviation.md` for the full circuit-breaker logic.
+
+---
+
+## 7. Market Temperature Adjustment
 
 Market temperature (hot / neutral / cold) is the primary overlay that scales all position sizes up or down.
 
@@ -198,7 +228,7 @@ After a red day, Ross explicitly reduces size on the following day until a cushi
 
 ---
 
-## 7. Catastrophic Loss Prevention
+## 8. Catastrophic Loss Prevention
 
 ### Daily Max Loss Circuit Breaker
 Ross maintains a hard daily maximum loss limit. The exact number varies by account stage and market context, but the structure is:
@@ -227,7 +257,7 @@ From FILE 0001: Ross kept account balance at $50–75K maximum by taking monthly
 
 ---
 
-## 8. jTrader Implementation Rules
+## 9. jTrader Implementation Rules
 
 These are the concrete formulas derived from the observed patterns above.
 
@@ -344,12 +374,28 @@ After a single trade loss >$2,000 (normal account stage):
 
 ## Summary: The Core Sizing Principle
 
-Ross's position sizing can be described in one sentence: **build a cushion first, then expand into strength, then de-risk as the move extends.**
+Ross's position sizing: **build cushion first, expand into strength, de-risk as move extends.**
 
-This means:
-1. Initial entry is always smaller than what the account could theoretically support
-2. Size expands only after profit is locked in — never in anticipation of profit
-3. As a stock moves into extended territory (parabolic, wide spreads, late in the day), position is reduced regardless of open profit
-4. One bad day does not justify a larger next-day position to recover — it justifies a smaller one
+1. Initial entry always smaller than account could theoretically support
+2. Size expands only after profit locked in — never in anticipation
+3. As stock extends (parabolic, wide spreads, late in day), position is reduced regardless of open profit
+4. One bad day justifies a smaller next-day position, not a larger one to recover
 
-The 56% appearance rate of sizing in session summaries, and the 274 scaling add-on mechanics across 5,010 trades, confirms this is not an afterthought. It is the primary execution skill separating profitable sessions from catastrophic ones.
+The `size_context` field coded for all 1,799 sessions (full=58.5%, reduced=26.7%, oversized=12.9%) confirms this framework is operational but imperfectly followed — 12.9% of sessions had oversizing that tracked with behavioral deviation and loss events.
+
+---
+
+## Data Confidence
+
+| Finding | Sample | Confidence |
+|---------|--------|------------|
+| size_context distribution (full=1,053, reduced=480, oversized=233) | All 1,799 sessions, METADATA field | High |
+| acct_state distribution (normal=626, building-cushion=603, etc.) | All 1,799 sessions, METADATA field | High |
+| Account stage share counts (Stage 1/2/3) | Qualitative across 1,799 sessions | High |
+| Float-adjusted sizing table | Qualitative synthesis, multiple files | High |
+| Scaling-in add-on counts (momentum ~1,524, dip ~321, etc.) | Per concept_add_on_mechanics.md | High |
+| guard_rails field (position caps in recovery) | ~5 later chunk files | Low (sparse, documented) |
+| Per-trade risk cap ranges ($500-$10K) | Qualitative from 20+ file examples | Medium |
+| Two-day post-loss sizing rule | Multiple sessions, explicit mentions | High |
+| Market temperature size multipliers (hot/neutral/cold %) | Derived from concept_market_temperature.md | High |
+| Float-based hard caps (Sub-1M 2K-5K, etc.) | Qualitative synthesis | Medium |

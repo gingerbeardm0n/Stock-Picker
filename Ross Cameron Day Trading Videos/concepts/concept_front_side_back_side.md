@@ -1,7 +1,7 @@
 # Concept: Front Side vs Back Side (MACD Framework)
 
-**Last updated:** 2026-05-07  
-**Source:** jTrader_Audit_Against_Statistics.md rule #38; RC_STRATEGY_STATISTICS.md  
+**Last updated:** 2026-05-21  
+**Source:** RC_STRATEGY_STATISTICS.md (5,010 trades, pattern-MACD correlations); jTrader_Audit_Against_Statistics.md rule #38; TRANSCRIPT_SUMMARIES_0001-1799 corpus (MACD_STATE field: 391 coded entries, 390 = "unknown" — field sparsely populated; qualitative evidence from session narratives is primary corpus source)  
 **Core rule:** MACD LINE > 0 = front side = valid trade. MACD LINE ≤ 0 = back side = no trade.
 
 ---
@@ -209,8 +209,9 @@ FRONT_SIDE_GATE (corrected implementation):
 
 | Finding | Confidence | Notes |
 |---------|------------|-------|
-| MACD line > 0 = front side rule | High | Explicit Ross Cameron rule, consistent across sessions |
-| Histogram vs line distinction | High | Verified from RC strategy documentation |
-| Pattern-specific MACD relevance % | High | Computed from 5,010 trades |
-| MACD line calculation correctness | Medium | Depends on indicators.py implementation — verify |
+| MACD line > 0 = front side rule | High | Explicit Ross Cameron rule, consistent across all session summaries |
+| Histogram vs line distinction | High | Verified from RC strategy documentation + corpus session narratives |
+| Pattern-specific MACD relevance % | High | Computed from RC_STRATEGY_STATISTICS.md 5,010 trades |
+| MACD line calculation correctness | Medium | Depends on indicators.py implementation — verify `'macd_line'` key exists |
 | Optimal MACD periods (12/26/9) | High | Standard periods used by Ross |
+| MACD_STATE corpus field | Low | 391 coded entries (390 = "unknown") — field was not systematically populated; qualitative narrative evidence is primary source |

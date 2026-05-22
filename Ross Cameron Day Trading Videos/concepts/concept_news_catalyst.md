@@ -1,8 +1,8 @@
 # Concept: News Catalyst
 
-**Last updated:** 2026-05-07  
-**Source:** RC_STRATEGY_STATISTICS.md — 1,787 sessions, 5,261 trades  
-**Sample size:** 1,672 trades with news catalyst vs 3,561 without  
+**Last updated:** 2026-05-21  
+**Source:** RC_STRATEGY_STATISTICS.md — 1,787 sessions, 5,261 trades (authoritative for win rates); TRANSCRIPT_SUMMARIES_0001-1799 corpus — NEWS column, 6,625 coded trade rows  
+**Sample size:** 2,108 trades coded "yes" (31.8%) vs 4,517 "no" (68.2%) in corpus NEWS column; RC stats: 1,672 with news vs 3,561 without (ratio consistent)  
 **Win rate WITH news:** 73.4% | **Without:** 60.7% | **Delta: +12.7pp**
 
 ---
@@ -162,8 +162,10 @@ NEWS_CATALYST gate (Pillar 5):
 
 | Field | Coverage | Notes |
 |-------|----------|-------|
-| news/no-news split | 1,672 / 3,561 trades | High confidence |
-| Win rate delta | +12.7pp | Derived from complete sample |
-| Catalyst type taxonomy | Qualitative from summaries | Medium confidence |
-| Sector breakdown | Complete | High confidence |
-| Timing windows | Qualitative | Low confidence — not directly measured |
+| news/no-news win rate split (73.4% vs 60.7%) | 5,261 trades via RC_STRATEGY_STATISTICS.md | High |
+| Corpus NEWS column coding (yes=2,108, no=4,517) | 6,625 TRADES table rows across 19 chunk files | High |
+| News/no-news ratio (~32%/68%) | Both sources agree | High |
+| Catalyst type taxonomy (Tier 1/2/3) | Qualitative from summaries | Medium |
+| Sector breakdown | RC_STRATEGY_STATISTICS.md complete sample | High |
+| Timing windows (premarket best) | Qualitative from recaps | Medium |
+| news-catalyst scanner win rate (79.3%) | 29 trades — small sample | Low |

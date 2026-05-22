@@ -1,7 +1,7 @@
 # Concept: Daily Risk Rules
 
-**Last updated:** 2026-05-07  
-**Source:** RC_STRATEGY_STATISTICS.md — 1,787 sessions; jTrader_Audit_Against_Statistics.md rules #24-26  
+**Last updated:** 2026-05-21  
+**Source:** Full corpus analysis — TRANSCRIPT_SUMMARIES_0001-1799 (all 1,799 sessions) + RC_STRATEGY_STATISTICS.md  
 **Critical finding:** Max-loss-hit sessions → 30.9% win rate, -$4,454/trade avg over 414 trades
 
 ---
@@ -54,6 +54,72 @@ Ross's own rule: *"When I hit my max loss, I'm done. I don't try to recover it."
 **Rationale:** Big green days getting erased is the most common "disaster" recap topic in the 1,787 sessions. The emotional difficulty of watching gains disappear leads to larger and more desperate trades. A hard mechanical stop prevents the avalanche.
 
 **Ross's rule:** *"If I give back half, that's a hard stop. I don't negotiate with myself on this one."*
+
+### Rule 4: Daily Profit Goal Reached — Stop (Positive Circuit Breaker)
+**Threshold:** Session P&L >= daily_profit_goal  
+**Trigger:** `daily_pnl >= daily_profit_goal`  
+**Action:** Stop taking new entries; optionally reduce position size if already in a trade
+
+**Data from corpus:**  
+"Daily goal reached" is the single most common reason for session end across 1,799 sessions (831 session-end entries reference "goal reached" / "achieved goal" / "daily goal hit"). Sessions that stop at daily goal are overwhelmingly profitable. Sessions that continue past the goal often give back gains — the TWWG example shows scaled from $7→$9.20, "gave back" before final exit at $20,790.
+
+**Ross's rule:** "When I hit my daily goal, I'm done. I'd rather bank the win than chase more." (Observed across many sessions; goal is typically $1K-$2K/day at standard size.)
+
+**Why it belongs with the loss rules:** The asymmetry is that traders enforce MAX LOSS rigorously but ignore daily profit stops. Both sides of the equation matter equally. Continuing to trade after daily goal creates "give-back" risk that rivals a bad loss day.
+
+**Calibration:**
+- Conservative: stop at 1x average daily goal (e.g., $500 for a $5K account)
+- Moderate: stop at 2x average daily goal; reduce size by 50% at 1x
+- Hot day override: if market is HOT, extend goal threshold by 50% (tempting to let winners run, but must still reduce size after goal)
+
+---
+
+## The Risk Cascade (Critical Pattern)
+
+Full-corpus analysis reveals a consistent cascade in max-loss-hit sessions:
+
+```
+Trigger event (first bad trade)
+    ↓
+Position OVERSIZE (to recover quickly)
+    ↓
+Second bad trade (oversized = larger loss)
+    ↓  
+REVENGE TRADE (emotional, not setup-based)
+    ↓
+Max loss hit
+    ↓
+Continued trading (if rule not enforced)
+    ↓
+-$4,454/trade avg, 30.9% win rate
+```
+
+**Key finding:** In virtually every max_loss_hit session, `behavioral_deviation` includes **both** "oversize" and "revenge-trade". Oversize is always the FIRST behavioral signal — it appears before revenge trading and before max loss. This means:
+
+- **Oversize detection = earliest warning** the day is going wrong
+- If jTrader detects position size > planned, flag it before it becomes a loss cascade
+- A single bad trade handled at normal size rarely reaches max loss alone
+
+**Context amplifiers (high-risk conditions):**
+- `prior_day = loss` → 2x more likely to oversize next session
+- `month_context = in-drawdown` → highest frequency of cascade failures
+- `acct_state = in-drawdown` → combined with prior-day loss = maximum risk
+- Premarket max losses possible (FILE 1019: max loss hit at 8:38am before market open)
+
+---
+
+## Intermediate Soft Rule: Size Reduction
+
+Between "trade normally" and "halt entries" there is a documented intermediate state observed across hundreds of sessions:
+
+**`size_context = "reduced"`** appears in sessions that avoid max loss despite early losses.
+
+**Soft Rule:** After first losing trade where session P&L goes negative:
+1. Reduce position size by 50% for all subsequent entries
+2. Do not raise size back up until session P&L returns positive
+3. If P&L drops below -0.5× max_loss_limit at reduced size: halt entries entirely
+
+This matches Ross's observed pattern of "taking it smaller" on difficult days before fully walking away. It adds a buffer step that can convert a potential max-loss day into a controlled -$200 day.
 
 ---
 
@@ -170,12 +236,16 @@ Stopping at max-loss prevents the cascade from reaching its worst point. The 30.
 
 ## jTrader Implementation Checklist
 
-- [ ] `PortfolioManager._check_risk_rules()` — implement the enforcement, not just logging
+- [ ] `PortfolioManager._check_risk_rules()` — implement enforcement, not just logging
 - [ ] `entry_engine.evaluate_entry()` — check `portfolio_manager.halt_new_entries` before Gate 1
-- [ ] `RiskConfig` dataclass — add `max_loss_limit`, `giveback_pct` (default 0.5) thresholds
-- [ ] Session reset — `halt_new_entries = False` at session start each day
+- [ ] `RiskConfig` dataclass — add `max_loss_limit`, `giveback_pct` (0.5), `daily_profit_goal` thresholds
+- [ ] **Soft rule**: reduce `max_position_pct` by 50% after first losing trade puts session P&L negative
+- [ ] **Rule 4**: halt entries when `daily_pnl >= daily_profit_goal`
+- [ ] Session reset — `halt_new_entries = False`, `soft_size_reduced = False` at session start each day
+- [ ] Premarket coverage — rules must fire 4am–9:30am, not just regular session
 - [ ] Logging — emit structured log events when each rule fires (for backtest analysis)
-- [ ] Optuna scope — `max_loss_limit` is a Category A parameter (scanner/risk), optimize it
+- [ ] Optuna scope — `max_loss_limit` is Category A; `daily_profit_goal` also tunable
+- [ ] Context amplifiers — when `prior_day = loss` AND `month_context = in-drawdown`, lower `max_loss_limit` by 25%
 
 ---
 
@@ -186,5 +256,11 @@ Stopping at max-loss prevents the cascade from reaching its worst point. The 30.
 | Max-loss-hit win rate (30.9%) | 414 trades | High |
 | Max-loss-hit avg result (-$4,454) | 414 trades | High |
 | Non-max-loss win rate (68.0%) | 4,663 trades | Very High |
+| max_loss_hit=true sessions | ~106 sessions from chunk files | High |
+| "Oversize + revenge" cascade pattern | Consistent across all max_loss files | High |
+| Daily profit goal as session-end | 831 "goal" session-end entries | High |
 | Green-to-red / give-back triggers | Qualitative from recaps | Medium |
-| Threshold calibration by account size | Inferred from strategy | Low — needs optimization |
+| Premarket max loss applicability | 1 confirmed (8:38am) | Low — rare but documented |
+| Context amplifier (prior-day loss) | Observed pattern, not quantified | Medium |
+| Threshold calibration by account size | Inferred from strategy | Low — needs Optuna optimization |
+| Soft size reduction rule | Observed in "reduced" sessions | Medium |

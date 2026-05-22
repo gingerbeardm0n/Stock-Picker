@@ -1,7 +1,7 @@
 # Concept: Time of Day
 
-**Last updated:** 2026-05-07  
-**Source:** RC_STRATEGY_STATISTICS.md — 1,787 sessions; concept_pattern_playbook.md  
+**Last updated:** 2026-05-21  
+**Source:** RC_STRATEGY_STATISTICS.md — 1,787 sessions; TRANSCRIPT_SUMMARIES_0001-1799 corpus (TIME_OF_ENTRY + session_end METADATA fields); concept_pattern_playbook.md  
 **Core finding:** 9:30–10:30am = 71.9% win rate (hot market). After 11am = dead zone.
 
 ---
@@ -26,12 +26,14 @@ Time of day effects cannot be separated from market temperature:
 
 **Cold markets are net-losing** (-$63/trade avg over 1,556 trades). On cold days, the morning window is compressed or absent — the patterns don't set up cleanly. This is the most critical interaction: time + market temperature together determine whether any trade should be taken.
 
-Sessions per condition:
+Sessions per condition (RC_STRATEGY_STATISTICS.md basis — trade-level market field):
 | Market | Sessions | Avg trades/session |
 |---|---|---|
 | hot | 651 | 3.8 |
 | neutral | 297 | 3.2 |
 | cold | 450 | 3.5 |
+
+**Note on session counts vs. corpus counts:** RC stats shows hot=651 sessions (36.4% of 1,787). `concept_market_temperature.md` shows HOT=~867 (46% of 1,799 corpus sessions). The difference reflects: RC stats 3-tier classification (hot/neutral/cold, no choppy), corpus METADATA uses 4-tier + more varied labels. Both sources are internally consistent for their respective analyses.
 
 Cold days have nearly as many trades (3.5 avg) as hot days (3.8) — Ross is trading nearly as often on cold days but getting net-negative results. This is a behavioral finding: on cold days, the correct answer is fewer trades or none, but in practice the trade count barely drops.
 
@@ -89,8 +91,22 @@ Ross occasionally trades the 2:00–4:00pm window but explicitly flags it as low
 
 ## Pre-Market: 6am–9:29am
 
-Premarket is part of the strategy — Ross trades it:
+Premarket is part of the strategy — Ross trades it.
 
+**Corpus TIME_OF_ENTRY distribution (300 populated entries, confirming morning-weight):**
+
+| Time Window | Count | % of populated |
+|---|---|---|
+| Premarket (before 9:30am) | ~79 | 26% |
+| At open / 9:30am | ~37 | 12% |
+| 9:45am–10:30am | ~43 | 14% |
+| 10:30am–11:00am | ~9 | 3% |
+| After 11:00am | ~5 | 2% |
+| Generic "morning" / unspecified | ~127 | 42% |
+
+Note: TIME_OF_ENTRY sparsely coded (~300 of 5,000+ trades); unspecified entries likely morning. Distribution confirms: vast majority of entries happen at market open or premarket.
+
+**Premarket entry characteristics:**
 - Primary activity: monitoring, building watch list, observing price action
 - Entry: gap-and-go setups sometimes entered premarket if breakout is clear (FILE 0308: VWAP reclaim at 7am)
 - Risk: wide spreads, low volume, one whale can move the price
@@ -212,14 +228,34 @@ TIME_OF_DAY gates:
 
 ---
 
+## session_end Distribution (Corpus Finding)
+
+From METADATA `session_end` field (1,799 sessions):
+
+| session_end category | Count | Notes |
+|---|---|---|
+| Unknown / not coded | 464 | 26% of sessions — information gap |
+| ~10:30am range (10:30, 10:45, 10:30-profit) | ~23 | Classic: hit goal and stop |
+| ~11:00am range (11:00, 11:30, ~11:45) | ~13 | Late morning goal hit |
+| Market open / early (09:30, 09:45) | ~21 | Very quick sessions |
+| midday / 12:00 | ~8 | Extended sessions |
+| No trades taken | ~16 | No-trade days |
+| max-loss-hit | ~8 | Forced early stop |
+| afternoon | ~9 | Exceptional — continuation only |
+
+Most sessions with coded `session_end` cluster around 10:30–11:00am, confirming Ross's stated rule. 464 unknown entries (26%) are a gap in the data but don't change the directional finding.
+
+---
+
 ## Data Confidence
 
 | Finding | Sample | Confidence |
 |---|---|---|
 | Hot/cold market win rates | 2,437 / 1,556 trades | High |
 | Cold market net-losing (-$63/trade) | 1,556 trades | High |
-| Morning window 9:30–10:30am | Qualitative from recaps | High |
+| Morning window 9:30–10:30am | Qualitative from recaps + TIME_OF_ENTRY corpus | High |
 | Dead zone 11am–2pm | Direct Ross statement + qualitative | High |
 | Pattern-specific time cutoffs | Qualitative (playbook) | Medium |
-| Premarket entry quality | Small sample (subset of gap-and-go) | Low |
+| Premarket entry count (~79 entries) | 300 populated TIME_OF_ENTRY rows | Medium (sparse) |
 | Afternoon continuation win rate | 181 trades (continuation category) | Medium |
+| session_end distribution | 1,799 METADATA entries (26% unknown) | Medium |

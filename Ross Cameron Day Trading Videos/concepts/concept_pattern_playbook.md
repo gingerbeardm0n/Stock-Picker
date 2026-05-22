@@ -1,8 +1,8 @@
 # Pattern Playbook
 
-**Last updated:** 2026-05-06
-**Source:** Pass 1 enrichment, FILES 0001–1799
-**Total trades in sample:** 5,010
+**Last updated:** 2026-05-21  
+**Source:** Full corpus analysis — TRANSCRIPT_SUMMARIES_0001-1799 (all 1,799 sessions)  
+**Total trades in sample:** 5,010 + ~618 newly identified unlisted-pattern trades
 
 ---
 
@@ -20,9 +20,13 @@
 | flat-top           |   82 | 64%   | 54.9%  | 37.8%  | 7.3%      | 1.2%     | low/mid       | premarket or early market |
 | abcd               |   26 | —     | 15.4%  | 73.1%  | 11.5%     | 0.0%     | low-float     | 9:30–10:30 |
 | bull-flag          |   26 | —     | 34.6%  | 38.5%  | 11.5%     | 0.0%     | any           | 9:30–10:30 |
+| squeeze            |  119 | ~65%† | 28%    | 52%    | 20%       | 3%       | low/mid       | 9:30–11:00 |
+| continuation       |  216 | ~62%† | 37%    | 46%    | 17%       | 2%       | low-float     | premarket → 9:30 |
 
 **Win% source:** OUTCOME column from TRADES tables, 6,722 total outcomes parsed. Win/loss only — breakeven (113) excluded.  
-**Key ranking:** vwap-reclaim 75% > micro-pullback 70% > gap-and-go 69% > halt-resume 67% > dip-buy 63% > whole-dollar-break 59%  
+†Squeeze and continuation win rates estimated from corpus context; outcomes not separately tabulated for these labels.  
+**Key ranking (confirmed):** vwap-reclaim 75% > micro-pullback 70% > gap-and-go 69% > halt-resume 67% > dip-buy 63% > whole-dollar-break 59%  
+**Note:** ~283 trades labeled "breakout" in corpus = catch-all overlapping flat-top/whole-dollar/gap-and-go; not a standalone pattern (see note after Pattern 12).  
 **Hold duration:** scalp = <5 min; short = 5–30 min; extended = 30 min+  
 **MACD Rel** = % of trades where MACD positive was recorded (floor estimate — many trades have unknown MACD state).
 
@@ -430,6 +434,110 @@
 
 ---
 
+### 11. Squeeze
+
+**n ≈ 119 | Scalp ~28% / Short ~52% / Extended ~20% | MACD relevance ~3%**
+
+**Definition:** Momentum acceleration through a key resistance level as short-sellers are forced to cover. Unlike halt-resume, no circuit-breaker halt is required — the squeeze develops organically as buyers absorb supply at a defended level and shorts capitulate. Entry is the consolidation break just before or during the acceleration.
+
+**Distinct from halt-resume:** Halt-resume requires a formal LULD circuit-breaker halt. Squeeze happens without one — the stock pushes continuously through resistance, trapping shorts who were defending that level. Both result in rapid price extension; the mechanics and entry timing differ.
+
+**Setup criteria:**
+- Stock approaching a heavily-defended resistance level (prior high, whole-dollar, premarket high) with sustained buying pressure
+- Level has been tested 2–3 times without breaking — shorts have added positions at resistance, building the spring
+- Relative volume expanding on each approach (buyers accumulating, not selling)
+- Low-to-mid float preferred — fewer shares outstanding = faster price displacement when shorts cover
+- Corpus labels include: "squeeze momentum dip re-entry" (add on dip during active squeeze), "gap-and-go squeeze" (gap-and-go developing into squeeze at premarket high), "sympathy momentum indie squeeze" (secondary stock squeezed by leading gapper's momentum)
+
+**Entry trigger:**
+- **Break-and-hold:** 1-minute candle closes above the defended resistance level with volume expansion
+- **Dip re-entry (most common in corpus):** During squeeze acceleration, price dips briefly on profit-taking — enter the dip if momentum is intact; stop below the broken resistance level ("squeeze momentum dip re-entry")
+- **Sympathy squeeze:** Secondary stock breaking its own resistance level concurrent with the leading gapper; trade its chart independently
+
+**Add-on mechanic:**
+- Add on each dip that holds above the former resistance (now support)
+- Reduce size if squeeze has run multiple legs without a halt — back-side risk increases with each extension
+
+**Hold duration norms:**
+- Predominantly short (52%) — squeeze moves are fast, often peaking within 15–30 minutes
+- Extended (20%) above most patterns — low-float squeezes can run multi-leg when shorts are heavily trapped
+- Scalp (28%) when the consolidation breaks but follow-through is limited
+
+**Use when:**
+- Stock has established shorts by testing resistance 2+ times without breaking
+- Volume expanding each test (buying absorption confirmed)
+- Active catalyst (news, sector momentum, sympathy) — squeezes need fuel
+- First 90 minutes of trading; after 11 AM squeeze momentum exhausts
+
+**Skip when:**
+- Stock has already squeezed significantly — late entry into exhaustion
+- No visible short interest at the level (no one to squeeze)
+- Float > 20M — requires too many cover orders to move price meaningfully
+
+---
+
+### 12. Continuation / Multi-Day Runner
+
+**n ≈ 216 | Scalp ~37% / Short ~46% / Extended ~17% | MACD relevance ~2%**
+
+**Definition:** Re-entry on a stock that made a significant move on a prior session (Day 1) and continues its momentum on Day 2 or Day 3. Entry is on a break of a fresh technical level (prior-day high or VWAP) with confirmation that prior momentum hasn't exhausted.
+
+**Distinct from gap-and-go:** Gap-and-go is the initiating move. Continuation is the follow-through session. The catalyst is "already known" — the question is whether prior-day buyers are still active and new buyers are joining.
+
+**Setup criteria:**
+- Stock made a 50%+ move on Day 1 (ideally with halts or extended momentum)
+- Day 2: trading above prior-day VWAP premarket OR opens above prior-day high
+- Relative volume elevated vs historical baseline (confirms continued interest, not fading retail)
+- **Critical — low float strongly preferred:** corpus explicitly notes high-float continuations rejected as "too thickly traded, lacks low-float benefit"
+- Catalyst still relevant (same news playing out over multiple days, new PR, sector continuation)
+- Fresh technical level: prior-day high (breakout target) or premarket support (pullback entry)
+
+**Entry trigger:**
+- **Break of prior-day high:** 1-minute candle closes above the prior session's high — most reliable entry
+- **Premarket support hold + open break:** stock consolidates above prior-day VWAP premarket, then breaks its premarket high at/after 9:30
+- **VWAP reclaim on Day 2:** stock dips below prior-day VWAP at open, reclaims it with volume — continuation of prior trend
+
+**Hold duration norms:**
+- Short (46%) is modal — continuation moves rarely extend as far as Day 1 unless a second catalyst emerges
+- Scalp (37%) when Day 2 open shows weakness vs Day 1 closing momentum
+- Extended (17%) when a new catalyst arrives on Day 2 (second PR, sympathy squeeze, sector acceleration)
+
+**MACD relevance:** Low (2%) — continuation is price-level and relative volume driven, same as gap-and-go.
+
+**Rejection criteria (when NOT to trade):**
+- Float > 10M — explicitly rejected in corpus; prior day move diluted across too many shares
+- Relative volume declining on Day 2 (retail attention fading)
+- Stock opened and immediately sold off on Day 2 — distribution, not continuation
+- No premarket volume or catalyst — yesterday's news
+- Day 3+ without new catalyst — third-day runs are rare and require exceptional momentum
+
+**Use when:**
+- Low-float (sub-5M preferred), strong Day 1 move with halts
+- Day 2 relative volume still elevated vs historical baseline
+- Fresh technical breakout level established (prior-day high visible, actionable)
+- Market temperature HOT or NEUTRAL (cold days kill continuation interest)
+
+**Skip when:**
+- High float (corpus explicit rejection)
+- No premarket volume on Day 2
+- Day 1 run was on reverse split or dilutive news (typically one-day events)
+- Stock opened gap-down on Day 2 (sellers in control)
+
+---
+
+### Note: "Breakout" as Catch-All Classification
+
+~283 trades in the raw corpus are labeled "breakout" in TRADE_MECHANICS tables. This is not a standalone pattern — it is a meta-label for resistance breaks that fit multiple established patterns:
+
+- **Flat-top + breakout:** ~40% — flat-top consolidation resolving to a breakout (counted as both)
+- **Whole-dollar-break + breakout:** ~30% — round-number level break labeled as "breakout"
+- **Gap-and-go + breakout:** ~20% — premarket high break at open
+- **Remaining ~10%:** general resistance breaks not clearly fitting other categories
+
+**jTrader classification note:** When the corpus says "breakout," map it to the most specific pattern using level context: whole-dollar → Pattern 3, premarket high → Pattern 1, flat consolidation → Pattern 8. Do not create a standalone "breakout" entry type — it will double-count trades already in other categories.
+
+---
+
 ## Pattern Selection Logic
 
 ### (a) Premarket vs Market Hours
@@ -471,6 +579,45 @@
 **Float interaction with hold duration:** Low-float stocks skew toward extended holds (more likely to halt up multiple times). High-float stocks skew toward scalp/short (moves exhaust faster against larger supply).
 
 **Float interaction with position sizing:** Sub-1M float requires smaller share counts (wide spreads, thin book). As float grows, position can scale up but per-share movement shrinks. Relative expected value should be similar across floats when properly sized.
+
+---
+
+### (d) Pattern Chaining
+
+Momentum sessions frequently chain multiple patterns in sequence on the same stock. jTrader should recognize these chains to allow re-entry after an initial exit rather than blacklisting a symbol that's still in play.
+
+| Chain Sequence | Description |
+|---------------|-------------|
+| **Gap-and-go → Micro-pullback** | Most common chain: enter PM high break, add on first 1–3 candle dip that holds above breakout level |
+| **Gap-and-go → Dip-buy → VWAP reclaim** | Stock rips at open, pulls back through VWAP, reclaims it — VWAP reclaim is a valid second entry on the same mover |
+| **Flat-top (premarket) → Gap-and-go (open)** | Premarket consolidation resolves at 9:30 — the flat-top resistance level becomes the gap-and-go entry reference |
+| **Halt-resume → Dip-buy → Squeeze** | Stock halts up, resumes with dip — dip-buy on resume dip, then accelerates into squeeze as shorts cover the next level |
+| **Red-to-green → VWAP reclaim → Whole-dollar-break** | Recovery sequence: R2G squeeze, VWAP hold, then each whole-dollar level becomes the next breakout target |
+| **Gap-and-go (Day 1) → Continuation (Day 2)** | Strong Day 1 runner: trade the gap-and-go; next morning, assess continuation setup at prior-day high or VWAP |
+| **Squeeze → Halt-resume → Dip-buy** | Squeeze triggers halt — halt-resume entry or dip-buy on resumption — next squeeze leg begins |
+
+**Chain validity rules:**
+1. Each new entry requires its own setup criteria met — chain is not an automatic re-entry
+2. Same stock, same session: limit 3 chain entries (each successive entry has smaller edge, higher execution risk)
+3. Chain breaks when stock closes below VWAP — restart full assessment from scratch
+4. Sympathy plays chain independently of the leader: leader does gap-and-go while sympathy stock does its own micro-pullback
+
+---
+
+### (e) Sympathy Plays (Cross-Pattern)
+
+When a leading gapper is running hard, nearby stocks in the same sector can move in sympathy. Sympathy plays are NOT a standalone pattern — they use whatever pattern fits the secondary stock's own chart.
+
+**How to trade:**
+- Identify the leading gapper (Pattern 1: gap-and-go)
+- Find secondary stocks in the same sector showing premarket movement
+- Apply the correct pattern to the secondary stock's chart (its own PM high = gap-and-go trigger, its own resistance = squeeze target, etc.)
+- Use smaller size than the leading name — sympathy momentum can cut off abruptly
+
+**Examples from corpus:** ALT/BPTH (gap-and-go on sympathy), GBR/APOP (same-sector runner), ZIS/HTGM (+$3,331 sympathy)  
+**Failure case:** COHN sympathy attempt → -$900 "no sympathy" (FILE 0200-0299) — secondary stock failed to follow leader
+
+**Corpus note:** Sympathy plays appear under "sympathy momentum indie squeeze" (Pattern 11), "sympathy play add" (Pattern 2), and standalone gap-and-go labels. They are not separately tabulated in the n-counts above — they are distributed across patterns based on how the secondary stock's entry was classified.
 
 ---
 

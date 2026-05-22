@@ -1,7 +1,9 @@
 # Concept: Stop Management
-**Last Updated**: 2026-05-06
-**Source**: Pass 1 enrichment, FILES 0001–1799 (5,010 trades)
-**Status**: Active — use for jTrader exit logic implementation
+
+**Last updated:** 2026-05-21  
+**Source:** Full corpus analysis — TRANSCRIPT_SUMMARIES_0001-1799 (all 1,799 sessions, 19 chunk files); RC_STRATEGY_STATISTICS.md for win-rate data  
+**Sample size:** 15,187 STOP_CRITERIA rows scanned; 10,595 with non-dash values (multiple entries per trade common)  
+**Status:** Active — use for jTrader exit logic implementation
 
 ---
 
@@ -29,29 +31,31 @@ Key principles observed across summaries:
 
 Used when the trade hypothesis is invalidated. The position has not been profitable or is quickly going red.
 
-| Sub-type | Trigger | Typical Magnitude |
+| Sub-type | Trigger | Corpus Count |
 |---|---|---|
-| **Reversal stop** | Price action reverses vs. entry direction | Most common — 433 occurrences |
-| **Failed-breakout stop** | Breakout triggers but price fails to follow through, reverses back below level | 208 combined occurrences (2nd most common) |
-| **False-breakout / trap stop** | Level breaks briefly, then reverses sharply; entry is trapped | 17 occurrences, high-damage potential |
-| **Halt-down stop** | Stock halts downward; resumes lower, confirms reversal | 15 occurrences |
-| **Resistance stop** | Clear seller wall prevents advance; exit before loss compounds | 28+ occurrences (resist + resistance) |
-| **Support-level stop** | Key support level breaks definitively | 24 occurrences |
+| **Reversal stop** | Price action reverses vs. entry direction | **~1,952** (all reversal variants) |
+| **Failed-breakout stop** | Breakout triggers but price fails to follow through, reverses back below level | **~605** (all failed-breakout variants) |
+| **False-breakout / trap stop** | Level breaks briefly, then reverses sharply; entry is trapped | ~109 |
+| **Halt stop** | Halt-down resume, halt rejection at prior level, halt-up reversal | **~298** total (halt-down ~175, halt rejection ~68, halt-up reversal ~55) |
+| **Resistance / seller stop** | Clear seller wall prevents advance; exit before loss compounds | **~338** (sellers + resist + resistance variants) |
+| **Support-level stop** | Key support level breaks definitively | ~84 |
+| **Explicit stop-loss** | Hard dollar stop placed at entry; triggers mechanically | ~36 |
 
 ### 2.2 Profit Stops (Lock Gains)
 
 Used when in a winning position to guarantee a minimum outcome. The stop is raised as price advances.
 
-| Sub-type | Trigger | Notes |
+| Sub-type | Trigger | Corpus Count |
 |---|---|---|
-| **Profit-scale** | Scale out portions at T1, T2, T3 resistance levels | 60 occurrences — primary method |
-| **Profit-target** | Full exit at predetermined target | 111 occurrences — used on scalps |
+| **Profit-scale at resistance** | Scale out portions at T1, T2, T3 resistance levels | **~1,764** — most common profit exit |
+| **Profit scalp / quick exit** | Fast scalp exit, not waiting for full target | **~853** — "prof: quick scalp" dominant label |
+| **Profit-target** | Full exit at predetermined target | **~140** — used on more planned exits |
 | **MACD divergence exit** | MACD turns negative while price attempts new highs | Files 0002, 0007 — signals end of momentum |
 | **Spreading / volume decline exit** | Spreads widen, bid volume falls | FILE 0004: "risk management required reducing size as price extended" |
 | **Sellers stacking exit** | 25–50k share seller blocks appear | FILE 0002: "stopped when sellers stacked 25–30k share blocks" |
 | **Daily-goal lock** | Hit daily target, raise stop to protect green day | Most common session-end driver |
 
-Together, profit-scale + profit-target = **171 exits** (34% of all coded exits). A large fraction of "stop criteria" events are actually disciplined profit-taking, not losses.
+**Key corpus finding (NEW):** Profit exits (scaled + scalp + target = **~2,757**) roughly equal reversal stops (~1,952). This corrects the prior assumption that stops are loss-dominant. Ross exits approximately as many trades via disciplined profit-taking as via loss stops. The "profit-scale at resistance" label (1,764 occurrences) is the single most common non-dash exit label in the corpus.
 
 ### 2.3 Time Stops
 
@@ -278,23 +282,44 @@ AT 12:00 ET: force-close all remaining positions at market
 
 ---
 
-## Appendix: Stop Criteria Frequency Table (5,010 trades, FILES 0001–1799)
+## Appendix: Stop Criteria Frequency Table (Full Corpus — TRANSCRIPT_SUMMARIES_0001-1799)
 
-| Stop Criterion | Count | Category |
+**Note:** 15,187 rows scanned across 19 chunk files; 10,595 non-dash values. Multiple stop criteria entries per trade are common (pyramided positions with multiple partial exits). Counts reflect all partial and full exit events, not just final exits.
+
+| Stop Criterion (grouped) | Corpus Count | Category |
 |---|---|---|
-| reversal | 433 | Loss stop |
-| failed-breakout / failed breakout | 208 (combined) | Loss stop |
-| profit-target | 111 | Profit stop |
-| profit-scale / PROFIT: scaled | 82 (combined) | Profit stop |
-| sellers / resist / resistance | 66 (combined) | Loss stop |
-| stop loss (explicit) | 26 | Loss stop |
-| support level | 24 | Loss stop |
-| scaling | 19 | Profit stop |
-| scalp | 19 | Profit stop |
-| false breakout | 17 | Loss stop |
-| halt-down | 15 | Loss stop |
-| reversal flush | 14 | Loss stop |
+| Reversal (all variants: reversal, stop: reversal, reversal flush, etc.) | **~1,952** | Loss stop |
+| Profit scaled at resistance (prof: scaled, profit-scale, scaled throughout, etc.) | **~1,764** | Profit stop |
+| Generic exit (unclassified "exit", "quick exit") | **~1,591** | Mixed |
+| Profit scalp / quick exit (prof: quick scalp, prof: momentum scalp, etc.) | **~853** | Profit stop |
+| Failed-breakout (all variants) | **~605** | Loss stop |
+| Seller / resistance stop (sellers, resist, resistance) | **~338** | Loss stop |
+| Halt stops (halt-down, halt rejection, halt-up reversal) | **~298** | Loss stop |
+| False breakout | **~109** | Loss stop |
+| Support level break | **~84** | Loss stop |
+| Profit target (hard exit at target level) | **~140** | Profit stop |
+| Explicit stop-loss | **~36** | Loss stop |
 
-**Key ratio**: Reversal stops (433) are 2.1x more common than failed-breakout stops (208). This implies that the most frequent loss event is entering a valid breakout that then reverses — not a false breakout at the level, but a reversal after the stock initially follows through. Implication for jTrader: stops must trail as the trade moves in your favor; a static entry-candle stop is insufficient for extended moves.
+**Key ratio (updated):** Reversal stops (~1,952) are ~3.2x more common than failed-breakout stops (~605). The most frequent loss event is entering a valid breakout that reverses — not a false breakout at the level, but a reversal after initial follow-through. Implication: stops must trail as trade moves in your favor; static entry-candle stop is insufficient for extended moves.
 
-**Profit exits as % of all exits**: (111 + 82 + 19 + 19) = 231 / 5,010 coded = ~4.6% of trades have explicit profit-exit coding. The actual rate is higher — many WIN rows with PROF: prefix exits are not separately tallied in the stop criteria field. The profit-exit mechanism is not a minor edge case; it is the primary exit method on winning days.
+**Major corpus finding:** Profit exits (scaled ~1,764 + scalp ~853 + target ~140 = **~2,757**) exceed reversal stops (~1,952). Ross exits more trades via disciplined profit-taking than via stop-outs. The "prof: scaled at resistance" label dominates the corpus — confirming that scaling out at resistance levels is the primary exit mechanic on winning trades, not holding to a single hard target.
+
+---
+
+## Data Confidence
+
+| Finding | Sample | Confidence |
+|---------|--------|------------|
+| Reversal stop as most common loss type (~1,952) | 10,595 STOP_CRITERIA rows | High |
+| Profit-scaled exits most common overall (~1,764) | Same corpus | High |
+| Profit exits exceed reversal stops in frequency | Grouped corpus counts | High |
+| Halt stops total ~298 | Corpus "halt" pattern match | High |
+| Seller/resistance stops ~338 | Corpus pattern match | High |
+| Failed-breakout ~605 | Corpus pattern match | High |
+| Per-pattern stop placement rules (§3) | Qualitative from 5,010 trade recaps | High |
+| Hold vs. bail criteria (§4) | Qualitative synthesis, multiple files | High |
+| Common mistakes with examples (§5) | Direct corpus examples | High |
+| jTrader implementation rules (§6) | Derived from above findings | High |
+| MACD negative exit (75% rule) | Qualitative, files 0002/0007/0007 | Medium |
+| Knife-down timing (3 candles) | Qualitative, ~5 examples | Medium |
+| Commission drag on sub-$2 stocks (25-30%) | FILE 0119 example | Low (1 session) |

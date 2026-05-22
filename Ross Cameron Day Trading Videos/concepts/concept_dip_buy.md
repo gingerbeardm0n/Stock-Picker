@@ -1,9 +1,9 @@
 # Concept: Dip Buy
 
-**Last updated:** 2026-05-07  
-**Source:** RC_STRATEGY_STATISTICS.md; concept_pattern_playbook.md (FILES 0005, 0006, 0017)  
-**Sample size:** 712 trades (dip-buy) / 944 trades (pullback/dip combined)  
-**Win rate:** 64.0% | **Avg result:** +$1,728 | **Total P&L:** +$1,631,232 (combined)
+**Last updated:** 2026-05-21  
+**Source:** RC_STRATEGY_STATISTICS.md (5,261 trades, win rates); TRANSCRIPT_SUMMARIES_0001-1799 corpus (PATTERN_TYPE column: dip-buy=712 confirmed, dip-trade=29 variant); concept_pattern_playbook.md  
+**Sample size:** 712 PATTERN_TYPE=dip-buy corpus entries; 944 RC_STRATEGY_STATISTICS "pullback/dip" trades (rolled-up category including dip-trade variants)  
+**Win rate:** 64.0% | **Avg result:** +$1,728 | **Total P&L:** +$1,631,232 (pullback/dip combined)
 
 ---
 
@@ -24,12 +24,16 @@ Unlike micro-pullback (1-3 candles, minimal retracement), dip buy involves a rea
 
 **Lowest win rate of the main patterns at 64%.** However, still significantly profitable due to high trade volume (944 combined) and solid average result.
 
-**Hold type distribution:**
+**Hold type distribution (dip-buy specific, from prior analysis):**
 | Hold type | % of trades | Notes |
 |-----------|-------------|-------|
 | Scalp (1-5 min) | 35.8% | Quick dip-and-rip trades |
 | Short hold (5-30 min) | 46.8% | Dominant hold type |
 | Extended (30min+) | 6.2% | Present when dip occurs early in session |
+
+**Overall corpus HOLD_DURATION distribution (all 5,010 trades):** short=41.3%, scalp=40.3%, extended=8.0%, unknown=10.3%. Dip-buy's 46.8% short + 35.8% scalp is broadly consistent with the overall distribution, with slightly higher extended rate (6.2% vs 8.0% overall).
+
+**Note on dip-trade variant (29 trades):** PATTERN_TYPE "dip-trade" appears separately in corpus. Same mechanics as dip-buy but different label in earlier sessions. Combined dip-buy + dip-trade = 741 corpus entries (vs 944 in RC stats rolled-up category — RC stats includes some micro-pullback entries in the "pullback/dip" bucket).
 
 ---
 
@@ -232,9 +236,11 @@ DIP_BUY detection:
 
 | Finding | Sample | Confidence |
 |---------|--------|------------|
-| Win rate (64.0%) | 944 trades | High |
+| Win rate (64.0%) | 944 trades (RC_STRATEGY_STATISTICS.md) | High |
+| Corpus dip-buy count (712) | PATTERN_TYPE column, all 19 chunk files | High |
 | 3 Tricks framework | Qualitative from recaps | High (repeated across many sessions) |
 | MACD Line required (Trick 2) | Direct Ross statement | High |
 | Support level hierarchy | Qualitative | Medium |
 | Scaling strategy (pyramid) | Repeated in examples | High |
 | Time-of-day cutoff (11am) | Qualitative | Medium |
+| Hold type distribution (scalp 35.8% / short 46.8% / extended 6.2%) | Prior analysis | Medium |

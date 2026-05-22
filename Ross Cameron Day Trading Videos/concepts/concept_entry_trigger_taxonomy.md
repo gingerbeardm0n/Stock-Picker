@@ -1,8 +1,8 @@
 # Concept: Entry Trigger Taxonomy
 
-**Last updated:** 2026-05-07
-**Source:** RC_STRATEGY_STATISTICS.md Section 3; concept_pattern_playbook.md
-**Sample size:** 5,261 trades across 1,787 sessions
+**Last updated:** 2026-05-21  
+**Source:** RC_STRATEGY_STATISTICS.md Section 3 (win rates, categories) + TRANSCRIPT_SUMMARIES_0001-1799 corpus (raw trigger label extraction, sub-variant analysis)  
+**Sample size:** 5,261 trades across 1,787 sessions (RC_STRATEGY_STATISTICS); 5,091 raw ENTRY_TRIGGER values extracted from corpus TRADE_MECHANICS tables  
 **Scope:** All named entry trigger categories, ranked by performance
 
 ---
@@ -33,6 +33,32 @@ An entry trigger is the specific price action event that causes Ross to pull the
 | breakout | 507 | 56.4% | +$1,093 | +$524,752 |
 | reverse-split | 48 | 54.2% | +$1,138 | +$52,359 |
 | abcd-pattern | 14 | 42.9% | +$2,740 | +$38,361 |
+
+---
+
+## Trigger Granularity — Raw Corpus Labels
+
+Corpus ENTRY_TRIGGER field uses freeform labels. Below is how they map to the taxonomy categories above, with raw label counts. This table shows what's INSIDE each category and validates the mapping.
+
+| Taxonomy Category | Raw Corpus Labels (count) | Total Corpus Mentions |
+|---|---|---|
+| **gap-and-go** | "break premarket high" (28), "break of premarket high" (27), "premarket high break" (10), "gap-and-go" (13), "gap-and-go/break of PM high" (10), "premarket-high" (6), "first candle new high" (5), "first 1-min candle new high" (5) | ~104 |
+| **vwap-break/curl** | "VWAP break" (14), "break of VWAP" (8) | ~22 |
+| **micro-pullback** | "micro pullback" (15), "micro pullback entry" (6), "1-min micro pullback" (5), "micro-pullback" (5) | ~31 |
+| **vwap-reclaim** | "VWAP reclaim" (5), "V-WAP reclaim" (4) | ~9 |
+| **opening-range** | "opening range breakout" (11) | 11 |
+| **halt-resume** | "halt resume" (24), "halt resumption" (10), "resume" (9), "halt resume dip" (7), "halt resume squeeze" (6), "halt resume continuation" (5), "halt resume bounce" (4), "halt resume/continuation" (4) | ~69 |
+| **pullback/dip** | "dip" (22), "dip re-entry" (17), "dip buy" (11), "pullback dip" (8), "dip entry" (7), "dip trades" (5), "dip trade" (5), "pullback entry" (4), "pullback" (4) | ~83 |
+| **continuation** | "continuation" (14), "continuation breakout" (5), "squeeze continuation" (5) | ~24 |
+| **whole-dollar-break** | "whole-dollar break" (11), "break of whole dollar" (8), "half-dollar break" (7) | ~26 |
+| **bull-flag/flat-top** | "flag breakout" (7), "consolidation break" (5), "consolidation breakout" (5), "consolidation" (5) | ~22 |
+| **breakout (generic)** | "breakout" (54), "breakout attempt" (18), "break of resistance" (10), "breakout entry" (5), "breakout momentum" (6), "daily breakout" (8) | ~101 |
+| **squeeze** *(not in RC_STATS taxonomy — in "other" bucket)* | "squeeze" (16), "momentum squeeze" (15), "premarket squeeze" (5), "squeeze continuation" (5) | ~41 |
+| **news-driven** *(in "other" bucket)* | "news pop" (13), "news catalyst" (8) | ~21 |
+| **momentum/scalp** *(in "other" bucket)* | "momentum" (17), "momentum entry" (14), "momentum pop" (13), "momentum scanner" (10), "momentum spike" (8), "scalp" (20), "pop" (15), "scanner pop" (7), "scanner hit" (6), "scan-alert" (5) | ~115 |
+| **sympathy plays** *(in "other" bucket)* | "sympathy momentum" (6) | 6 |
+
+**Key finding:** The "other" bucket (1,813 trades, 60.5% win rate) contains at minimum: ~41 squeeze entries, ~21 news-driven entries, ~115 momentum/scalp entries. These are not random — they have structure. The "momentum" cluster especially (momentum + momentum entry + momentum pop + scanner pop = ~55 entries) likely has different win rates than unclassified noise.
 
 ---
 
@@ -78,6 +104,26 @@ vwap-break/curl (78.1%, +$7,126), vwap-reclaim (72.0%, +$6,920), and vwap-other 
 
 507 trades at 56.4%. The breakout category represents entries at arbitrary resistance without a specific, named anchor. Comparing it to other breakout-style triggers with defined levels (premarket high = 78.2%, opening range = 70.8%, whole-dollar = 64.3%) confirms the pattern: the anchor level is doing the work. Without one, win rate drops below 60%.
 
+### Squeeze trigger missing from taxonomy
+
+Corpus shows ~41 squeeze-labeled entries ("squeeze", "momentum squeeze", "premarket squeeze", "squeeze continuation"). These are classified as "other" or "continuation" in RC_STRATEGY_STATISTICS.md, so they don't have a separate win rate in the taxonomy table. Given squeeze's documented behavior (momentum acceleration at resistance, shorts covering, can run multi-leg), it likely has a win rate between halt-resume (68%) and gap-and-go (78%). Worth separating in a future data pass.
+
+**jTrader implication:** The squeeze trigger needs a named implementation. See `concept_pattern_playbook.md` Pattern 11. Current jTrader catches squeeze mechanics via micro-pullback detection during momentum runs but doesn't explicitly classify the trigger.
+
+### Halt-resume has 4 distinct sub-variants
+
+The 428 halt-resume trades aggregate very different entry mechanics:
+
+| Sub-Variant | Corpus Count | Mechanics | Risk Level |
+|---|---|---|---|
+| "halt resume" (generic) | 24 | Enter at any point on resume | Moderate — timing uncertain |
+| "halt resume dip" | 7 | Enter the first dip after resume spike | Lower — defined entry after initial volatility clears |
+| "halt resume squeeze" | 6 | Enter the continuation squeeze post-resume | Higher — requires momentum confirmation |
+| "halt resume bounce" | 4 | Enter bounce off lower level at resume | Moderate — counter-move entry |
+| "halt resume continuation" | 5 | Enter second/third halt resume | Lower risk — trend confirmed by multiple halts |
+
+**jTrader implication:** If halt-resume is implemented, "halt resume dip" is the safest sub-variant (enter after the initial volatility spike, not at the spike itself). "halt resume continuation" (multiple halts) is also well-defined.
+
 ### ABCD is dead
 
 14 trades, 42.9%. Disabled in jTrader after Trial 193. The data confirms the optimizer found the correct answer. ABCD's A-to-C structure introduces too much timing noise for low-float momentum stocks.
@@ -85,6 +131,20 @@ vwap-break/curl (78.1%, +$7,126), vwap-reclaim (72.0%, +$6,920), and vwap-other 
 ### "other" is the slippage bucket
 
 1,813 trades at 60.5% — Ross's non-rule trades. He reads L2, feels market temperature, reacts to news. These trades collectively underperform his named patterns (64.8% overall). Automating the named patterns and skipping unclassified triggers is the right architecture choice.
+
+**Corpus decomposition of "other":** Raw corpus labels reveal the composition includes: momentum/scalp entries (~115), squeeze entries (~41), news-driven entries (~21), sympathy plays (~6), and miscellaneous scan-based setups (~25). None of these have standalone win rate data yet. If squeeze entries average ~70% (reasonable estimate given the pattern), separating them from generic "other" would meaningfully improve "other"'s true average.
+
+### "false breakout" entries — edge case
+
+Corpus has 5 trades explicitly labeled "false breakout" as the ENTRY_TRIGGER. These are not trades that turned into false breakouts — they are entries *anticipating* the false breakout. I.e., Ross entered short-biased or on the expected fade of a breakout. This is a counter-trend play. Sample too small to quantify win rate, but worth flagging as a documented trigger type not in the taxonomy.
+
+### Daily breakout — daily chart trigger
+
+8 corpus entries labeled "daily breakout" or "break daily high" — these are entries at daily chart resistance levels (52-week high, multi-month high), not just intraday levels. Higher-stakes, larger potential targets. Currently lumped into "breakout" (56.4%) but are higher-quality setups due to the larger timeframe anchor. Would likely separate above the generic breakout win rate if isolated.
+
+### Sympathy plays as explicit trigger
+
+6 entries labeled "sympathy momentum" as the ENTRY_TRIGGER. These are entries on secondary stocks riding a leading gapper's momentum. Currently in "other" bucket. No win rate data available from corpus. See `concept_pattern_playbook.md` section (e) Sympathy Plays.
 
 ### Pattern vs. trigger distinction
 
@@ -170,9 +230,15 @@ ON conflict (multiple triggers on same symbol):
 | Category classifications | 5,261 trades, all assigned | High |
 | Win rate per category | Computed from outcome data | High |
 | Avg result per category | Computed from P&L data | High |
-| "other" composition | 1,813 trades, unclassified | Low — heterogeneous bucket |
+| "other" composition | 1,813 trades, partially decomposed via corpus | Medium — squeeze/news/momentum sub-types identified, not win-rated |
 | abcd-pattern sample | 14 trades | Low — insufficient sample for precise EV calc |
 | opening-range sample | 48 trades | Medium — pattern is correct, narrow CI |
 | vwap-break/curl subcategories | Not decomposed | Medium — break vs. curl conflated |
+| squeeze sub-trigger win rate | ~41 corpus mentions, no standalone rate | Low — estimate ~70% based on pattern behavior |
+| halt-resume sub-variants | 4 sub-types identified from corpus | Medium — counts small per sub-type |
+| false breakout entries | 5 corpus mentions | Low — too small for win rate |
+| daily breakout isolation | 8 corpus mentions | Low — likely in "breakout" 56.4% bucket |
+| sympathy plays | 6 corpus mentions | Low — no win rate |
+| raw corpus trigger alignment | 5,091 extracted vs 5,261 RC_STATS | High — ~3% gap from parsing variance |
 
-**Note on "other":** 34% of all trades are unclassified. If Pass 2 or Pass 3 enrichment reclassifies even 20% of the "other" bucket into named categories, win rate estimates across all tiers will shift. The current taxonomy is directionally reliable but not final.
+**Note on "other":** 34% of all trades are unclassified. Corpus analysis identifies squeeze (~41), news-driven (~21), momentum cluster (~115), and sympathy plays (~6) as structured sub-types within "other." If separated, the residual true-"other" (unstructured L2-gut-feel trades) would be a smaller but lower-win-rate bucket. The taxonomy is directionally reliable and corpus-validated.

@@ -1,7 +1,7 @@
 # Concept: Float Analysis
 
-**Last updated:** 2026-05-07  
-**Source:** RC_STRATEGY_STATISTICS.md; jTrader_Audit_Against_Statistics.md rule #4; concept_pattern_playbook.md  
+**Last updated:** 2026-05-21  
+**Source:** RC_STRATEGY_STATISTICS.md; jTrader_Audit_Against_Statistics.md rule #4; concept_pattern_playbook.md; TRANSCRIPT_SUMMARIES_0001-1799 corpus (FLOAT + REL_VOL columns: 235 FLOAT entries, 630 REL_VOL entries coded — most sessions use "-")  
 **Core finding:** Float ≤20M = jTrader's disabled pre-screen gate. Sub-5M float = maximum squeeze per pilot finding.
 
 ---
@@ -101,6 +101,34 @@ On a $5.00 stock:
 Same dollar amount = different market impact. Low float = your 5,000 shares matter. High float = they don't.
 
 **jTrader implication:** Float must be known at entry time to set position sizing correctly. The `ScannerConfig.max_position_pct` (20%) is float-agnostic — float-aware sizing would cap at a smaller % of daily float volume for very low-float stocks.
+
+---
+
+## Corpus FLOAT Distribution (235 explicitly coded entries)
+
+Most TRADE_MECHANICS rows have `-` for FLOAT — ~235/15,000+ coded = 1.5% of rows. When coded:
+
+| Float Range | Count | % of coded | Notes |
+|---|---|---|---|
+| Sub-1M (sub-1m, <1m, 170K, 441K, 480K, 878K) | ~45 | 19% | Extreme — halts, thin market |
+| 1M–5M (1.2M–4.9M + "low-float" generic) | ~79 | 34% | Core target zone |
+| Sub-5M generic ("sub-5m", "low", "low-float") | ~36 | 15% | Confirms low-float focus without specific number |
+| 5M–20M (5M–12M range) | ~35 | 15% | Acceptable |
+| 20M+ (50M, high-float, 269M) | ~11 | 5% | Rare — usually outliers |
+
+**Takeaway:** When explicitly coded, 87% of float entries are sub-20M. This confirms the strategy's low-float focus. The generic "low-float" and "sub-5m" labels (common in earlier chunk files) indicate Ross doesn't always know the exact float — he uses scanner screening to ensure low-float.
+
+## Corpus REL_VOL Distribution (630 coded entries)
+
+| REL_VOL label | Count | % |
+|---|---|---|
+| high (generic "high") | 506 | 80% |
+| very-high | 35 | 6% |
+| Specific (45x, 86x, 90x, 100x, 5000x+) | ~30 | 5% |
+| low / normal | ~11 | 2% |
+| Other (premarket volume, shorts-covering) | ~48 | 8% |
+
+**Takeaway:** 86% of coded REL_VOL entries are "high" or "very-high". When the field has a specific multiplier, values range from 5x to 5000x. The few "low" entries represent trades taken despite low relative volume — these are likely the setups that underperformed.
 
 ---
 
@@ -228,4 +256,6 @@ FLOAT_FILTER gate (Pillar: pre-screen):
 | Reverse-split win rate (54.2%) | 48 trades | Medium (small sample) |
 | Float bucket behavior | Qualitative from playbook examples | Medium |
 | Float-position sizing interaction | Ross statements + reasoning | Medium |
+| Corpus FLOAT distribution (sub-5M = 87% of coded) | 235 coded FLOAT entries | Medium (sparse — 1.5% of rows) |
+| Corpus REL_VOL distribution (high = 80% of coded) | 630 coded REL_VOL entries | Medium (sparse) |
 | Optimal float cutoff (20M vs 10M vs 5M) | Not directly measured | Low — needs backtest |
