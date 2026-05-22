@@ -5,7 +5,8 @@ Classifies each trading session as HOT / NEUTRAL / COLD / CHOP based on
 pre-market gap quality and number of qualifying symbols.
 
 Source: concept_market_temperature.md
-Key fact: 74% of sessions are COLD. COLD is the default; HOT is activated by evidence.
+Key fact: HOT=46%, NEUTRAL=22%, COLD=32% of sessions in 1,799-session corpus.
+COLD is the safe default; HOT/NEUTRAL are activated by evidence at 9:15 AM ET.
 
 Temperature drives:
     max_position_pct        — how large positions can be

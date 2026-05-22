@@ -136,6 +136,10 @@ class SimulationRunner:
 
         # Track symbols that exited via TIME_DECAY to prevent re-entry same day
         self.time_decay_exits = set()
+        # GAP-14: track stop-out count per symbol to apply cooldown rules:
+        #   1st stop-out → allow 1 re-entry at 50% size
+        #   2nd stop-out on same symbol → block re-entry entirely
+        self.stop_hit_counts: dict[str, int] = {}
         self._stats = {}
 
         # Pre-computed set of symbols that pass price/gain filters for this day.
@@ -392,6 +396,7 @@ class SimulationRunner:
 
         # Reset daily tracking
         self.time_decay_exits = set()
+        self.stop_hit_counts = {}
         self.portfolio_manager.reset_day()
 
         # Keep one DB connection open for the whole simulation loop
@@ -576,6 +581,10 @@ class SimulationRunner:
                     # Track TIME_DECAY exits to prevent re-entry same day
                     if exit_signal.reason == 'TIME_DECAY':
                         self.time_decay_exits.add(pos.symbol)
+                    # GAP-14: track stop-outs — 1st allows half-size re-entry, 2nd blocks entirely
+                    if exit_signal.reason == 'STOP_HIT':
+                        self.stop_hit_counts[pos.symbol] = \
+                            self.stop_hit_counts.get(pos.symbol, 0) + 1
                     # Temperature update: after a full close, update consecutive losses
                     if self.position_manager.position is None and pos.exit_reason:
                         win = pos.get_pnl() > 0
@@ -664,6 +673,9 @@ class SimulationRunner:
                     continue
             # Skip symbols that exited via TIME_DECAY (no re-entry same day)
             if symbol in self.time_decay_exits:
+                continue
+            # GAP-14: 2nd stop-out on same symbol → blocked entirely
+            if self.stop_hit_counts.get(symbol, 0) >= 2:
                 continue
             history = self.bar_history.get(symbol, [])
             if len(history) < 7:  # Need enough bars for patterns
@@ -764,6 +776,10 @@ class SimulationRunner:
             if self.debug:
                 self._stats['entries_found'] += 1
             pat = best_signal.pattern
+            fund = self.fundamentals.get(best_signal.symbol, {})
+            # GAP-14: 1st stop-out → half-size re-entry; 0 stop-outs → full size
+            stop_hit_n = self.stop_hit_counts.get(best_signal.symbol, 0)
+            size_mult = 0.5 if stop_hit_n == 1 else 1.0
             trade = self.position_manager.enter_position(
                 symbol=best_signal.symbol,
                 entry_price=pat.entry_price,
@@ -772,6 +788,8 @@ class SimulationRunner:
                 target1=pat.target1,
                 target2=pat.target2,
                 pattern_type=pat.pattern_type,
+                float_shares=fund.get('float_shares'),  # GAP-11: float-bucket cap
+                size_multiplier=size_mult,               # GAP-14: cooldown sizing
             )
             if trade:
                 self.trade_log.append({

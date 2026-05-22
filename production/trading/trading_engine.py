@@ -75,6 +75,15 @@ class Trade:
 class PositionManager:
     """Manages capital, open position, and daily risk rules."""
 
+    # GAP-11: Float-bucket hard caps on position value.
+    # Source: concept_float_analysis.md — low-float stocks need smaller positions
+    # because spreads/slippage compound fast and thin books cause outsized losses.
+    # sub-1M float: max $5K position; 1M-3M float: max $15K; 3M+ float: max_position_pct applies.
+    FLOAT_BUCKET_CAPS = [
+        (1_000_000,  5_000.0),   # sub-1M float  → hard cap $5K
+        (3_000_000, 15_000.0),   # 1M–3M float   → hard cap $15K
+    ]
+
     def __init__(self, account_size, risk_per_trade_pct=2.0,
                  daily_max_loss_pct=3.0, max_position_pct=1.5):
         self.account_size = account_size
@@ -87,13 +96,25 @@ class PositionManager:
         self.trades_completed = []
         self.daily_loss = 0.0
 
+        # GAP-16: track first-loss-of-day for half-size rule
+        self._had_loss_today = False
+
     def can_enter_trade(self):
         return self.position is None and self.daily_loss < self.daily_max_loss
 
     def enter_position(self, symbol, entry_price, entry_time,
                        stop_loss_price, target1, target2,
-                       pattern_type='UNKNOWN', daily_high=None):
-        """Enter a new position using pattern-specific stop/targets from EntrySignal."""
+                       pattern_type='UNKNOWN', daily_high=None,
+                       float_shares: int | None = None,
+                       size_multiplier: float = 1.0):
+        """Enter a new position using pattern-specific stop/targets from EntrySignal.
+
+        Args:
+            float_shares: company's public float (shares). Used for GAP-11 bucket caps.
+                          Pass None to skip float-based capping (float unknown).
+            size_multiplier: extra scaling applied after all other sizing rules.
+                             Pass 0.5 for GAP-14 half-size re-entry after a stop-out.
+        """
         if not self.can_enter_trade():
             return None
 
@@ -101,18 +122,32 @@ class PositionManager:
         if stop_distance <= 0:
             return None
 
+        # Combined size multiplier: GAP-16 (first-loss-today) × GAP-14 (stop-out cooldown)
+        # Applied uniformly to both risk-based and cap-based share calculations so the
+        # binding constraint always produces a proportional reduction.
+        gap16_mult = 0.5 if self._had_loss_today else 1.0
+        total_mult = gap16_mult * size_multiplier   # size_multiplier carries GAP-14 reduction
+
         risk_per_trade = self.current_balance * (self.risk_per_trade_pct / 100.0)
         risk_based_shares = int(risk_per_trade / stop_distance)
 
         max_position_value = self.current_balance * (self.max_position_pct / 100.0)
+
+        # GAP-11: apply float-bucket hard cap on max_position_value
+        if float_shares is not None:
+            for bucket_float, cap_dollars in self.FLOAT_BUCKET_CAPS:
+                if float_shares < bucket_float:
+                    max_position_value = min(max_position_value, cap_dollars)
+                    break
+
         max_position_shares = int(max_position_value / entry_price)
 
-        shares = min(risk_based_shares, max_position_shares)
+        shares = int(min(risk_based_shares, max_position_shares) * total_mult)
         if shares <= 0:
             return None
 
         if shares * entry_price > self.current_balance:
-            shares = int(self.current_balance / entry_price)
+            shares = int(self.current_balance / entry_price * total_mult)
             if shares <= 0:
                 return None
 
@@ -151,9 +186,11 @@ class PositionManager:
         if is_full_close:
             pos.close_position(price, exit_signal.reason, current_time)
             self.trades_completed.append(pos)
-            self.current_balance += pos.get_pnl()
-            if pnl < 0:
-                self.daily_loss += abs(pnl)
+            trade_pnl = pos.get_pnl()
+            self.current_balance += trade_pnl
+            if trade_pnl < 0:
+                self.daily_loss += abs(trade_pnl)
+                self._had_loss_today = True   # GAP-16: triggers half-size next entry
             self.position = None
         else:
             pos.scale_out(qty, price, exit_signal.reason, current_time)
@@ -170,6 +207,9 @@ class PositionManager:
             if pos.shares_remaining == 0:
                 pos.close_position(price, 'FULLY_SCALED', current_time)
                 self.trades_completed.append(pos)
+                # Check full-trade P&L for the GAP-16 loss flag
+                if pos.get_pnl() < 0:
+                    self._had_loss_today = True
                 self.position = None
 
         return pnl

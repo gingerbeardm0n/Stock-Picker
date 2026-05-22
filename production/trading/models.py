@@ -73,6 +73,10 @@ class EntryConfig:
     enable_abcd: bool = False           # Trial 193: disabled
     enable_dip_buy: bool = True
     enable_flat_top: bool = True
+    # GAP-07/08/10: new patterns from concept page corpus analysis
+    enable_red_to_green: bool = True    # Red-to-Green reclaim — 66.2% win rate / 71 trades
+    enable_whole_dollar: bool = True    # Whole Dollar Break — 64.3% win rate / 112 trades
+    enable_orb: bool = True             # Opening Range Breakout — 70.8% win rate / 48 trades
 
     # ── Gap and Go ─────────────────────────────────────────────────────────────
     # Source: concept_gap_and_go.md — break of premarket high at open

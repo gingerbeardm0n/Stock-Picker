@@ -40,6 +40,9 @@ from trading.patterns import (
     detect_abcd_pattern,
     detect_dip_buy,
     detect_flat_top_breakout,
+    detect_red_to_green,
+    detect_whole_dollar_break,
+    detect_opening_range_breakout,
 )
 
 ET = pytz.timezone('US/Eastern')
@@ -235,6 +238,8 @@ def evaluate_entry(
         'market_open_bar_count': market_open_bar_count,
         # VWAP reclaim: current session VWAP (market-hours bars only)
         'vwap': vwap,
+        # Red-to-Green: prior day close for reclaim detection (GAP-07)
+        'prior_close': prior_close,
     }
 
     current_price = float(current_bar['close'])
@@ -268,13 +273,25 @@ def evaluate_entry(
             if indicators['macd_line'] <= 0:
                 return None
 
+        # GAP-06: Micro-pullback has a hard 10:30 cutoff (concept_micro_pullback.md).
+        # It's an opening-momentum pattern — edge drops sharply after 10:30 ET.
+        # Other patterns keep the standard 11:00 ET cutoff.
+        micro_pullback_ok = (
+            ecfg.enable_micro_pullback
+            and (et_time.hour < 10 or (et_time.hour == 10 and et_time.minute < 30))
+        )
+
         signal = (
-            (detect_vwap_reclaim(all_bars_so_far, indicators, ecfg) if ecfg.enable_vwap_reclaim else None) or
-            (detect_bull_flag(all_bars_so_far, indicators, ecfg) if ecfg.enable_bull_flag else None)       or
-            (detect_micro_pullback(all_bars_so_far, indicators, ecfg) if ecfg.enable_micro_pullback else None) or
-            (detect_abcd_pattern(all_bars_so_far, ecfg) if ecfg.enable_abcd else None)                  or
-            (detect_dip_buy(all_bars_so_far, indicators, ecfg) if ecfg.enable_dip_buy else None)         or
-            (detect_flat_top_breakout(all_bars_so_far, ecfg) if ecfg.enable_flat_top else None)
+            (detect_vwap_reclaim(all_bars_so_far, indicators, ecfg) if ecfg.enable_vwap_reclaim else None)      or
+            (detect_bull_flag(all_bars_so_far, indicators, ecfg) if ecfg.enable_bull_flag else None)            or
+            (detect_micro_pullback(all_bars_so_far, indicators, ecfg) if micro_pullback_ok else None)           or
+            (detect_abcd_pattern(all_bars_so_far, ecfg) if ecfg.enable_abcd else None)                         or
+            (detect_dip_buy(all_bars_so_far, indicators, ecfg) if ecfg.enable_dip_buy else None)                or
+            (detect_flat_top_breakout(all_bars_so_far, ecfg) if ecfg.enable_flat_top else None)                 or
+            # GAP-07/08/10: new patterns (lower priority — less data, narrower edge)
+            (detect_red_to_green(all_bars_so_far, indicators, ecfg) if ecfg.enable_red_to_green else None)     or
+            (detect_whole_dollar_break(all_bars_so_far, indicators, ecfg) if ecfg.enable_whole_dollar else None) or
+            (detect_opening_range_breakout(all_bars_so_far, indicators, ecfg) if ecfg.enable_orb else None)
         )
 
     if signal is None:

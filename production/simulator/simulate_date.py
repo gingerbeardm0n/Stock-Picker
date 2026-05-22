@@ -93,7 +93,7 @@ def main():
     )
     parser.add_argument('--date', type=str, help='Date (YYYY-MM-DD)')
     parser.add_argument('--account', type=float, default=5000, help='Starting account size')
-    parser.add_argument('--risk', type=float, default=2.0, help='Risk per trade (%)')
+    parser.add_argument('--risk', type=float, default=2.0, help='Risk per trade (percent)')
     parser.add_argument('--quiet', action='store_true', help='Suppress detailed output')
 
     args = parser.parse_args()

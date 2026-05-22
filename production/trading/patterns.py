@@ -608,10 +608,13 @@ def detect_dip_buy(bars: list[dict], indicators: dict,
         return None
 
     ema9 = indicators.get('ema9')
-    macd_histogram = indicators.get('macd_histogram')
+    # GAP-04 fix: use MACD line (EMA12 − EMA26), not the histogram.
+    # Histogram = MACD line − signal line, which can be negative even on a rising trend.
+    # MACD line > 0 confirms upward momentum; histogram > 0 only means faster than signal.
+    macd_line = indicators.get('macd_line')
 
     # Both indicators must be valid
-    if ema9 is None or macd_histogram is None:
+    if ema9 is None or macd_line is None:
         return None
 
     current = bars[-1]
@@ -626,8 +629,8 @@ def detect_dip_buy(bars: list[dict], indicators: dict,
     if current_price <= ema9:
         return None
 
-    # Trick 2: MACD histogram positive
-    if macd_histogram <= 0:
+    # Trick 2: MACD line positive (bullish momentum — EMA12 > EMA26)
+    if macd_line <= 0:
         return None
 
     # Trick 3: Light volume on last 2-3 pullback bars
@@ -661,7 +664,7 @@ def detect_dip_buy(bars: list[dict], indicators: dict,
 
     reasoning = (
         f"Dip Buy (3 Tricks): price ${current_price:.2f} > EMA9 ${ema9:.2f}, "
-        f"MACD hist {macd_histogram:.4f}, light vol pullback to ${dip_low:.2f}"
+        f"MACD line {macd_line:.4f}, light vol pullback to ${dip_low:.2f}"
     )
     return PatternSignal(
         pattern_type='DIP_BUY',
@@ -758,6 +761,240 @@ def detect_flat_top_breakout(bars: list[dict],
         pattern_type='FLAT_TOP',
         confidence=3,
         entry_price=entry,
+        stop_price=stop,
+        target1=target1,
+        target2=target2,
+        reasoning=reasoning,
+    )
+
+
+# ── 6. Red-to-Green ──────────────────────────────────────────────────────────
+
+def detect_red_to_green(
+    bars: list[dict],
+    indicators: dict,
+    config: EntryConfig | None = None,
+) -> PatternSignal | None:
+    """
+    Red-to-Green (RTG): stock was below prior close, then reclaims it on this bar.
+
+    Mechanics: prior close acts as resistance-turned-support; the cross triggers
+    short covering + fresh long entries → momentum surge.
+
+    Source: concept_front_side_back_side.md — 66.2% win rate / 71 trades.
+
+    Requires indicators['prior_close'] to be populated by evaluate_entry().
+
+    Entry : Current bar close (the reclaim bar)
+    Stop  : Low of the prior 2 bars, or prior_close − stop_buffer (whichever is lower)
+    """
+    cfg = config if config is not None else _DEFAULTS
+    prior_close = indicators.get('prior_close')
+    if prior_close is None or prior_close <= 0:
+        return None
+
+    if len(bars) < 5:
+        return None
+
+    current = bars[-1]
+    if not _is_green(current):
+        return None
+
+    current_price = _close(current)
+
+    # Must be above prior close now
+    if current_price <= prior_close:
+        return None
+
+    # At least one of the prior 3 bars must have closed below prior close
+    lookback = bars[-4:-1]
+    if not any(_close(b) < prior_close for b in lookback):
+        return None
+
+    # Stop: lower of (recent low − buffer) or (prior_close − buffer)
+    recent_low = min(_low(b) for b in lookback + [current])
+    stop = min(recent_low - cfg.stop_buffer * 0.5, prior_close - cfg.stop_buffer)
+
+    stop_dist = current_price - stop
+    if stop_dist <= 0.01:
+        return None
+
+    target1 = current_price + stop_dist * 2
+    target2 = current_price + stop_dist * 3
+
+    reasoning = (
+        f"Red-to-Green: crossed above prior close ${prior_close:.2f} "
+        f"from ${_close(lookback[-1]):.2f}, stop ${stop:.2f}"
+    )
+    return PatternSignal(
+        pattern_type='RED_TO_GREEN',
+        confidence=3,
+        entry_price=current_price,
+        stop_price=stop,
+        target1=target1,
+        target2=target2,
+        reasoning=reasoning,
+    )
+
+
+# ── 7. Whole Dollar Break ─────────────────────────────────────────────────────
+
+def detect_whole_dollar_break(
+    bars: list[dict],
+    indicators: dict,
+    config: EntryConfig | None = None,
+) -> PatternSignal | None:
+    """
+    Whole Dollar Break: price breaks and closes above a whole dollar level ($5, $6, ...).
+
+    Mechanics: whole-dollar levels are psychological magnets for resting orders;
+    a confirmed close above triggers short covers and momentum buyers.
+
+    Source: concept_entry_trigger_taxonomy.md — 64.3% win rate / 112 trades.
+
+    Entry : Current bar close (the break bar)
+    Stop  : The whole dollar level − stop_buffer (now acts as support)
+    """
+    cfg = config if config is not None else _DEFAULTS
+
+    if len(bars) < 4:
+        return None
+
+    current = bars[-1]
+    prev    = bars[-2]
+
+    if not _is_green(current):
+        return None
+
+    current_price = _close(current)
+    prev_price    = _close(prev)
+
+    # Whole dollar level just below current price
+    level = float(int(current_price))   # floor to nearest integer
+    if level <= 0:
+        return None
+
+    # Current bar must close above the level
+    if current_price <= level:
+        return None
+
+    # Previous bar must have closed at or below the level (fresh break this bar)
+    if prev_price > level:
+        return None
+
+    # Break must be close to the level — within 3% (not already extended)
+    if (current_price - level) / level > 0.03:
+        return None
+
+    stop      = level - cfg.stop_buffer
+    stop_dist = current_price - stop
+    if stop_dist <= 0.01:
+        return None
+
+    target1 = current_price + stop_dist * 2
+    target2 = float(int(current_price) + 1)   # next whole dollar as natural resistance
+
+    reasoning = (
+        f"Whole Dollar Break: close ${current_price:.2f} above ${level:.0f} "
+        f"(prev close ${prev_price:.2f}), stop ${stop:.2f}"
+    )
+    return PatternSignal(
+        pattern_type='WHOLE_DOLLAR',
+        confidence=3,
+        entry_price=current_price,
+        stop_price=stop,
+        target1=target1,
+        target2=target2,
+        reasoning=reasoning,
+    )
+
+
+# ── 8. Opening Range Breakout (ORB) ──────────────────────────────────────────
+
+def detect_opening_range_breakout(
+    bars: list[dict],
+    indicators: dict,
+    config: EntryConfig | None = None,
+) -> PatternSignal | None:
+    """
+    Opening Range Breakout (ORB): price breaks above the high of the first 5 bars
+    after market open (9:30–9:34 ET).
+
+    Mechanics: the first 5 minutes of trading establish a congestion zone;
+    a close above that zone triggers directional momentum from both shorts
+    covering and fresh buyers.
+
+    Source: concept_time_of_day.md — 70.8% win rate / 48 trades.
+
+    Entry : Current bar close (the breakout bar)
+    Stop  : Opening range low − stop_buffer
+    """
+    import pytz as _pytz
+    _ET = _pytz.timezone('America/New_York')
+
+    cfg = config if config is not None else _DEFAULTS
+
+    if len(bars) < 6:
+        return None
+
+    # Identify market-hours bars (9:30 AM ET onwards)
+    market_bars = []
+    for b in bars:
+        t = b.get('time')
+        if t is None or not hasattr(t, 'astimezone'):
+            continue
+        t_et = t.astimezone(_ET)
+        if t_et.hour > 9 or (t_et.hour == 9 and t_et.minute >= 30):
+            market_bars.append(b)
+
+    if len(market_bars) < 6:
+        return None   # Need opening range bars + at least 1 breakout bar
+
+    # Opening range = first 5 market-open bars
+    or_bars = market_bars[:5]
+    or_high = max(_high(b) for b in or_bars)
+    or_low  = min(_low(b) for b in or_bars)
+
+    current    = bars[-1]
+    prev       = bars[-2]
+
+    if not _is_green(current):
+        return None
+
+    current_price = _close(current)
+    prev_price    = _close(prev)
+
+    # Current bar closes above OR high
+    if current_price <= or_high:
+        return None
+
+    # Previous bar did NOT close above OR high (fresh break this bar)
+    if prev_price > or_high:
+        return None
+
+    # Must not be extended — within 5% above OR high
+    if (current_price - or_high) / or_high > 0.05:
+        return None
+
+    stop      = or_low - cfg.stop_buffer
+    stop_dist = current_price - stop
+
+    if stop_dist <= 0.01:
+        return None
+    if stop_dist > current_price * 0.15:   # Stop too wide (>15% of price) — skip
+        return None
+
+    target1 = current_price + stop_dist * 2
+    target2 = current_price + stop_dist * 3
+
+    reasoning = (
+        f"ORB: close ${current_price:.2f} above opening range high ${or_high:.2f} "
+        f"(OR: ${or_low:.2f}–${or_high:.2f}), stop ${stop:.2f}"
+    )
+    return PatternSignal(
+        pattern_type='ORB',
+        confidence=3,
+        entry_price=current_price,
         stop_price=stop,
         target1=target1,
         target2=target2,
@@ -962,10 +1199,10 @@ def explain_pattern_rejection(
         if len(bars) < 8:
             return f'too_few_bars({len(bars)}<8)'
         ema9 = indicators.get('ema9')
-        macd_histogram = indicators.get('macd_histogram')
+        macd_line = indicators.get('macd_line')
         if ema9 is None:
             return 'no_ema_indicator'
-        if macd_histogram is None:
+        if macd_line is None:
             return 'no_macd_indicator'
         current = bars[-1]
         if not _is_green(current):
@@ -973,8 +1210,8 @@ def explain_pattern_rejection(
         current_price = _close(current)
         if current_price <= ema9:
             return f'price_below_ema9(price={current_price:.2f} ema9={ema9:.2f})'
-        if macd_histogram <= 0:
-            return f'macd_negative(histogram={macd_histogram:.4f})'
+        if macd_line <= 0:
+            return f'macd_line_negative(macd_line={macd_line:.4f})'
         pullback_bars = bars[-4:-1]
         if len(pullback_bars) < 2:
             return f'too_few_pullback_bars({len(pullback_bars)}<2)'
