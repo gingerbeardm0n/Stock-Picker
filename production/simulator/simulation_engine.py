@@ -862,17 +862,34 @@ class SimulationRunner:
                 if in_trading_window else []
             )
             if symbols_need_query and self._db:
-                try:
-                    if self.debug:
-                        self._stats['rel_vol_batch_calls'] += 1
-                    avg_vols = self._db.get_avg_volume_at_time_batch(
-                        symbols_need_query, self.date,
-                        et_time.hour, et_time.minute,
-                        lookback_days=20,
-                        include_premarket_hourly=True,
-                    )
-                except Exception:
-                    pass  # Graceful degradation — rel_vol will be 0 for these
+                # Check in-process avg_vols cache first (keyed by minute-of-day).
+                # Candidates are determined by hardcoded price/gain criteria, so the
+                # same symbol set appears at each minute across all Optuna trials —
+                # the DB result is safe to reuse without re-querying.
+                minute_key = et_time.hour * 60 + et_time.minute
+                day_avg_cache = None
+                if self.cache_data and self.date in _DATA_CACHE:
+                    day_avg_cache = _DATA_CACHE[self.date].setdefault('avg_vols_by_minute', {})
+                    cached_avgs = day_avg_cache.get(minute_key)
+                    if cached_avgs is not None:
+                        avg_vols = cached_avgs
+                        symbols_need_query = []  # All served from cache
+
+                if symbols_need_query:
+                    try:
+                        if self.debug:
+                            self._stats['rel_vol_batch_calls'] += 1
+                        avg_vols = self._db.get_avg_volume_at_time_batch(
+                            symbols_need_query, self.date,
+                            et_time.hour, et_time.minute,
+                            lookback_days=20,
+                            include_premarket_hourly=True,
+                        )
+                        # Store in cache for subsequent trials.
+                        if day_avg_cache is not None:
+                            day_avg_cache[minute_key] = avg_vols
+                    except Exception:
+                        pass  # Graceful degradation — rel_vol will be 0 for these
 
         # ── Step 3: Full entry evaluation for remaining candidates ─────────────
         best_signal = None
