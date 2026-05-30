@@ -10,7 +10,6 @@ COLD is the safe default; HOT/NEUTRAL are activated by evidence at 9:15 AM ET.
 
 Temperature drives:
     max_position_pct        — how large positions can be
-    max_trades_per_day      — how many completed trades allowed
     session_stop_hour/min   — hard stop for new entries (and force-close open positions)
     daily_loss_limit_pct    — max daily loss before halt
     consecutive_loss_stop   — consecutive losses before upgrading to CHOP
@@ -72,7 +71,6 @@ class TemperatureState:
     # ── Derived trading parameters (set by _apply_params) ─────────────────────
     # These mirror the SimulationRunner fields they override each minute.
     max_position_pct: float = 10.0        # % of account per position
-    max_trades_per_day: int = 3
     session_stop_hour: int = 10           # Hard stop hour (ET)
     session_stop_minute: int = 30         # Hard stop minute (ET)
     daily_loss_limit_pct: float = 1.5
@@ -86,7 +84,6 @@ class TemperatureState:
 _PARAMS: dict[Temperature, dict] = {
     Temperature.HOT: {
         'max_position_pct':     20.0,
-        'max_trades_per_day':   10,
         'session_stop_hour':    12,
         'session_stop_minute':  0,
         'daily_loss_limit_pct': 3.0,
@@ -95,7 +92,6 @@ _PARAMS: dict[Temperature, dict] = {
     },
     Temperature.NEUTRAL: {
         'max_position_pct':     15.0,
-        'max_trades_per_day':   5,
         'session_stop_hour':    11,
         'session_stop_minute':  0,
         'daily_loss_limit_pct': 2.0,
@@ -104,7 +100,6 @@ _PARAMS: dict[Temperature, dict] = {
     },
     Temperature.COLD: {
         'max_position_pct':     10.0,
-        'max_trades_per_day':   3,
         'session_stop_hour':    10,
         'session_stop_minute':  30,
         'daily_loss_limit_pct': 1.5,
@@ -113,7 +108,6 @@ _PARAMS: dict[Temperature, dict] = {
     },
     Temperature.CHOP: {
         'max_position_pct':     5.0,
-        'max_trades_per_day':   1,
         'session_stop_hour':    10,
         'session_stop_minute':  0,
         'daily_loss_limit_pct': 1.0,
@@ -145,7 +139,6 @@ def _apply_params(state: TemperatureState, cfg) -> None:
         return table_val
 
     state.max_position_pct      = _pick('max_position_pct',     f'{state.temperature.value.lower()}_max_position_pct')
-    state.max_trades_per_day    = _pick('max_trades_per_day',    f'{state.temperature.value.lower()}_max_trades')
     state.session_stop_hour     = base['session_stop_hour']
     state.session_stop_minute   = base['session_stop_minute']
     state.daily_loss_limit_pct  = base['daily_loss_limit_pct']

@@ -13,7 +13,31 @@
       "Bash(tasklist /FI \"IMAGENAME eq python.exe\")",
       "Bash(sqlite3 optimizer/robust_results.db \".schema\")",
       "Bash(./venv/Scripts/python:*)",
-      "Bash(du -sh analysis/*)"
+      "Bash(du -sh analysis/*)",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "Bash(wc -l /c/Repositories/Stock-Picker/production/**/*.py)",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(tasklist //FI \"IMAGENAME eq python.exe\")",
+      "Bash(grep -i \"TIMESCALE_CONNECTION\" .env*)",
+      "Read(//tmp/**)",
+      "Bash(python:*)",
+      "Bash(.venv/Scripts/python.exe research/maintenance/diagnostics/open_of_day_analysis.py)",
+      "WebFetch(domain:forum.alpaca.markets)",
+      "WebFetch(domain:www.reddit.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(tasklist)",
+      "WebFetch(domain:polygon.io)",
+      "WebFetch(domain:massive.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.oreateai.com)",
+      "WebFetch(domain:www.ksred.com)",
+      "WebFetch(domain:konstantinmb.medium.com)",
+      "WebFetch(domain:medium.datadriveninvestor.com)",
+      "WebFetch(domain:point276.substack.com)",
+      "WebFetch(domain:analyzingalpha.com)",
+      "WebFetch(domain:www.trustpilot.com)",
+      "Bash(psql -h localhost -U postgres -d stockdata -c \"SELECT 1;\")"
     ]
   }
 }

@@ -15,6 +15,8 @@ Usage:
     from trading.trading_engine import Trade, PositionManager
 """
 
+from trading.sizing import compute_shares, FLOAT_BUCKET_CAPS
+
 
 class Trade:
     """Represents a single completed (or open) trade."""
@@ -104,18 +106,10 @@ class Trade:
 class PositionManager:
     """Manages capital, open position, and daily risk rules."""
 
-    # GAP-11: Float-bucket hard caps on position value.
-    # Source: concept_position_sizing.md §3 + concept_float_analysis.md.
-    # Low-float stocks need smaller positions: spreads widen fast, thin books cause
-    # outsized slippage losses. Upper buckets (3M-20M) added in GAP-N.
-    # The scanner already blocks float > 20M, so no 20M+ entry needed.
-    # List must be ascending — loop breaks on first match.
-    FLOAT_BUCKET_CAPS = [
-        (1_000_000,  5_000.0),   # sub-1M float   → hard cap $5K  (2K-5K shares @ $1-$2.50)
-        (3_000_000, 15_000.0),   # 1M–3M float    → hard cap $15K (3K-15K shares @ $1-$5)
-        (10_000_000, 8_000.0),   # 3M–10M float   → hard cap $8K  (concept: ≤9K shares; tighter spread)
-        (20_000_000, 5_000.0),   # 10M–20M float  → hard cap $5K  (concept: ≤5K shares; smaller edge)
-    ]
+    # GAP-11: Float-bucket hard caps on position value. Single source of truth now
+    # lives in trading.sizing.FLOAT_BUCKET_CAPS (used by sizing.compute_shares, which
+    # both the sim and live brokers call). Kept as a class attr for backward compat.
+    FLOAT_BUCKET_CAPS = FLOAT_BUCKET_CAPS
 
     def __init__(self, account_size, risk_per_trade_pct=2.0,
                  daily_max_loss_pct=3.0, max_position_pct=1.5):
@@ -151,38 +145,21 @@ class PositionManager:
         if not self.can_enter_trade():
             return None
 
-        stop_distance = entry_price - stop_loss_price
-        if stop_distance <= 0:
-            return None
-
-        # Combined size multiplier: GAP-16 (first-loss-today) × GAP-14 (stop-out cooldown)
-        # Applied uniformly to both risk-based and cap-based share calculations so the
-        # binding constraint always produces a proportional reduction.
-        gap16_mult = 0.5 if self._had_loss_today else 1.0
-        total_mult = gap16_mult * size_multiplier   # size_multiplier carries GAP-14 reduction
-
-        risk_per_trade = self.current_balance * (self.risk_per_trade_pct / 100.0)
-        risk_based_shares = int(risk_per_trade / stop_distance)
-
-        max_position_value = self.current_balance * (self.max_position_pct / 100.0)
-
-        # GAP-11: apply float-bucket hard cap on max_position_value
-        if float_shares is not None:
-            for bucket_float, cap_dollars in self.FLOAT_BUCKET_CAPS:
-                if float_shares < bucket_float:
-                    max_position_value = min(max_position_value, cap_dollars)
-                    break
-
-        max_position_shares = int(max_position_value / entry_price)
-
-        shares = int(min(risk_based_shares, max_position_shares) * total_mult)
+        # Sizing is delegated to trading.sizing.compute_shares — the single source of
+        # truth shared by the sim broker and the live broker (proven identical to the
+        # original inline math by test_sizing.py). GAP-11/14/16 all live in there.
+        shares = compute_shares(
+            entry_price=entry_price,
+            stop_loss_price=stop_loss_price,
+            current_balance=self.current_balance,
+            risk_pct=self.risk_per_trade_pct,
+            max_position_pct=self.max_position_pct,
+            float_shares=float_shares,
+            size_multiplier=size_multiplier,
+            had_loss_today=self._had_loss_today,
+        )
         if shares <= 0:
             return None
-
-        if shares * entry_price > self.current_balance:
-            shares = int(self.current_balance / entry_price * total_mult)
-            if shares <= 0:
-                return None
 
         self.position = Trade(
             symbol=symbol,
@@ -227,9 +204,13 @@ class PositionManager:
             self.position = None
         else:
             pos.scale_out(qty, price, exit_signal.reason, current_time)
-            self.current_balance += pnl
-            if pnl < 0:
-                self.daily_loss += abs(pnl)
+            # H1 FIX: do NOT realize P&L incrementally on partial scale-outs.
+            # current_balance / daily_loss are realized ONCE at trade completion via
+            # get_pnl() (the full_close branch above, or the fully-scaled close below).
+            # The old `current_balance += pnl` here was ALSO included by get_pnl() when
+            # the remainder later closed via full_close → the partial was counted twice
+            # (inflated current_balance → inflated avg_daily_pnl reporting). The per-fill
+            # `pnl` is still returned below for callers, just not summed into the balance.
 
             # GAP-03: mark T1 hit so add-on engine knows a partial has been taken
             if exit_signal.reason in ('TARGET_1', 'TARGET_1_COLD'):
@@ -244,8 +225,13 @@ class PositionManager:
             if pos.shares_remaining == 0:
                 pos.close_position(price, 'FULLY_SCALED', current_time)
                 self.trades_completed.append(pos)
-                # Check full-trade P&L for the GAP-16 loss flag
-                if pos.get_pnl() < 0:
+                # Realize the full trade P&L exactly once (mirrors the full_close branch).
+                # Previously this branch never updated current_balance/daily_loss at all,
+                # relying on the now-removed incremental partial adds.
+                trade_pnl = pos.get_pnl()
+                self.current_balance += trade_pnl
+                if trade_pnl < 0:
+                    self.daily_loss += abs(trade_pnl)
                     self._had_loss_today = True
                 self.position = None
 

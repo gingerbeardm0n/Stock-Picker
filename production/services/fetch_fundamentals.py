@@ -35,7 +35,7 @@ DB_CONN = os.getenv('TIMESCALE_CONNECTION_STRING',
 FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', '')
 FINNHUB_URL = 'https://finnhub.io/api/v1/stock/profile2'
 
-STOCKS_FILE = os.path.join(os.path.dirname(__file__), '../database/stocks_1_to_20.txt')
+STOCKS_FILE = os.path.join(os.path.dirname(__file__), 'stocks_in_price_range.txt')
 CALLS_PER_MIN = 55          # Stay safely under free tier's 60/min limit
 SLEEP_BETWEEN = 60 / CALLS_PER_MIN  # ~1.09 seconds per call
 

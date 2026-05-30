@@ -32,6 +32,9 @@ import argparse
 import json
 import logging
 import sqlite3
+import threading
+import time
+import traceback as _traceback
 
 try:
     import optuna
@@ -44,6 +47,46 @@ from optimizer.run_config import RunConfig
 from optimizer.results_db import init_db, write_run
 from optimizer.simulate_one import run_date_range
 from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig
+
+
+# ── Heartbeat monitor ─────────────────────────────────────────────────────────
+
+class _Heartbeat:
+    """Background thread that prints a status line every `interval` seconds.
+
+    Shows: elapsed time, current trial number, and the last date processed.
+    Lets you distinguish "slow but working" from "truly hung".
+    """
+    def __init__(self, interval: int = 30):
+        self.interval = interval
+        self.trial_num: int = 0
+        self.last_date: str = '?'
+        self.days_done: int = 0
+        self._t0 = time.time()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def start(self):
+        self._thread.start()
+
+    def stop(self):
+        self._stop.set()
+
+    def update(self, trial_num: int, date: str, days_done: int):
+        self.trial_num = trial_num
+        self.last_date = date
+        self.days_done = days_done
+
+    def _run(self):
+        while not self._stop.wait(self.interval):
+            elapsed = int(time.time() - self._t0)
+            m, s = divmod(elapsed, 60)
+            print(
+                f"\n  [heartbeat] {m:02d}:{s:02d} elapsed | "
+                f"trial {self.trial_num} | last date: {self.last_date} "
+                f"({self.days_done} days done)",
+                flush=True,
+            )
 
 
 # ── Adaptive trend controller ─────────────────────────────────────────────────
@@ -547,6 +590,16 @@ def _make_objective(
             )
         cfg = _build_config_from_trial(trial, mode=mode, disable_relative_volume=disable_relative_volume, locked_params=trial_locked)
 
+        _hb = objective._heartbeat  # attached externally by run_optuna
+        _days_done = [0]
+
+        def _day_tick(date: str):
+            _days_done[0] += 1
+            if _hb is not None:
+                _hb.update(trial.number, date, _days_done[0])
+
+        t_start = time.time()
+        is_first_trial = (trial.number == 0)
         try:
             result = run_date_range(
                 cfg,
@@ -557,9 +610,16 @@ def _make_objective(
                 cache_data=cache_data,
                 cache_dir=cache_dir,
                 symbol_universe=symbol_universe,
+                on_day_complete=_day_tick,
+                print_dates=is_first_trial,  # only trial 0: full per-day progress
+                # Abort dead configs fast: if 0 trades after 20 data-days, skip rest.
+                # Cuts ~80% of dead-trial time from ~130s → ~14s per pruned trial.
+                early_abort_days=20,
             )
         except Exception as e:
-            print(f"  Trial {trial.number} ERROR: {e}")
+            elapsed = time.time() - t_start
+            print(f"\n  Trial {trial.number} ERROR after {elapsed:.1f}s: {e}", flush=True)
+            _traceback.print_exc()
             return -999.0
 
         if result['total_trades'] == 0:
@@ -572,6 +632,7 @@ def _make_objective(
 
         return result['objective']
 
+    objective._heartbeat = None  # type: ignore[attr-defined]  # set externally after creation
     return objective
 
 
@@ -686,15 +747,22 @@ def run_optuna(
     if n_remaining == 0:
         print("All trials already complete.")
     else:
-        study.optimize(
-            _make_objective(
-                start_date, end_date, results_conn, mode, debug, cache_data,
-                disable_relative_volume, cache_dir, symbol_universe, locked_params,
-                adaptive_trend_controller,
-            ),
-            n_trials=n_remaining,
-            show_progress_bar=True,
+        heartbeat = _Heartbeat(interval=30)
+        obj_fn = _make_objective(
+            start_date, end_date, results_conn, mode, debug, cache_data,
+            disable_relative_volume, cache_dir, symbol_universe, locked_params,
+            adaptive_trend_controller,
         )
+        obj_fn._heartbeat = heartbeat  # type: ignore[attr-defined]
+        heartbeat.start()
+        try:
+            study.optimize(
+                obj_fn,
+                n_trials=n_remaining,
+                show_progress_bar=True,
+            )
+        finally:
+            heartbeat.stop()
 
     best = study.best_trial
     print(f"\n{'='*60}")

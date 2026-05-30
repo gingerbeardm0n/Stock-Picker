@@ -2,31 +2,42 @@
 """
 Optimized Historical Data Backfill with Hybrid Time-Window Filtering
 Collects the data needed for accurate Ross Cameron relative volume calculation:
-- 5-minute bars: 4am-8am (premarket session, low noise)
 - 1-minute bars: 8am-12pm (full trading morning, precise signals)
-- Hour bars: All day 4am-8pm (premarket + afternoon + after-hours)
-- Daily bars: 60 days for volume calculations
+- Hour bars: 4am-8am (premarket session, low noise)
+- Daily bars: for volume calculations
 
 For 4,000 stocks over 12 months (252 trading days):
-- 5-min storage: ~25 GB (48 bars/day × 4000 × 252 days)
 - 1-min storage: ~50 GB (240 bars/day × 4000 × 252 days)
-- Hour storage: ~25 GB (16 bars/day × 4000 × 252 days)
+- Hour storage: ~25 GB (4 bars/day × 4000 × 252 days)
 - Daily storage: ~5 GB (252 bars × 4000 symbols)
-- Total: ~105 GB (4am-12pm window only)
-- Time: 5-10 days (parallel batching)
 - ON CONFLICT DO NOTHING: safe to re-run, won't duplicate existing data
+
+Usage:
+    # Backfill a specific date range:
+    python production/data/backfill/backfill_optimized.py --start 2023-01-01 --end 2024-12-31
+
+    # Backfill last N calendar days from today:
+    python production/data/backfill/backfill_optimized.py --days 90
+
+    # Interactive menu (no flags):
+    python production/data/backfill/backfill_optimized.py
+
+Prerequisites:
+    tradable_stocks_by_date must be populated for the date range.
+    Run first: python research/database_analysis/historical_tradable_stocks.py --start 2023-01-01 --end 2024-12-31
 """
 
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
+import argparse
 import psycopg2
 from psycopg2.extras import execute_values
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as date_type
 from config import Config
 from dotenv import load_dotenv
 from utils.query_helpers import StockDataDB
@@ -52,13 +63,29 @@ PROGRESS_FILE = os.path.join(os.path.dirname(__file__), 'backfill_optimized_prog
 # Trading hours in ET
 ET = pytz.timezone('US/Eastern')
 
-# Premarket: 5-minute bars (lower noise, adequate for EMA seeding)
-FIVEMIN_WINDOW_START = 4   # 4am ET
-FIVEMIN_WINDOW_END   = 8   # 8am ET
+# Premarket: hour bars (lower noise, adequate for EMA seeding)
+HOUR_WINDOW_START = 4   # 4am ET
+HOUR_WINDOW_END   = 8   # 8am ET
 
 # Trading morning: 1-minute bars (precise signals for entry/exit)
 ONEMIN_WINDOW_START = 8    # 8am ET
 ONEMIN_WINDOW_END   = 12   # 12pm ET (noon)
+
+# Flush accumulated bars to DB every N days to keep RAM under control.
+# At ~200k bars/day for 3000 symbols, 20 days ≈ 4M rows ≈ ~1 GB peak RAM.
+FLUSH_EVERY = 20
+
+
+def get_trading_days(start_date: date_type, end_date: date_type) -> list[date_type]:
+    """Return list of weekday dates between start_date and end_date inclusive."""
+    days = []
+    current = start_date
+    while current <= end_date:
+        if current.weekday() < 5:  # Monday–Friday
+            days.append(current)
+        current += timedelta(days=1)
+    return days
+
 
 def load_progress():
     """Load progress from file"""
@@ -69,14 +96,95 @@ def load_progress():
         'completed_windows': [],
         'failed_batches': [],
         'total_inserted': 0,
-        'last_updated': None
+        'last_updated': None,
+        'last_heartbeat': None,
     }
 
 def save_progress(progress):
-    """Save progress to file"""
-    progress['last_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    """Save progress to file + update heartbeat timestamp."""
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    progress['last_updated'] = now
+    progress['last_heartbeat'] = now
     with open(PROGRESS_FILE, 'w') as f:
         json.dump(progress, f, indent=2)
+
+
+def print_status(start_date=None, end_date=None):
+    """
+    Print a human-readable status report from the progress file.
+    Pass start/end to also show what percentage of a planned range is done.
+    """
+    progress = load_progress()
+
+    dates_1min = progress.get('completed_dates_1min', [])
+    dates_hour = progress.get('completed_dates_hour', [])
+    last_heartbeat = progress.get('last_heartbeat') or progress.get('last_updated')
+    total_inserted = progress.get('total_inserted', 0)
+
+    print("\n" + "=" * 60)
+    print("  BACKFILL STATUS")
+    print("=" * 60)
+
+    # Heartbeat / alive check
+    if last_heartbeat:
+        from datetime import datetime as _dt
+        try:
+            hb = _dt.strptime(last_heartbeat, '%Y-%m-%d %H:%M:%S')
+            age_min = (_dt.now() - hb).total_seconds() / 60
+            alive = "✅ LIKELY RUNNING" if age_min < 10 else (
+                    "⚠️  STALLED?" if age_min < 60 else "❌ PROBABLY STOPPED")
+            print(f"  Last heartbeat : {last_heartbeat}  ({age_min:.0f} min ago)  {alive}")
+        except ValueError:
+            print(f"  Last heartbeat : {last_heartbeat}")
+    else:
+        print("  Last heartbeat : never (not started)")
+
+    print(f"  Total rows DB  : {total_inserted:,}")
+    print()
+
+    # 1-min progress
+    if dates_1min:
+        print(f"  1-MIN bars  : {len(dates_1min)} days completed")
+        print(f"    First : {dates_1min[0]}")
+        print(f"    Last  : {dates_1min[-1]}")
+    else:
+        print("  1-MIN bars  : 0 days completed")
+
+    # Hour progress
+    if dates_hour:
+        print(f"  HOUR bars   : {len(dates_hour)} days completed")
+        print(f"    First : {dates_hour[0]}")
+        print(f"    Last  : {dates_hour[-1]}")
+    else:
+        print("  HOUR bars   : 0 days completed")
+
+    # Coverage vs planned range
+    if start_date and end_date:
+        from datetime import date as _date
+        s = _date.fromisoformat(str(start_date))
+        e = _date.fromisoformat(str(end_date))
+        planned = get_trading_days(s, e)
+        planned_set = {str(d) for d in planned}
+        done_1min = len([d for d in dates_1min if d in planned_set])
+        done_hour = len([d for d in dates_hour if d in planned_set])
+        total = len(planned)
+        pct_1min = done_1min / total * 100 if total else 0
+        pct_hour = done_hour / total * 100 if total else 0
+        print()
+        print(f"  Range coverage ({start_date} to {end_date},  {total} trading days):")
+        print(f"    1-min : {done_1min}/{total}  ({pct_1min:.1f}%)")
+        print(f"    hour  : {done_hour}/{total}  ({pct_hour:.1f}%)")
+        # Find first missing date for each type
+        done_1min_set = set(dates_1min)
+        done_hour_set = set(dates_hour)
+        missing_1min = [d for d in planned if str(d) not in done_1min_set]
+        missing_hour = [d for d in planned if str(d) not in done_hour_set]
+        if missing_1min:
+            print(f"    Next 1-min needed : {missing_1min[0]}")
+        if missing_hour:
+            print(f"    Next hour  needed : {missing_hour[0]}")
+
+    print("=" * 60 + "\n")
 
 def reset_progress():
     """Clear progress file"""
@@ -94,449 +202,294 @@ def load_symbols_from_file(filepath):
         with open(filepath, 'r') as f:
             return [line.strip() for line in f if line.strip()]
 
-def backfill_5min_bars_premarket(symbols, batch_num, total_batches, days_back, progress):
-    """Backfill 5-minute bars for 4am-8am premarket window using per-day datetime filtering"""
 
-    window_key = f"5min_4to8_batch_{batch_num}"
-    if window_key in progress['completed_windows']:
-        logger.info(f"[SKIP] Batch {batch_num} already completed (5-min premarket)")
+def _flush_to_db(cursor, conn, values: list, table: str) -> int:
+    """Insert accumulated bar rows and return count inserted."""
+    if not values:
         return 0
-
-    logger.info(f"\n{'='*70}")
-    logger.info(f"5-MINUTE BARS (4am-8am Premarket) - Batch {batch_num}/{total_batches}")
-    logger.info(f"{'='*70}")
-    logger.info(f"Fetching {len(symbols)} symbols, {days_back} days (per-day API calls)")
-
-    client = StockHistoricalDataClient(
-        Config.ALPACA_API_KEY,
-        Config.ALPACA_SECRET_KEY
+    execute_values(
+        cursor,
+        f"""
+        INSERT INTO {table}
+            (time, symbol, open, high, low, close, volume, trade_count, vwap)
+        VALUES %s
+        ON CONFLICT (time, symbol) DO NOTHING
+        """,
+        values,
+        page_size=10_000,
     )
+    conn.commit()
+    return len(values)
 
-    conn = psycopg2.connect(DB_CONN)
-    cursor = conn.cursor()
 
-    all_values = []
-    total_api_calls = 0
+def backfill_1min_bars_trading(trading_days: list[date_type], batch_num, total_batches, progress):
+    """
+    Backfill 1-minute bars for 8am-12pm trading window.
+    Flushes to DB every FLUSH_EVERY days to keep RAM bounded.
+    Tracks completed dates individually so restarts resume mid-range.
+    """
+    # Skip days already completed in a previous run
+    completed_dates = set(progress.get('completed_dates_1min', []))
+    remaining = [d for d in trading_days if str(d) not in completed_dates]
 
-    try:
-        # Fetch each day separately with exact 4am-8am time window
-        for day_offset in range(days_back):
-            current_date = datetime.now(ET).date() - timedelta(days=day_offset)
-
-            # Create datetime for 4:00 AM ET that day
-            start_dt = ET.localize(datetime.combine(current_date, datetime.min.time().replace(hour=FIVEMIN_WINDOW_START, minute=0)))
-
-            # Create datetime for 8:00 AM ET that day
-            end_dt = ET.localize(datetime.combine(current_date, datetime.min.time().replace(hour=FIVEMIN_WINDOW_END, minute=0)))
-
-            # Skip weekends (Saturday=5, Sunday=6)
-            if current_date.weekday() >= 5:
-                continue
-
-            # Skip future dates
-            if current_date > datetime.now(ET).date():
-                continue
-
-            # GET DAILY-ACCURATE STOCKS FROM DATABASE
-            try:
-                with StockDataDB() as db:
-                    db_cursor = db.conn.cursor()
-                    db_cursor.execute("""
-                        SELECT symbol FROM tradable_stocks_by_date
-                        WHERE date = %s ORDER BY symbol
-                    """, (current_date,))
-                    symbols_for_day = [row[0] for row in db_cursor.fetchall()]
-                    db_cursor.close()
-            except Exception as db_error:
-                logger.warning(f"  [WARN] Failed to fetch stocks for {current_date} from database: {db_error}")
-                continue
-
-            if not symbols_for_day:
-                logger.debug(f"  [SKIP] No stocks in database for {current_date.strftime('%Y-%m-%d')}")
-                continue
-
-            try:
-                # DEBUG: Log exactly what we're sending to the API
-                if day_offset == 0:  # Only log first day to avoid spam
-                    logger.info(f"  [DEBUG] Requesting 5-minute data:")
-                    logger.info(f"    Start (EST): {start_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-                    logger.info(f"    Start (UTC): {start_dt.astimezone(pytz.utc).strftime('%Y-%m-%d %H:%M:%S %Z')}")
-                    logger.info(f"    End (EST):   {end_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-                    logger.info(f"    End (UTC):   {end_dt.astimezone(pytz.utc).strftime('%Y-%m-%d %H:%M:%S %Z')}")
-
-                request = StockBarsRequest(
-                    symbol_or_symbols=symbols_for_day,
-                    timeframe=TimeFrame.Minute,
-                    start=start_dt,
-                    end=end_dt
-                )
-
-                bars_response = client.get_stock_bars(request)
-                total_api_calls += 1
-
-                # Collect values from this day
-                for symbol, bars in bars_response.data.items():
-                    for bar in bars:
-                        all_values.append((
-                            bar.timestamp,
-                            symbol,
-                            float(bar.open),
-                            float(bar.high),
-                            float(bar.low),
-                            float(bar.close),
-                            int(bar.volume),
-                            int(bar.trade_count) if bar.trade_count else None,
-                            float(bar.vwap) if bar.vwap else None
-                        ))
-
-                # Small delay between API calls
-                time.sleep(0.5)
-
-                if (day_offset + 1) % 5 == 0:
-                    logger.info(f"  Progress: {day_offset + 1}/{days_back} days, {total_api_calls} API calls, {len(all_values):,} bars collected")
-
-            except Exception as day_error:
-                logger.warning(f"  [WARN] Failed to fetch {current_date}: {day_error}")
-                continue
-
-        # Insert all collected values into 1m table (same table, different time window)
-        if all_values:
-            execute_values(
-                cursor,
-                """
-                INSERT INTO stock_candles_1m
-                    (time, symbol, open, high, low, close, volume, trade_count, vwap)
-                VALUES %s
-                ON CONFLICT (time, symbol) DO NOTHING
-                """,
-                all_values
-            )
-
-            conn.commit()
-            logger.info(f"[SUCCESS] Made {total_api_calls} API calls (per-day filtering)")
-            logger.info(f"          Inserted {len(all_values):,} candles into stock_candles_1m (4am-8am premarket)")
-        else:
-            logger.warning(f"[WARNING] No data collected")
-
-        cursor.close()
-        conn.close()
-
-        # Mark as completed
-        progress['completed_windows'].append(window_key)
-        progress['total_inserted'] += len(all_values)
-        save_progress(progress)
-
-        return len(all_values)
-
-    except Exception as e:
-        logger.error(f"[ERROR] Batch {batch_num} (5-min premarket) failed: {e}")
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-        progress['failed_batches'].append({
-            'window': window_key,
-            'symbols': symbols,
-            'error': str(e)
-        })
-        save_progress(progress)
-        return 0
-
-def backfill_1min_bars_trading(symbols, batch_num, total_batches, days_back, progress):
-    """Backfill 1-minute bars for 8am-12pm trading window using per-day datetime filtering"""
-
-    window_key = f"1min_8to12_batch_{batch_num}"
-    if window_key in progress['completed_windows']:
-        logger.info(f"[SKIP] Batch {batch_num} already completed (1-min trading)")
+    if not remaining:
+        logger.info("[SKIP] All 1-min days already completed")
         return 0
 
     logger.info(f"\n{'='*70}")
     logger.info(f"1-MINUTE BARS (8am-12pm Trading) - Batch {batch_num}/{total_batches}")
     logger.info(f"{'='*70}")
-    logger.info(f"Fetching {len(symbols)} symbols, {days_back} days (per-day API calls)")
+    logger.info(f"{len(remaining)} days to process "
+                f"({len(completed_dates)} already done, skipped)")
 
     client = StockHistoricalDataClient(
         Config.ALPACA_API_KEY,
         Config.ALPACA_SECRET_KEY
     )
 
-    conn = psycopg2.connect(DB_CONN)
+    conn   = psycopg2.connect(DB_CONN)
     cursor = conn.cursor()
 
-    all_values = []
+    pending      = []   # bars accumulated since last flush
+    total_inserted = 0
     total_api_calls = 0
 
     try:
-        # Fetch each day separately with exact 8am-12pm time window
-        for day_offset in range(days_back):
-            current_date = datetime.now(ET).date() - timedelta(days=day_offset)
+        for idx, current_date in enumerate(remaining):
+            start_dt = ET.localize(datetime.combine(
+                current_date,
+                datetime.min.time().replace(hour=ONEMIN_WINDOW_START)
+            ))
+            end_dt = ET.localize(datetime.combine(
+                current_date,
+                datetime.min.time().replace(hour=ONEMIN_WINDOW_END)
+            ))
 
-            # Create datetime for 8:00 AM ET that day
-            start_dt = ET.localize(datetime.combine(current_date, datetime.min.time().replace(hour=ONEMIN_WINDOW_START, minute=0)))
-
-            # Create datetime for 12:00 PM ET that day
-            end_dt = ET.localize(datetime.combine(current_date, datetime.min.time().replace(hour=ONEMIN_WINDOW_END, minute=0)))
-
-            # Skip weekends (Saturday=5, Sunday=6)
-            if current_date.weekday() >= 5:
-                continue
-
-            # Skip future dates
-            if current_date > datetime.now(ET).date():
-                continue
-
-            # GET DAILY-ACCURATE STOCKS FROM DATABASE
+            # Get symbol list for this day
             try:
                 with StockDataDB() as db:
                     db_cursor = db.conn.cursor()
-                    db_cursor.execute("""
-                        SELECT symbol FROM tradable_stocks_by_date
-                        WHERE date = %s ORDER BY symbol
-                    """, (current_date,))
+                    db_cursor.execute(
+                        "SELECT symbol FROM tradable_stocks_by_date WHERE date = %s ORDER BY symbol",
+                        (current_date,)
+                    )
                     symbols_for_day = [row[0] for row in db_cursor.fetchall()]
                     db_cursor.close()
             except Exception as db_error:
-                logger.warning(f"  [WARN] Failed to fetch stocks for {current_date} from database: {db_error}")
+                logger.warning(f"  [WARN] DB error for {current_date}: {db_error}")
                 continue
 
             if not symbols_for_day:
-                logger.debug(f"  [SKIP] No stocks in database for {current_date.strftime('%Y-%m-%d')}")
+                logger.debug(f"  [SKIP] No symbols for {current_date}")
                 continue
 
             try:
-                # DEBUG: Log exactly what we're sending to the API
-                if day_offset == 0:  # Only log first day to avoid spam
-                    logger.info(f"  [DEBUG] Requesting 1-minute data:")
-                    logger.info(f"    Start (EST): {start_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-                    logger.info(f"    Start (UTC): {start_dt.astimezone(pytz.utc).strftime('%Y-%m-%d %H:%M:%S %Z')}")
-                    logger.info(f"    End (EST):   {end_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-                    logger.info(f"    End (UTC):   {end_dt.astimezone(pytz.utc).strftime('%Y-%m-%d %H:%M:%S %Z')}")
-
                 request = StockBarsRequest(
                     symbol_or_symbols=symbols_for_day,
                     timeframe=TimeFrame.Minute,
                     start=start_dt,
-                    end=end_dt
+                    end=end_dt,
                 )
-
                 bars_response = client.get_stock_bars(request)
                 total_api_calls += 1
 
-                # Collect values from this day
                 for symbol, bars in bars_response.data.items():
                     for bar in bars:
-                        all_values.append((
-                            bar.timestamp,
-                            symbol,
-                            float(bar.open),
-                            float(bar.high),
-                            float(bar.low),
-                            float(bar.close),
+                        pending.append((
+                            bar.timestamp, symbol,
+                            float(bar.open), float(bar.high),
+                            float(bar.low),  float(bar.close),
                             int(bar.volume),
                             int(bar.trade_count) if bar.trade_count else None,
-                            float(bar.vwap) if bar.vwap else None
+                            float(bar.vwap) if bar.vwap else None,
                         ))
 
-                # Small delay between API calls
                 time.sleep(0.5)
-
-                if (day_offset + 1) % 5 == 0:
-                    logger.info(f"  Progress: {day_offset + 1}/{days_back} days, {total_api_calls} API calls, {len(all_values):,} bars collected")
 
             except Exception as day_error:
                 logger.warning(f"  [WARN] Failed to fetch {current_date}: {day_error}")
                 continue
 
-        # Insert all collected values into 1m table
-        if all_values:
-            execute_values(
-                cursor,
-                """
-                INSERT INTO stock_candles_1m
-                    (time, symbol, open, high, low, close, volume, trade_count, vwap)
-                VALUES %s
-                ON CONFLICT (time, symbol) DO NOTHING
-                """,
-                all_values
-            )
+            # Mark this date done and flush every FLUSH_EVERY days
+            progress.setdefault('completed_dates_1min', []).append(str(current_date))
 
-            conn.commit()
-            logger.info(f"[SUCCESS] Made {total_api_calls} API calls (per-day filtering)")
-            logger.info(f"          Inserted {len(all_values):,} candles into stock_candles_1m (8am-12pm trading)")
-        else:
-            logger.warning(f"[WARNING] No data collected")
+            days_since_flush = (idx + 1) % FLUSH_EVERY
+            is_last = (idx == len(remaining) - 1)
+
+            if days_since_flush == 0 or is_last:
+                n = _flush_to_db(cursor, conn, pending, 'stock_candles_1m')
+                total_inserted += n
+                pending = []
+                save_progress(progress)
+                logger.info(f"  [{idx+1}/{len(remaining)}] Flushed {n:,} bars to DB "
+                            f"| total={total_inserted:,} | api_calls={total_api_calls}")
+
+            elif (idx + 1) % 5 == 0:
+                logger.info(f"  [{idx+1}/{len(remaining)}] {len(pending):,} bars pending "
+                            f"| api_calls={total_api_calls}")
+                save_progress(progress)  # heartbeat every 5 days
 
         cursor.close()
         conn.close()
 
-        # Mark as completed
-        progress['completed_windows'].append(window_key)
-        progress['total_inserted'] += len(all_values)
+        progress['total_inserted'] = progress.get('total_inserted', 0) + total_inserted
+        progress['completed_windows'].append(f"1min_8to12_batch_{batch_num}")
         save_progress(progress)
 
-        return len(all_values)
+        logger.info(f"[SUCCESS] 1-min bars done: {total_inserted:,} rows inserted")
+        return total_inserted
 
     except Exception as e:
-        logger.error(f"[ERROR] Batch {batch_num} (1-min trading) failed: {e}")
-        if cursor:
+        logger.error(f"[ERROR] 1-min backfill failed: {e}")
+        # Flush whatever we have before giving up
+        try:
+            n = _flush_to_db(cursor, conn, pending, 'stock_candles_1m')
+            total_inserted += n
+            logger.info(f"  Emergency flush: {n:,} bars saved before exit")
+        except Exception:
+            pass
+        try:
             cursor.close()
-        if conn:
             conn.close()
-        progress['failed_batches'].append({
-            'window': window_key,
-            'symbols': symbols,
-            'error': str(e)
-        })
+        except Exception:
+            pass
         save_progress(progress)
-        return 0
+        return total_inserted
 
-def backfill_hour_bars(symbols, batch_num, total_batches, days_back, progress):
-    """Backfill hour bars (4am-8pm) using per-day datetime filtering and daily-accurate stock lists"""
 
-    window_key = f"hour_allday_batch_{batch_num}"
-    if window_key in progress['completed_windows']:
-        logger.info(f"[SKIP] Batch {batch_num} already completed")
+def backfill_hour_bars(trading_days: list[date_type], batch_num, total_batches, progress):
+    """
+    Backfill hour bars for 4am-8am premarket window.
+    Flushes to DB every FLUSH_EVERY days to keep RAM bounded.
+    Tracks completed dates individually so restarts resume mid-range.
+    """
+    completed_dates = set(progress.get('completed_dates_hour', []))
+    remaining = [d for d in trading_days if str(d) not in completed_dates]
+
+    if not remaining:
+        logger.info("[SKIP] All hour-bar days already completed")
         return 0
 
     logger.info(f"\n{'='*70}")
-    logger.info(f"HOUR BARS (4am-8pm All Day) - Batch {batch_num}/{total_batches}")
+    logger.info(f"HOUR BARS (4am-8am premarket) - Batch {batch_num}/{total_batches}")
     logger.info(f"{'='*70}")
-    logger.info(f"Fetching {days_back} days (per-day, 400 symbols per API call)")
+    logger.info(f"{len(remaining)} days to process "
+                f"({len(completed_dates)} already done, skipped)")
 
     client = StockHistoricalDataClient(
         Config.ALPACA_API_KEY,
         Config.ALPACA_SECRET_KEY
     )
 
-    conn = psycopg2.connect(DB_CONN)
+    conn   = psycopg2.connect(DB_CONN)
     cursor = conn.cursor()
 
-    all_values = []
+    pending        = []
+    total_inserted = 0
     total_api_calls = 0
 
     try:
-        # Fetch each day separately with 4am-8pm time window
-        for day_offset in range(days_back):
-            current_date = datetime.now(ET).date() - timedelta(days=day_offset)
+        for idx, current_date in enumerate(remaining):
+            start_dt = ET.localize(datetime.combine(
+                current_date,
+                datetime.min.time().replace(hour=HOUR_WINDOW_START)
+            ))
+            end_dt = ET.localize(datetime.combine(
+                current_date,
+                datetime.min.time().replace(hour=HOUR_WINDOW_END)
+            ))
 
-            # Create datetime for 4:00 AM ET that day
-            start_dt = ET.localize(datetime.combine(current_date, datetime.min.time().replace(hour=4, minute=0)))
-
-            # Create datetime for 8:00 PM ET that day (20:00 in 24-hour)
-            end_dt = ET.localize(datetime.combine(current_date, datetime.min.time().replace(hour=20, minute=0)))
-
-            # Skip weekends (Saturday=5, Sunday=6)
-            if current_date.weekday() >= 5:
-                continue
-
-            # Skip future dates
-            if current_date > datetime.now(ET).date():
-                continue
-
-            # GET DAILY-ACCURATE STOCKS FROM DATABASE
             try:
                 with StockDataDB() as db:
                     db_cursor = db.conn.cursor()
-                    db_cursor.execute("""
-                        SELECT symbol FROM tradable_stocks_by_date
-                        WHERE date = %s ORDER BY symbol
-                    """, (current_date,))
+                    db_cursor.execute(
+                        "SELECT symbol FROM tradable_stocks_by_date WHERE date = %s ORDER BY symbol",
+                        (current_date,)
+                    )
                     symbols_for_day = [row[0] for row in db_cursor.fetchall()]
                     db_cursor.close()
             except Exception as db_error:
-                logger.warning(f"  [WARN] Failed to fetch stocks for {current_date} from database: {db_error}")
+                logger.warning(f"  [WARN] DB error for {current_date}: {db_error}")
                 continue
 
             if not symbols_for_day:
-                logger.debug(f"  [SKIP] No stocks in database for {current_date.strftime('%Y-%m-%d')}")
+                logger.debug(f"  [SKIP] No symbols for {current_date}")
                 continue
 
-            # Batch symbols in groups of 400 to avoid API limits
-            symbol_batch_size = 400
-            for batch_start in range(0, len(symbols_for_day), symbol_batch_size):
-                batch_end = min(batch_start + symbol_batch_size, len(symbols_for_day))
-                symbols_batch = symbols_for_day[batch_start:batch_end]
+            try:
+                request = StockBarsRequest(
+                    symbol_or_symbols=symbols_for_day,
+                    timeframe=TimeFrame.Hour,
+                    start=start_dt,
+                    end=end_dt,
+                )
+                bars_response = client.get_stock_bars(request)
+                total_api_calls += 1
 
-                try:
-                    request = StockBarsRequest(
-                        symbol_or_symbols=symbols_batch,
-                        timeframe=TimeFrame.Hour,
-                        start=start_dt,
-                        end=end_dt
-                    )
+                for symbol, bars in bars_response.data.items():
+                    for bar in bars:
+                        pending.append((
+                            bar.timestamp, symbol,
+                            float(bar.open), float(bar.high),
+                            float(bar.low),  float(bar.close),
+                            int(bar.volume),
+                            int(bar.trade_count) if bar.trade_count else None,
+                            float(bar.vwap) if bar.vwap else None,
+                        ))
 
-                    bars_response = client.get_stock_bars(request)
-                    total_api_calls += 1
+                time.sleep(0.5)
 
-                    # Collect values from this day/batch
-                    for symbol, bars in bars_response.data.items():
-                        for bar in bars:
-                            all_values.append((
-                                bar.timestamp,
-                                symbol,
-                                float(bar.open),
-                                float(bar.high),
-                                float(bar.low),
-                                float(bar.close),
-                                int(bar.volume),
-                                int(bar.trade_count) if bar.trade_count else None,
-                                float(bar.vwap) if bar.vwap else None
-                            ))
+            except Exception as day_error:
+                logger.warning(f"  [WARN] Failed to fetch {current_date}: {day_error}")
+                continue
 
-                    # Small delay between API calls
-                    time.sleep(0.5)
+            progress.setdefault('completed_dates_hour', []).append(str(current_date))
 
-                except Exception as batch_error:
-                    logger.warning(f"  [WARN] Failed to fetch batch {batch_start}-{batch_end} for {current_date}: {batch_error}")
-                    continue
+            days_since_flush = (idx + 1) % FLUSH_EVERY
+            is_last = (idx == len(remaining) - 1)
 
-            if (day_offset + 1) % 5 == 0:
-                logger.info(f"  Progress: {day_offset + 1}/{days_back} days, {total_api_calls} API calls, {len(all_values):,} bars collected")
+            if days_since_flush == 0 or is_last:
+                n = _flush_to_db(cursor, conn, pending, 'stock_candles_1h')
+                total_inserted += n
+                pending = []
+                save_progress(progress)
+                logger.info(f"  [{idx+1}/{len(remaining)}] Flushed {n:,} bars to DB "
+                            f"| total={total_inserted:,} | api_calls={total_api_calls}")
 
-        # Insert all collected values into hour table
-        if all_values:
-            execute_values(
-                cursor,
-                """
-                INSERT INTO stock_candles_1h
-                    (time, symbol, open, high, low, close, volume, trade_count, vwap)
-                VALUES %s
-                ON CONFLICT (time, symbol) DO NOTHING
-                """,
-                all_values
-            )
-
-            conn.commit()
-            logger.info(f"[SUCCESS] Made {total_api_calls} API calls (per-day, 400 symbols per batch)")
-            logger.info(f"          Inserted {len(all_values):,} candles into stock_candles_1h (4am-8pm)")
-        else:
-            logger.warning(f"[WARNING] No data collected")
+            elif (idx + 1) % 5 == 0:
+                logger.info(f"  [{idx+1}/{len(remaining)}] {len(pending):,} bars pending "
+                            f"| api_calls={total_api_calls}")
+                save_progress(progress)  # heartbeat every 5 days
 
         cursor.close()
         conn.close()
 
-        # Mark as completed
-        progress['completed_windows'].append(window_key)
-        progress['total_inserted'] += len(all_values)
+        progress['total_inserted'] = progress.get('total_inserted', 0) + total_inserted
+        progress['completed_windows'].append(f"hour_allday_batch_{batch_num}")
         save_progress(progress)
 
-        return len(all_values)
+        logger.info(f"[SUCCESS] Hour bars done: {total_inserted:,} rows inserted")
+        return total_inserted
 
     except Exception as e:
-        logger.error(f"[ERROR] Batch {batch_num} (hour bars) failed: {e}")
-        if cursor:
+        logger.error(f"[ERROR] Hour backfill failed: {e}")
+        try:
+            n = _flush_to_db(cursor, conn, pending, 'stock_candles_1h')
+            total_inserted += n
+            logger.info(f"  Emergency flush: {n:,} bars saved before exit")
+        except Exception:
+            pass
+        try:
             cursor.close()
-        if conn:
             conn.close()
-        progress['failed_batches'].append({
-            'window': window_key,
-            'symbols': symbols,
-            'error': str(e)
-        })
+        except Exception:
+            pass
         save_progress(progress)
-        return 0
+        return total_inserted
 
-def backfill_daily_bars(symbols, batch_num, total_batches, days_back, progress):
+
+
+def backfill_daily_bars(symbols, trading_days: list[date_type], batch_num, total_batches, progress):
     """Backfill daily bars for volume calculations"""
 
     window_key = f"daily_batch_{batch_num}"
@@ -553,13 +506,14 @@ def backfill_daily_bars(symbols, batch_num, total_batches, days_back, progress):
         Config.ALPACA_SECRET_KEY
     )
 
-    end = datetime.now()
-    start = end - timedelta(days=days_back + 5)
+    start = datetime.combine(trading_days[0], datetime.min.time())
+    end   = datetime.combine(trading_days[-1], datetime.min.time()) + timedelta(days=1)
 
     try:
         batch_start = time.time()
 
-        logger.info(f"Fetching daily bars for {len(symbols)} symbols...")
+        logger.info(f"Fetching daily bars for {len(symbols):,} symbols "
+                    f"({trading_days[0]} → {trading_days[-1]})...")
         request = StockBarsRequest(
             symbol_or_symbols=symbols,
             timeframe=TimeFrame.Day,
@@ -600,7 +554,6 @@ def backfill_daily_bars(symbols, batch_num, total_batches, days_back, progress):
                 """,
                 values
             )
-
             conn.commit()
             logger.info(f"[SUCCESS] Inserted {len(values):,} candles into stock_candles_1d")
 
@@ -617,155 +570,284 @@ def backfill_daily_bars(symbols, batch_num, total_batches, days_back, progress):
         logger.error(f"[ERROR] Batch {batch_num} failed: {e}")
         progress['failed_batches'].append({
             'window': window_key,
-            'symbols': symbols,
             'error': str(e)
         })
         save_progress(progress)
         return 0
 
+
+def _load_symbols_with_prices() -> list[tuple[str, float]]:
+    """
+    Load (symbol, price) pairs from stocks_in_price_range.json.
+    Falls back to .txt file with price=0.0 if JSON not found.
+    """
+    script_dir = os.path.dirname(__file__)
+    json_path = os.path.abspath(os.path.join(script_dir, '../../services/stocks_in_price_range.json'))
+
+    if os.path.exists(json_path):
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        stocks = data.get('stocks', [])
+        return [(s['symbol'], float(s['price'])) for s in stocks if 'symbol' in s and 'price' in s]
+
+    # Fallback: use .txt symbols with price=0.0
+    symbols_path = _find_symbols_file()
+    if symbols_path:
+        symbols = load_symbols_from_file(symbols_path)
+        logger.warning("JSON price file not found — seeding with price=0.0")
+        return [(sym, 0.0) for sym in symbols]
+
+    return []
+
+
+def seed_tradable_stocks_by_date(symbols_with_prices: list[tuple[str, float]], trading_days: list[date_type]):
+    """
+    Populate tradable_stocks_by_date for all trading days in the backfill range.
+
+    Required because backfill_1min_bars_trading() and backfill_hour_bars() query
+    this table per day to get the symbol list. If it's empty, they silently skip
+    every day and collect nothing.
+
+    NOTE: This seeds every day with the SAME current symbol list. For historically
+    accurate per-day lists, run historical_tradable_stocks.py first — that script
+    populates this table correctly by fetching actual historical prices per day.
+
+    Uses ON CONFLICT DO NOTHING — safe to re-run.
+    """
+    values = []
+    for current_date in trading_days:
+        for symbol, price in symbols_with_prices:
+            values.append((current_date, symbol, price))
+
+    if not values:
+        logger.warning("No trading days found in range — skipping seed")
+        return
+
+    num_symbols = len(symbols_with_prices)
+    num_days = len(trading_days)
+    logger.info(f"Seeding tradable_stocks_by_date: {num_symbols:,} symbols × "
+                f"{num_days} trading days = {len(values):,} rows")
+
+    conn = psycopg2.connect(DB_CONN)
+    cursor = conn.cursor()
+    try:
+        execute_values(
+            cursor,
+            """
+            INSERT INTO tradable_stocks_by_date (date, symbol, price)
+            VALUES %s
+            ON CONFLICT (date, symbol) DO NOTHING
+            """,
+            values,
+            page_size=10_000,
+        )
+        conn.commit()
+        logger.info(f"[OK] tradable_stocks_by_date seeded successfully")
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to seed tradable_stocks_by_date: {e}")
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def _find_symbols_file() -> str | None:
+    """
+    Look for the symbols file in two locations (in priority order):
+      1. production/services/stocks_in_price_range.txt  (output of fetch_stocks_in_price_range.py)
+      2. database/stocks_1_to_20.txt                    (canonical list used by run_trading.py)
+    Returns the path if found, else None.
+    """
+    script_dir = os.path.dirname(__file__)  # production/data/backfill/
+
+    candidates = [
+        os.path.abspath(os.path.join(script_dir, '../../services/stocks_in_price_range.txt')),
+        os.path.abspath(os.path.join(script_dir, '../../../database/stocks_1_to_20.txt')),
+    ]
+
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
 def main():
-    """Main optimized backfill with time windows"""
+    """Main optimized backfill: minute bars (8am-12pm), hour bars, and daily bars."""
+
+    parser = argparse.ArgumentParser(
+        description='Backfill historical OHLCV bars from Alpaca.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Backfill all of 2023 and 2024:
+  python production/data/backfill/backfill_optimized.py --start 2023-01-01 --end 2024-12-31
+
+  # Backfill last 90 calendar days from today:
+  python production/data/backfill/backfill_optimized.py --days 90
+
+  # Interactive mode (prompts for range and bar type):
+  python production/data/backfill/backfill_optimized.py
+
+Prerequisite for minute/hour bars:
+  tradable_stocks_by_date must be populated first:
+  python research/database_analysis/historical_tradable_stocks.py --start 2023-01-01 --end 2024-12-31
+        """
+    )
+    parser.add_argument('--start', type=str, metavar='YYYY-MM-DD',
+                        help='Start date for backfill (inclusive)')
+    parser.add_argument('--end', type=str, metavar='YYYY-MM-DD',
+                        help='End date for backfill (inclusive, defaults to today)')
+    parser.add_argument('--days', type=int, metavar='N',
+                        help='Backfill last N calendar days from today (overrides --start/--end)')
+    parser.add_argument('--type', choices=['1min', 'hour', 'daily', 'all'],
+                        help='Bar type to backfill (skips interactive prompt)')
+    parser.add_argument('--status', action='store_true',
+                        help='Show current backfill progress and exit (no backfill runs)')
+    parser.add_argument('--reset', action='store_true',
+                        help='Reset progress file and start fresh')
+    parser.add_argument('--skip-seed', action='store_true',
+                        help='Skip seeding tradable_stocks_by_date (use when already populated '
+                             'by historical_tradable_stocks.py — avoids re-polluting accurate data)')
+    args = parser.parse_args()
+
+    # ── Status-only mode ───────────────────────────────────────────────────────
+    if args.status:
+        start = args.start or None
+        end   = args.end   or None
+        print_status(start_date=start, end_date=end)
+        return
 
     logger.info("=" * 70)
     logger.info("  OPTIMIZED HISTORICAL DATA BACKFILL")
-    logger.info("  (Time-Window Filtered, Daily-Accurate Stock Lists)")
+    logger.info("  (1-min trading window + hour bars + daily bars)")
     logger.info("=" * 70)
-    logger.info("\nNote: Symbols will be loaded from tradable_stocks_by_date table")
-    logger.info("      (one query per day for historically accurate lists)\n")
 
-    # Check for existing progress
-    progress = load_progress()
-    if progress['completed_windows']:
-        print(f"\nFound existing progress: {len(progress['completed_windows'])} windows completed")
-        reset = input("Reset and start fresh? (y/n): ").strip().lower()
-        if reset == 'y':
-            reset_progress()
-            progress = load_progress()
-
-    # Ask for data range
-    print("\nHow much historical data do you want to backfill?")
-    print("  1. 2 weeks (14 days) - Fast test")
-    print("  2. 1 month (30 days)")
-    print("  3. 6 weeks (45 days)")
-    print("  4. 3 months (60 days)")
-    print("  5. All of 2025 (416 days, ~252 trading days)")
-    print("  6. Custom (enter days)")
-    days_choice = input("\nEnter choice (1-6): ").strip()
-
-    if days_choice == "1":
-        days_back_minute = 14
-        days_back_hour = 14
-        days_back_daily = 14
-    elif days_choice == "2":
-        days_back_minute = 30
-        days_back_hour = 30
-        days_back_daily = 30
-    elif days_choice == "3":
-        days_back_minute = 45
-        days_back_hour = 45
-        days_back_daily = 45
-    elif days_choice == "4":
-        days_back_minute = 60
-        days_back_hour = 60
-        days_back_daily = 60
-    elif days_choice == "5":
-        # All of 2025: Jan 1 to Dec 31 = 365 calendar days
-        # Feb 20, 2026 to Jan 1, 2025 = 416 calendar days
-        days_back_minute = 416
-        days_back_hour = 416
-        days_back_daily = 416
-    else:
-        try:
-            days_back_minute = int(input("Days back (will apply to 5-min, 1-min, hour, and daily bars): ").strip())
-            days_back_hour = days_back_minute
-            days_back_daily = days_back_minute
-        except ValueError:
-            logger.error("Invalid input, using default (14 days)")
-            days_back_minute = 14
-            days_back_hour = 14
-            days_back_daily = 14
-
-    logger.info(f"\nBackfill range: {days_back_minute} days (5-min premarket + 1-min trading), {days_back_hour} days (hour), {days_back_daily} days (daily)")
-
-    # Estimate data volume (hourly + 1-min trading window only)
-    trading_days_multiplier = max(days_back_minute, days_back_hour) // 2  # ~50% of calendar days are trading days
-    avg_stocks_per_day = 3500  # Typical number of stocks in $1-$20 range
-
-    # 1-minute bars: 8am-12pm = 4 hours = 240 bars/day per symbol
-    onemin_candles = avg_stocks_per_day * trading_days_multiplier * 240
-
-    # Hour bars: 4am-8am = 4 hours = 4 bars/day per symbol (premarket only)
-    hour_candles = avg_stocks_per_day * trading_days_multiplier * 4
-
-    total_candles = onemin_candles + hour_candles
-    storage_gb = (total_candles * 100) / 1024 / 1024 / 1024  # ~100 bytes per candle
-
-    # Calculate API calls (more accurate time estimate)
-    trading_days_minute = max(1, days_back_minute // 2)  # ~50% trading days
-    trading_days_hour = max(1, days_back_hour // 2)
-    avg_stocks = 3994  # From tradable_stocks_by_date
-    symbol_batch_size = 400
-
-    # Hour bars: ~10 batches per trading day (3994 stocks / 400 per batch)
-    hour_batches_per_day = max(1, (avg_stocks + symbol_batch_size - 1) // symbol_batch_size)
-    onemin_api_calls = trading_days_minute   # One call per trading day (all symbols at once for minutes)
-    hour_api_calls = trading_days_hour * hour_batches_per_day  # Multiple calls per day with batching
-    total_api_calls = onemin_api_calls + hour_api_calls
-    estimated_minutes = (total_api_calls * 10) / 60  # ~10 seconds per API call
-
-    print(f"\nData Volume Estimates (Hourly + 1-minute):")
-    print(f"  Average stocks per day:  ~{avg_stocks_per_day:,}")
-    print(f"  1-min bars (8am-12pm):   {onemin_candles:,} candles")
-    print(f"  Hour bars (4am-8am):     {hour_candles:,} candles")
-    print(f"  Total:                   {total_candles:,} candles (~{storage_gb:.1f} GB)")
-    print(f"\nAPI Call Estimates (Daily-Accurate Lists):")
-    print(f"  1-min bars:              {onemin_api_calls} calls ({trading_days_minute} trading days)")
-    print(f"  Hour bars:               {hour_api_calls} calls ({hour_batches_per_day} batches/day × {trading_days_hour} days, 400 symbols/batch)")
-    print(f"  Total API calls:         {total_api_calls}")
-    print(f"  Estimated time:          ~{estimated_minutes:.0f} minutes ({estimated_minutes/60:.1f} hours)")
-    print(f"  NOTE: ON CONFLICT DO NOTHING — new/existing data will be handled safely")
-
-    print("\nSelect what to backfill:")
-    print("  1. Hour bars only (4am-8pm)")
-    print("  2. Minute bars only (8am-12pm)")
-    print("  3. Both (hour + minute)")
-    backfill_choice = input("\nEnter choice (1/2/3): ").strip()
-
-    proceed = input("\nProceed with backfill? (y/n): ").strip().lower()
-    if proceed != 'y':
-        logger.info("Backfill cancelled")
+    # ── Load symbols ───────────────────────────────────────────────────────────
+    symbols_path = _find_symbols_file()
+    if not symbols_path:
+        print("\n[ERROR] No symbols file found. Run this first:")
+        print("  python production/services/fetch_stocks_in_price_range.py")
         return
 
-    # Run backfill (no batching needed — daily queries happen inside each function)
+    symbols = load_symbols_from_file(symbols_path)
+    if not symbols:
+        print(f"\n[ERROR] Symbols file is empty: {symbols_path}")
+        return
+
+    logger.info(f"Loaded {len(symbols):,} symbols from {os.path.basename(symbols_path)}")
+
+    symbols_with_prices = _load_symbols_with_prices()
+    logger.info(f"Loaded prices for {len(symbols_with_prices):,} symbols (for DB seed)")
+
+    # ── Resolve date range ─────────────────────────────────────────────────────
+    today = datetime.now(ET).date()
+
+    if args.days:
+        end_date   = today
+        start_date = today - timedelta(days=args.days)
+    elif args.start:
+        start_date = datetime.strptime(args.start, '%Y-%m-%d').date()
+        end_date   = datetime.strptime(args.end, '%Y-%m-%d').date() if args.end else today
+    else:
+        # Interactive
+        print("\nHow much historical data do you want to backfill?")
+        print("  1. 2 weeks  (14 days)  — fast test")
+        print("  2. 1 month  (30 days)")
+        print("  3. 3 months (90 days)")
+        print("  4. 1 year   (365 days)")
+        print("  5. Custom date range")
+        days_choice = input("\nEnter choice (1-5): ").strip()
+
+        if days_choice == "1":
+            start_date, end_date = today - timedelta(days=14), today
+        elif days_choice == "2":
+            start_date, end_date = today - timedelta(days=30), today
+        elif days_choice == "3":
+            start_date, end_date = today - timedelta(days=90), today
+        elif days_choice == "4":
+            start_date, end_date = today - timedelta(days=365), today
+        else:
+            start_str = input("Start date (YYYY-MM-DD): ").strip()
+            end_str   = input("End date   (YYYY-MM-DD, or Enter for today): ").strip()
+            start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
+            end_date   = datetime.strptime(end_str, '%Y-%m-%d').date() if end_str else today
+
+    trading_days = get_trading_days(start_date, end_date)
+    logger.info(f"Date range: {start_date} → {end_date}  ({len(trading_days)} trading days)")
+
+    # ── What to backfill ───────────────────────────────────────────────────────
+    if args.type:
+        backfill_choice = {'1min': '1', 'hour': '2', 'daily': '3', 'all': '4'}[args.type]
+    else:
+        print("\nSelect what to backfill:")
+        print("  1. Minute bars only (8am-12pm → stock_candles_1m)")
+        print("  2. Hour bars only   (4am-8am  → stock_candles_1h)")
+        print("  3. Daily bars only             (stock_candles_1d)")
+        print("  4. All three (recommended)")
+        backfill_choice = input("\nEnter choice (1/2/3/4): ").strip()
+
+    # ── Check for existing progress ────────────────────────────────────────────
+    progress = load_progress()
+    if args.reset:
+        reset_progress()
+        progress = load_progress()
+    elif progress['completed_windows']:
+        # Only prompt interactively when no CLI args provided (non-interactive runs skip this)
+        if not (args.start or args.days or args.type):
+            print(f"\nFound existing progress: {len(progress['completed_windows'])} windows completed")
+            reset = input("Reset and start fresh? (y/n): ").strip().lower()
+            if reset == 'y':
+                reset_progress()
+                progress = load_progress()
+
+    if not (args.start or args.days or args.type):
+        proceed = input("\nProceed with backfill? (y/n): ").strip().lower()
+        if proceed != 'y':
+            logger.info("Backfill cancelled")
+            return
+
+    # ── Seed tradable_stocks_by_date (required for minute + hour functions) ────
+    if backfill_choice in ['1', '2', '4']:
+        if args.skip_seed:
+            logger.info("\n[SKIP] tradable_stocks_by_date seed skipped (--skip-seed flag set)")
+            logger.info("       Assuming historical_tradable_stocks.py has already populated it correctly.")
+        else:
+            logger.info("\nSeeding tradable_stocks_by_date (skips existing rows)...")
+            logger.warning("NOTE: If you already ran historical_tradable_stocks.py for this date range,")
+            logger.warning("      use --skip-seed to avoid re-polluting with the static symbol list.")
+            try:
+                seed_tradable_stocks_by_date(symbols_with_prices, trading_days)
+            except Exception as e:
+                logger.error(f"Failed to seed tradable_stocks_by_date: {e}")
+                logger.error("Cannot proceed with minute/hour backfill without this table.")
+                return
+
+    # ── Run backfill ───────────────────────────────────────────────────────────
     overall_start = time.time()
     total_inserted = 0
-    dummy_batch = []  # Empty list since we query DB for stocks per day
     batch_num = 1
     total_batches = 1
 
     logger.info(f"\n{'#'*70}")
-    logger.info(f"BACKFILL STARTING (Daily-Accurate Stock Lists)")
+    logger.info(f"BACKFILL STARTING")
     logger.info(f"{'#'*70}")
 
-    # Hour bars (4am-8pm premarket)
-    if backfill_choice in ['1', '3']:
-        inserted = backfill_hour_bars(dummy_batch, batch_num, total_batches, days_back_hour, progress)
+    if backfill_choice in ['1', '4']:
+        inserted = backfill_1min_bars_trading(trading_days, batch_num, total_batches, progress)
         total_inserted += inserted
         time.sleep(2)
 
-    # 1-minute bars (8am-12pm trading)
-    if backfill_choice in ['2', '3']:
-        inserted = backfill_1min_bars_trading(dummy_batch, batch_num, total_batches, days_back_minute, progress)
+    if backfill_choice in ['2', '4']:
+        inserted = backfill_hour_bars(trading_days, batch_num, total_batches, progress)
         total_inserted += inserted
         time.sleep(2)
 
-    # Progress summary
-    elapsed = time.time() - overall_start
-    logger.info(f"\n[PROGRESS] Backfill complete")
-    logger.info(f"           Total inserted: {total_inserted:,} candles")
-    logger.info(f"           Elapsed: {elapsed/60:.1f}min")
+    if backfill_choice in ['3', '4']:
+        inserted = backfill_daily_bars(symbols, trading_days, batch_num, total_batches, progress)
+        total_inserted += inserted
 
-    # Complete
+    # ── Summary ────────────────────────────────────────────────────────────────
     total_time = time.time() - overall_start
     logger.info("\n" + "=" * 70)
     logger.info("  BACKFILL COMPLETE!")
@@ -773,10 +855,9 @@ def main():
     logger.info(f"Total candles inserted: {total_inserted:,}")
     logger.info(f"Total time: {total_time/60:.1f} minutes ({total_time/3600:.1f} hours)")
     logger.info(f"\nNext steps:")
-    logger.info(f"  1. Verify data: check DB for 5-min (4am-8am) and 1-min (8am-12pm) bars")
-    logger.info(f"  2. Start live collector: python data/collector/collect_data.py")
-    logger.info(f"  3. Run simulator: python simulator/simulate_date_range.py --start 2025-01-01 --end 2025-12-31")
-    logger.info(f"  4. Note: Full data collection will take 5-10 days with parallel batching\n")
+    logger.info(f"  1. Start live collector: python production/data/collector/collect_data.py")
+    logger.info(f"  2. Run trading:          python production/run_trading.py\n")
+
 
 if __name__ == "__main__":
     try:

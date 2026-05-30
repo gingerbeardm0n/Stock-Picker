@@ -375,6 +375,78 @@ def test_scan_historical():
         logger.error(f"Error in test scan: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Live Trading routes — read from session_status.json written by run_trading.py
+# ─────────────────────────────────────────────────────────────────────────────
+
+import json as _json
+from pathlib import Path as _Path
+import io as _io
+
+_STATUS_FILE = _Path(__file__).parent.parent / 'logs' / 'session_status.json'
+
+
+@app.route('/api/trading/status')
+def trading_status():
+    """
+    Return the current live-trading session state written by run_trading.py.
+    Returns {} (session_running: false) when the session is not running.
+    """
+    if not _STATUS_FILE.exists():
+        return jsonify({'session_running': False})
+    try:
+        data = _json.loads(_STATUS_FILE.read_text(encoding='utf-8'))
+        return jsonify(data)
+    except Exception as e:
+        logger.warning(f"Could not read session_status.json: {e}")
+        return jsonify({'session_running': False, 'error': str(e)})
+
+
+@app.route('/api/trading/logs')
+def trading_logs():
+    """
+    SSE endpoint — streams new lines from today's session log as they appear.
+    Query param: ?lines=N  — send N most recent lines on connect (default 200)
+    Client filter is applied on the browser side.
+    """
+    import pytz as _pytz
+    from datetime import datetime as _dt
+
+    et = _pytz.timezone('America/New_York')
+    today_str = _dt.now(et).strftime('%Y-%m-%d')
+    log_file = _Path(__file__).parent.parent / 'logs' / f'session_{today_str}.log'
+
+    n_lines = min(int(request.args.get('lines', 200)), 2000)
+
+    def generate():
+        # Send most-recent N lines on connect
+        if log_file.exists():
+            with open(log_file, 'r', encoding='utf-8', errors='replace') as fh:
+                existing = fh.readlines()
+            for line in existing[-n_lines:]:
+                yield f"data: {line.rstrip()}\n\n"
+
+        # Tail new lines
+        with open(log_file, 'a+', encoding='utf-8', errors='replace') as fh:
+            fh.seek(0, 2)  # seek to end
+            while True:
+                line = fh.readline()
+                if line:
+                    yield f"data: {line.rstrip()}\n\n"
+                else:
+                    time.sleep(0.5)
+
+    from flask import Response, stream_with_context
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+        },
+    )
+
+
 if __name__ == '__main__':
     # Start background scanner thread (DISABLED during development)
     # scanner_thread = threading.Thread(target=background_scanner, daemon=True)
@@ -386,4 +458,4 @@ if __name__ == '__main__':
     logger.info("🔥 Hot reload ENABLED - code changes will auto-restart server")
 
     # Run Flask app with hot reload enabled
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=True)
+    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=True, threaded=True)

@@ -32,7 +32,7 @@ def get_all_tradable_stocks():
     client = TradingClient(
         Config.ALPACA_API_KEY,
         Config.ALPACA_SECRET_KEY,
-        paper=Config.ALPACA_PAPER_TRADING
+        paper=(Config.TRADING_MODE == 'PAPER'),
     )
 
     logger.info("Calling Alpaca API...")

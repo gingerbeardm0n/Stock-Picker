@@ -673,7 +673,11 @@ def detect_abcd_pattern(bars: list[dict],
 
     # ── Build signal ──────────────────────────────────────────────────────
     entry = _close(current)
-    stop = b_low - cfg.stop_buffer
+    # Stop below the D-leg dip low (the most recent higher low before entry).
+    # concept_stop_management.md §3.4: "Stop below the prior higher low (the
+    # C-point in ABCD, or the last touch of the ascending trendline)."
+    # D-bars are that last touch — using b_low was too wide.
+    stop = d_low - cfg.stop_buffer
     stop_dist = entry - stop
     if stop_dist <= 0:
         return None
@@ -688,7 +692,7 @@ def detect_abcd_pattern(bars: list[dict],
 
     reasoning = (
         f"ABCD: A=${a_price:.2f}, B=${b_low:.2f}, C=${c_high:.2f}, "
-        f"D=${d_low:.2f}, breakout ${entry:.2f}, stop ${stop:.2f}"
+        f"D=${d_low:.2f}, breakout ${entry:.2f}, stop ${stop:.2f} (D-low)"
     )
     return PatternSignal(
         pattern_type='ABCD',
@@ -898,8 +902,12 @@ def detect_flat_top_breakout(bars: list[dict],
 
     # ── Build signal ──────────────────────────────────────────────────────
     entry = _close(current)
-    consol_low = min(_low(b) for b in window)
-    stop = consol_low - cfg.stop_buffer
+    # Stop just below the flat-top resistance level (now support after break).
+    # concept_stop_management.md §3.2: "Stop below the flat-top resistance line
+    # that was just broken (now support)."
+    # Using consol_low was wrong — that's the bottom of the range and produces
+    # a stop far wider than necessary, killing R/R on all flat-top signals.
+    stop = best_resistance - cfg.stop_buffer
     stop_dist = entry - stop
     if stop_dist <= 0:
         return None
@@ -910,6 +918,7 @@ def detect_flat_top_breakout(bars: list[dict],
     reasoning = (
         f"Flat Top Breakout: resistance ${best_resistance:.2f} "
         f"({len(best_touches)} touches), breakout ${entry:.2f}, "
+        f"stop ${stop:.2f} (below resistance), "
         f"vol {_vol(current):,.0f} > consol max {max_consol_vol:,.0f}"
     )
     return PatternSignal(
@@ -1351,36 +1360,62 @@ def explain_pattern_rejection(
 
     # ── DIP BUY ────────────────────────────────────────────────────────────────
     def _explain_dip_buy() -> str:
-        if len(bars) < 8:
-            return f'too_few_bars({len(bars)}<8)'
-        ema9 = indicators.get('ema9')
+        # Mirrors detect_dip_buy (3 Tricks: news → MACD line → named support).
+        # No ema9 / light-volume gates — those were the pre-GAP-A algorithm.
+        if len(bars) < 6:
+            return f'too_few_bars({len(bars)}<6)'
+        # Trick 1: news catalyst. False = hard block; None = allowed (unknown); True = pass.
+        has_news = indicators.get('has_news')
+        if has_news is False:
+            return 'no_news_catalyst(has_news=False)'
+        # Trick 2: MACD line > 0 (front side). Skipped when None (<26 bars, too early).
         macd_line = indicators.get('macd_line')
-        if ema9 is None:
-            return 'no_ema_indicator'
-        if macd_line is None:
-            return 'no_macd_indicator'
-        current = bars[-1]
-        if not _is_green(current):
-            return f'current_not_green(close={_close(current):.2f} open={_open(current):.2f})'
-        current_price = _close(current)
-        if current_price <= ema9:
-            return f'price_below_ema9(price={current_price:.2f} ema9={ema9:.2f})'
-        if macd_line <= 0:
+        if macd_line is not None and macd_line <= 0:
             return f'macd_line_negative(macd_line={macd_line:.4f})'
-        pullback_bars = bars[-4:-1]
-        if len(pullback_bars) < 2:
-            return f'too_few_pullback_bars({len(pullback_bars)}<2)'
-        ref_bars = bars[-10:-4]
-        if len(ref_bars) < 3:
-            return f'too_few_ref_bars({len(ref_bars)}<3)'
-        if not any(_close(b) < _close(bars[-4]) for b in pullback_bars[1:]):
-            return f'no_actual_dip(pullback_closes={[_close(b) for b in pullback_bars]})'
-        if not all(is_light_volume(b, ref_bars, threshold=cfg.dip_buy_light_vol)
-                   for b in pullback_bars):
-            pb_vols = [_vol(b) for b in pullback_bars]
-            ref_avg = average_volume(ref_bars, lookback=len(ref_bars))
-            return (f'pullback_heavy_volume(vols={pb_vols}, '
-                    f'ref_avg={ref_avg:.0f}, threshold={cfg.dip_buy_light_vol})')
+        current = bars[-1]
+        current_price = _close(current)
+        # Current bar must be green (first recovery candle).
+        if not _is_green(current):
+            return f'current_not_green(close={current_price:.2f} open={_open(current):.2f})'
+        # 4+ bar dip from a prior high inside the lookback window.
+        lookback = bars[-21:-1]
+        if len(lookback) < 5:
+            return f'too_few_lookback_bars({len(lookback)}<5)'
+        peak_idx = max(range(len(lookback)), key=lambda i: _high(lookback[i]))
+        dip_bars_list = lookback[peak_idx + 1:]
+        if len(dip_bars_list) < 4:
+            return f'dip_too_shallow({len(dip_bars_list)}<4_bars_micro_pullback_territory)'
+        dip_low = min(_low(b) for b in dip_bars_list)
+        # Trick 3: dip low within tolerance of a named support level (priority order).
+        support_tol = cfg.dip_buy_support_tolerance
+        pm_high = indicators.get('premarket_high')
+        vwap = indicators.get('vwap')
+        whole_dollar = float(int(current_price))
+        half_dollar = whole_dollar + 0.50
+        candidates = []
+        if pm_high and pm_high > 0:
+            candidates.append((pm_high, 'PM_HIGH'))
+        if vwap and vwap > 0:
+            candidates.append((vwap, 'VWAP'))
+        if half_dollar > 0:
+            candidates.append((half_dollar, 'HALF_$'))
+        if whole_dollar > 0:
+            candidates.append((whole_dollar, 'WHOLE_$'))
+        support_level = None
+        support_label = ''
+        for level, label in candidates:
+            if abs(dip_low - level) / level <= support_tol:
+                support_level = level
+                support_label = label
+                break
+        if support_level is None:
+            return (f'no_named_support(dip_low={dip_low:.2f} tol={support_tol} '
+                    f'levels={[round(c[0], 2) for c in candidates]})')
+        if current_price <= support_level:
+            return (f'price_not_above_support(price={current_price:.2f} '
+                    f'{support_label}={support_level:.2f})')
+        if current_price - (support_level - cfg.stop_buffer) <= 0:
+            return 'nonpositive_stop_distance'
         return 'PASS'
 
     results['DIP_BUY'] = _explain_dip_buy()
@@ -1421,6 +1456,11 @@ def explain_pattern_rejection(
         max_consol_vol = max(touch_volumes)
         if _vol(current) <= max_consol_vol:
             return f'breakout_vol_too_low(current_vol={_vol(current):.0f} max_consol_vol={max_consol_vol:.0f})'
+        # Stop calc (mirrors detect_flat_top_breakout): below resistance level
+        stop = best_resistance - cfg.flat_top_resistance_tol
+        stop_dist = _close(current) - stop
+        if stop_dist <= 0:
+            return f'stop_dist_zero(entry={_close(current):.2f} stop={stop:.2f})'
         return 'PASS'
 
     results['FLAT_TOP'] = _explain_flat_top()

@@ -390,14 +390,29 @@ class LiveScanner:
 
         if signal:
             prev = self._best_signal_candidate
-            if (prev is None or
-                    signal.pattern.confidence > prev['signal'].pattern.confidence):
-                if prev is not None:
+            prev_sig = prev['signal'] if prev is not None else None
+            # M5: mirror the simulator's selection exactly (simulation_engine
+            # _scan_for_entry, ~line 936): confidence primary, rel_vol tiebreak.
+            # NOTE: the sim uses entry_score for SIZING (size_multiplier), NOT for
+            # selection — so selecting by entry_score here would BREAK sim/live
+            # parity. The real selection gap was the missing rel_vol tiebreak.
+            # (The separate live SIZING gap — live ignores entry_score's multiplier
+            # — is audit item H2, deferred to the live-parity wave.)
+            better = (
+                prev_sig is None or
+                signal.pattern.confidence > prev_sig.pattern.confidence or
+                (signal.pattern.confidence == prev_sig.pattern.confidence and
+                 signal.pillar_data.get('rel_vol', 0) >
+                 prev_sig.pillar_data.get('rel_vol', 0))
+            )
+            if better:
+                if prev_sig is not None:
                     logger.info(
                         f"  [SIGNAL UPGRADE] {symbol} {signal.pattern.pattern_type} "
-                        f"conf={signal.pattern.confidence:.2f} beats "
-                        f"{prev['symbol']} {prev['signal'].pattern.pattern_type} "
-                        f"conf={prev['signal'].pattern.confidence:.2f}"
+                        f"conf={signal.pattern.confidence:.2f} "
+                        f"rvol={signal.pillar_data.get('rel_vol', 0):.1f} beats "
+                        f"{prev['symbol']} {prev_sig.pattern.pattern_type} "
+                        f"conf={prev_sig.pattern.confidence:.2f}"
                     )
                 self._best_signal_candidate = {
                     'signal': signal,
@@ -495,8 +510,12 @@ class LiveScanner:
                 self._last_gate[symbol] = reason
                 logger.info(f"  [{symbol}] {reason}")
                 return
-            if macd_data['histogram'] <= 0:
-                reason = f"Gate3 MACD histogram {macd_data['histogram']:.4f} <= 0"
+            # M3: report the MACD LINE (12EMA-26EMA), which is the real entry gate
+            # (front side > 0). calculate_macd returns it under key 'macd'. The old
+            # diagnostic logged 'histogram', so it reported a different blocking reason
+            # than the gate that actually fires in entry_engine.
+            if macd_data['macd'] <= 0:
+                reason = f"Gate3 MACD line {macd_data['macd']:.4f} <= 0 (back side)"
                 self._last_gate[symbol] = reason
                 logger.info(f"  [{symbol}] {reason}")
                 return
@@ -636,6 +655,11 @@ class LiveScanner:
         label = f"{now_et.hour}:{now_et.minute:02d}"
         logger.info(f"=== PREMARKET SCAN ({label} ET) ===")
 
+        # M2: use the (optimized) ScannerConfig thresholds, not module constants, so the
+        # tuned Category-A pillars actually reach live. Falls back to ScannerConfig()
+        # defaults (which equal the old constants except max_float: 20M vs 100M).
+        scfg = self._scanner_config or ScannerConfig()
+
         today   = now_et.date()
         now_utc = now_et.astimezone(pytz.UTC)
 
@@ -659,7 +683,7 @@ class LiveScanner:
         for symbol, quote in quotes.items():
             price = quote.last or quote.ask    # last price (or ask if last unavailable)
 
-            if not (1.0 <= price <= 20.0):
+            if not (scfg.min_price <= price <= scfg.max_price):
                 continue
 
             # Use prior close from DB (already loaded in startup_preload)
@@ -667,13 +691,13 @@ class LiveScanner:
             if not prior_close or prior_close <= 0:
                 continue
             pct_gain = (price / prior_close - 1.0) * 100.0
-            if pct_gain < PREMARKET_MIN_GAIN_PCT:
+            if pct_gain < scfg.min_premarket_gain:
                 continue
 
             price_gain_candidates.append((symbol, price, prior_close, pct_gain))
 
-        logger.info(f"  {len(price_gain_candidates)} symbols up {PREMARKET_MIN_GAIN_PCT}%+ "
-                    f"in ${1.0}–${20.0} range")
+        logger.info(f"  {len(price_gain_candidates)} symbols up {scfg.min_premarket_gain}%+ "
+                    f"in ${scfg.min_price}–${scfg.max_price} range")
 
         if not price_gain_candidates:
             logger.info("  No premarket movers found — quiet morning")
@@ -711,12 +735,12 @@ class LiveScanner:
 
             avg_vol = avg_vols.get(symbol, 0.0)
             rel_vol = (total_vol / avg_vol) if avg_vol > 0 else 0.0
-            if rel_vol < PREMARKET_MIN_REL_VOL:
+            if rel_vol < scfg.min_relative_volume:
                 continue
 
             fund         = self._fundamentals.get(symbol, {})
             float_shares = fund.get('float_shares')
-            if float_shares and float_shares > PREMARKET_MAX_FLOAT:
+            if float_shares and float_shares > scfg.max_float:
                 continue
 
             qualified.append((symbol, pct_gain, rel_vol, price, float_shares))

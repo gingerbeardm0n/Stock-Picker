@@ -37,7 +37,9 @@ load_dotenv()
 DB_CONN = os.getenv('TIMESCALE_CONNECTION_STRING',
                     'postgresql://postgres:yourpassword@localhost:5432/stockdata')
 
-STOCKS_FILE = os.path.join(os.path.dirname(__file__), '../../database/stocks_1_to_20.txt')
+_services_file  = os.path.join(os.path.dirname(__file__), '../../services/stocks_in_price_range.txt')
+_database_file  = os.path.join(os.path.dirname(__file__), '../../../database/stocks_1_to_20.txt')
+STOCKS_FILE = _services_file if os.path.exists(_services_file) else _database_file
 LOG_FILE    = os.path.join(os.path.dirname(__file__), 'collector.log')
 
 MARKET_OPEN_HOUR  = 4   # 4 AM ET (pre-market opens)
@@ -79,7 +81,7 @@ def load_symbols():
     """Load stock universe from stocks_1_to_20.txt"""
     if not os.path.exists(STOCKS_FILE):
         logger.error(f"Symbol file not found: {STOCKS_FILE}")
-        logger.error("Run: python database/fetch_stocks_1_to_20.py")
+        logger.error("Run: python production/services/fetch_stocks_in_price_range.py")
         return []
 
     with open(STOCKS_FILE) as f:

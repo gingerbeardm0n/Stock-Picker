@@ -141,17 +141,23 @@ class LiveTradeManager:
     def has_open_position(self) -> bool:
         return self.active_trade is not None
 
-    def execute_entry(self, entry_signal: EntrySignal, ask_price: float) -> bool:
+    def execute_entry(self, entry_signal: EntrySignal, ask_price: float,
+                      shares: int | None = None) -> bool:
         """
         Place entry order and set up stop loss after fill.
         Returns True if position entered, False if order timed out or rejected.
+
+        shares: engine-computed size (LiveBroker passes sizing.compute_shares() so live
+        sizes IDENTICALLY to the sim — fixes audit H2). None = legacy internal
+        _calculate_shares (basic risk%/max_position_pct only).
         """
         if self.has_open_position():
             logger.warning("execute_entry called but position already open — skipping")
             return False
 
         pattern = entry_signal.pattern
-        shares  = self._calculate_shares(ask_price, pattern.stop_price)
+        if shares is None:
+            shares = self._calculate_shares(ask_price, pattern.stop_price)
         if shares <= 0:
             logger.warning(f"Skipping entry for {entry_signal.symbol}: "
                            f"shares=0 (balance=${self.account_balance:.0f}, "

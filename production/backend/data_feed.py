@@ -24,9 +24,9 @@ class AlpacaDataFeed:
         self.trading_client = TradingClient(
             Config.ALPACA_API_KEY,
             Config.ALPACA_SECRET_KEY,
-            paper=Config.ALPACA_PAPER_TRADING
+            paper=(Config.TRADING_MODE == 'PAPER')
         )
-        trading_mode = "Paper Trading" if Config.ALPACA_PAPER_TRADING else "Live Trading"
+        trading_mode = "Paper Trading" if Config.TRADING_MODE == 'PAPER' else "Live Trading"
         logger.info(f"✅ Alpaca API clients initialized ({trading_mode})")
 
     def get_active_stocks(self):

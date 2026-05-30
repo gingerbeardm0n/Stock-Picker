@@ -254,11 +254,6 @@ class MarketTemperatureConfig:
     cold_max_position_pct: float = 10.0
     chop_max_position_pct: float = 5.0
 
-    # ── Per-temperature max trades overrides ──────────────────────────────────
-    hot_max_trades: int = 10
-    neutral_max_trades: int = 5
-    cold_max_trades: int = 3
-    chop_max_trades: int = 1
 
 
 @dataclass

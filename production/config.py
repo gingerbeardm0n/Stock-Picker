@@ -54,8 +54,11 @@ class Config:
     BROKER = os.getenv('BROKER', 'tradier').lower()
 
     # ── Tradier credentials ────────────────────────────────────────────────────
-    TRADIER_TOKEN      = os.getenv('TRADIER_TOKEN', '')
-    TRADIER_ACCOUNT_ID = os.getenv('TRADIER_ACCOUNT_ID', '')
+    TRADIER_PAPER_TOKEN      = os.getenv('TRADIER_PAPER_TOKEN', '')
+    TRADIER_PRODUCTION_TOKEN = os.getenv('TRADIER_PRODUCTION_TOKEN', '')
+    TRADIER_ACCOUNT_ID       = os.getenv('TRADIER_ACCOUNT_ID', '')
+    # Backward-compat: legacy TRADIER_TOKEN key still works if new keys absent
+    TRADIER_TOKEN = TRADIER_PAPER_TOKEN or os.getenv('TRADIER_TOKEN', '')
 
     # ── Alpaca credentials (optional — only needed if BROKER=alpaca) ──────────
     ALPACA_API_KEY    = os.getenv('APCA_API_KEY_ID', '')
@@ -136,14 +139,16 @@ class Config:
     @classmethod
     def _make_tradier_broker(cls):
         from trading.broker.tradier import TradierBroker
-        if not cls.TRADIER_TOKEN or not cls.TRADIER_ACCOUNT_ID:
+        sandbox = (cls.TRADING_MODE == 'PAPER')
+        token   = cls.TRADIER_PAPER_TOKEN if sandbox else cls.TRADIER_PRODUCTION_TOKEN
+        if not token or not cls.TRADIER_ACCOUNT_ID:
             raise ValueError(
                 f"ERROR: Tradier credentials not found in {env_file}.\n"
-                f"Add TRADIER_TOKEN=<token> and TRADIER_ACCOUNT_ID=<id>."
+                f"Paper mode needs TRADIER_PAPER_TOKEN + TRADIER_ACCOUNT_ID.\n"
+                f"Live mode needs TRADIER_PRODUCTION_TOKEN + TRADIER_ACCOUNT_ID."
             )
-        sandbox = (cls.TRADING_MODE == 'PAPER')
         broker  = TradierBroker(
-            token=cls.TRADIER_TOKEN,
+            token=token,
             account_id=cls.TRADIER_ACCOUNT_ID,
             sandbox=sandbox,
         )
@@ -165,13 +170,19 @@ class Config:
     @classmethod
     def _make_tradier_data_feed(cls):
         from trading.broker.tradier import TradierDataFeed
-        if not cls.TRADIER_TOKEN:
+        # Data feed always uses production token for real market data.
+        # Falls back to paper token (15-min delayed) if production not set.
+        token = cls.TRADIER_PRODUCTION_TOKEN or cls.TRADIER_PAPER_TOKEN
+        if not token:
             raise ValueError(
-                f"ERROR: TRADIER_TOKEN not found in {env_file}."
+                f"ERROR: No Tradier token found in {env_file}.\n"
+                f"Set TRADIER_PRODUCTION_TOKEN for real market data."
             )
+        # sandbox=False when using production token (real market data endpoint)
+        sandbox = not bool(cls.TRADIER_PRODUCTION_TOKEN)
         return TradierDataFeed(
-            token=cls.TRADIER_TOKEN,
-            sandbox=(cls.TRADING_MODE == 'PAPER'),
+            token=token,
+            sandbox=sandbox,
         )
 
     @classmethod

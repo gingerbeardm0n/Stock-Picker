@@ -19,9 +19,11 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # research/
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../production')))  # production/
 
+import time
 from datetime import datetime
 
 from optimizer.run_config import RunConfig
+from optimizer.objective_functions import compute_objective
 from simulator.simulation_engine import SimulationRunner
 from utils.trading_calendar import get_trading_days
 
@@ -36,9 +38,19 @@ def run_date_range(
     cache_dir: str | None = None,
     on_day_complete=None,
     symbol_universe: list | dict | None = None,
+    print_dates: bool = False,
+    early_abort_days: int = 0,
+    dates: list | None = None,
 ) -> dict:
     """
     Run a simulation over a date range using the given RunConfig.
+
+    dates: optional explicit list of trading days (str 'YYYY-MM-DD' or date objects).
+           When provided, it OVERRIDES the contiguous get_trading_days(start, end)
+           range — the simulation runs ONLY these days, in the given order.
+           start_date/end_date are then used only as metadata labels (results DB).
+           This powers the oracle test, which runs a config over a scattered
+           subset of days that share one market-temperature label.
 
     symbol_universe accepts two formats:
       - list[str]        : flat symbol list, same for every day (legacy)
@@ -62,21 +74,34 @@ def run_date_range(
     On failure (no data for any day), returns a metrics dict with all zeros
     and objective = -999.0 so Optuna treats it as a bad trial.
     """
-    start = datetime.strptime(start_date, '%Y-%m-%d').date()
-    end   = datetime.strptime(end_date,   '%Y-%m-%d').date()
-    trading_days = get_trading_days(start, end)
+    if dates is not None:
+        # Explicit day-subset mode (oracle test). Accept str or date objects.
+        trading_days = [
+            d if not isinstance(d, str) else datetime.strptime(d, '%Y-%m-%d').date()
+            for d in dates
+        ]
+    else:
+        start = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end   = datetime.strptime(end_date,   '%Y-%m-%d').date()
+        trading_days = get_trading_days(start, end)
 
     all_trades: list[dict] = []
     all_daily_pnls: list[float] = []
     total_winners = 0
     total_losers  = 0
+    n_days = len(trading_days)
+    _days_with_data = 0   # successful SimulationRunner days (for early-abort denominator)
 
-    for day in trading_days:
+    for day_idx, day in enumerate(trading_days, 1):
         # Resolve per-day symbol list when universe is date-specific dict
         if isinstance(symbol_universe, dict):
             day_symbols = symbol_universe.get(str(day), [])
         else:
             day_symbols = symbol_universe  # flat list or None
+
+        if verbose or print_dates:
+            print(f"  [{day_idx}/{n_days}] {day} starting...", flush=True)
+        _day_t0 = time.perf_counter()
 
         runner = SimulationRunner(
             date=day,
@@ -100,10 +125,22 @@ def run_date_range(
         )
 
         success = runner.run()
+        _day_elapsed = time.perf_counter() - _day_t0
         if on_day_complete is not None:
-            on_day_complete()
+            on_day_complete(str(day))
+        if verbose or print_dates:
+            print(f"  [{day_idx}/{n_days}] {day} done ({_day_elapsed:.1f}s)", flush=True)
         if not success:
             continue
+
+        _days_with_data += 1
+
+        # Early-abort: dead config check.
+        # If early_abort_days > 0 and we've run at least that many data-days
+        # without a single trade, this config is almost certainly too restrictive.
+        # Return empty metrics now instead of burning the remaining days.
+        if early_abort_days > 0 and _days_with_data >= early_abort_days and len(all_trades) == 0:
+            return _empty_metrics()
 
         stats = runner.position_manager.get_stats()
         daily_pnl = runner.position_manager.current_balance - config.account_size
@@ -138,8 +175,19 @@ def run_date_range(
     avg_daily_pnl = sum(all_daily_pnls) / len(all_daily_pnls) if all_daily_pnls else 0.0
     max_drawdown  = _compute_max_drawdown([t['pnl'] for t in all_trades])
 
-    # Objective: total P&L in dollars (account-size-agnostic, easy to read)
-    objective = total_pnl
+    # Objective: robustness-adjusted ('consistency'). Rewards green-day frequency
+    # and payoff ratio, penalizes drawdown, shrinks on thin trade/day samples — and
+    # does NOT amputate the right tail (downside-only risk via the green-rate factor).
+    # Replaces raw total_pnl, which rewarded the tiny-win / one-lucky-day regime.
+    # Raw total_pnl is still reported below for comparison.
+    # See research/optimizer/objective_functions.py + memory/optimizer_objective_fix.md.
+    objective = compute_objective(
+        formula='consistency',
+        total_pnl=total_pnl,
+        max_drawdown=max_drawdown,
+        trade_pnls=[t['pnl'] for t in all_trades],
+        daily_pnls=all_daily_pnls,
+    )
 
     return {
         'total_trades':  total_trades,

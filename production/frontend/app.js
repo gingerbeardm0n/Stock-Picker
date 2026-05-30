@@ -273,6 +273,13 @@ function setupEventListeners() {
         switchMode('backtest');
     });
 
+    document.getElementById('liveTradingMode').addEventListener('click', () => {
+        switchMode('liveTrading');
+    });
+
+    // Live trading log filter — re-filter existing lines on each keystroke
+    document.getElementById('ltFilter').addEventListener('input', ltRefilter);
+
     // Main scan button — always saves current filter state before scanning
     document.getElementById('scanBtn').addEventListener('click', () => {
         saveCriteria();
@@ -294,23 +301,52 @@ function switchMode(mode) {
     currentMode = mode;
 
     // Update UI
-    const liveBtn = document.getElementById('liveMode');
-    const backtestBtn = document.getElementById('backtestMode');
-    const datePicker = document.getElementById('backtestDatePicker');
-    const scanBtn = document.getElementById('scanBtn');
+    const liveBtn         = document.getElementById('liveMode');
+    const backtestBtn     = document.getElementById('backtestMode');
+    const liveTradingBtn  = document.getElementById('liveTradingMode');
+    const datePicker      = document.getElementById('backtestDatePicker');
+    const scanBtn         = document.getElementById('scanBtn');
+    const scannerUI       = document.querySelector('.criteria-panel');
+    const resultsUI       = document.querySelector('.results-summary');
+    const gridUI          = document.getElementById('stockGrid');
+    const ltTab           = document.getElementById('liveTradingTab');
 
-    if (mode === 'live') {
-        liveBtn.classList.add('active');
-        backtestBtn.classList.remove('active');
+    // Reset all buttons
+    liveBtn.classList.remove('active');
+    backtestBtn.classList.remove('active');
+    liveTradingBtn.classList.remove('active');
+
+    if (mode === 'liveTrading') {
+        liveTradingBtn.classList.add('active');
         datePicker.style.display = 'none';
-        scanBtn.textContent = 'Scan Now';
-        updateStatus('Live mode - scanning latest database data');
+        scanBtn.style.display = 'none';
+        if (scannerUI) scannerUI.style.display = 'none';
+        if (resultsUI) resultsUI.style.display = 'none';
+        if (gridUI)    gridUI.style.display    = 'none';
+        ltTab.style.display = 'block';
+        updateStatus('Live Trading monitor');
+        ltStartPolling();
+        ltStartLogStream();
     } else {
-        liveBtn.classList.remove('active');
-        backtestBtn.classList.add('active');
-        datePicker.style.display = 'flex';
-        scanBtn.textContent = 'Backtest Date';
-        updateStatus('Backtest mode - select a date to scan');
+        ltStopPolling();
+        ltStopLogStream();
+        ltTab.style.display = 'none';
+        scanBtn.style.display = '';
+        if (scannerUI) scannerUI.style.display = '';
+        if (resultsUI) resultsUI.style.display = '';
+        if (gridUI)    gridUI.style.display    = '';
+
+        if (mode === 'live') {
+            liveBtn.classList.add('active');
+            datePicker.style.display = 'none';
+            scanBtn.textContent = 'Scan Now';
+            updateStatus('Live mode - scanning latest database data');
+        } else {
+            backtestBtn.classList.add('active');
+            datePicker.style.display = 'flex';
+            scanBtn.textContent = 'Backtest Date';
+            updateStatus('Backtest mode - select a date to scan');
+        }
     }
 }
 
@@ -493,4 +529,161 @@ function updateStatus(message, type = '') {
     if (type) {
         statusEl.classList.add(`status-${type}`);
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Live Trading Tab
+// ─────────────────────────────────────────────────────────────────────────────
+
+let _ltPollInterval = null;
+let _ltEventSource  = null;
+let _ltAllLines     = [];    // all raw log lines received this session
+
+function ltStartPolling() {
+    if (_ltPollInterval) return;
+    ltFetchStatus();
+    _ltPollInterval = setInterval(ltFetchStatus, 3000);
+}
+
+function ltStopPolling() {
+    if (_ltPollInterval) { clearInterval(_ltPollInterval); _ltPollInterval = null; }
+}
+
+function ltStartLogStream() {
+    if (_ltEventSource) return;
+    _ltAllLines = [];
+    document.getElementById('ltLog').innerHTML = '';
+    try {
+        _ltEventSource = new EventSource('/api/trading/logs?lines=200');
+        _ltEventSource.onmessage = (evt) => ltAppendLine(evt.data);
+        _ltEventSource.onerror   = () => {};   // silently handle when session not running
+    } catch(e) {}
+}
+
+function ltStopLogStream() {
+    if (_ltEventSource) { _ltEventSource.close(); _ltEventSource = null; }
+}
+
+async function ltFetchStatus() {
+    try {
+        const res  = await fetch('/api/trading/status');
+        const data = await res.json();
+        ltRenderStatus(data);
+    } catch (e) {
+        document.getElementById('ltStatus').textContent = 'Flask offline';
+    }
+}
+
+function ltRenderStatus(data) {
+    const dot    = document.getElementById('ltDot');
+    const status = document.getElementById('ltStatus');
+    const bars   = document.getElementById('ltBars');
+    const pnl    = document.getElementById('ltPnl');
+    const trades = document.getElementById('ltTrades');
+
+    if (!data.session_running) {
+        dot.style.color = '#888';
+        status.textContent = `Not running (as of ${data.as_of || '—'})`;
+        bars.textContent   = '—';
+        pnl.textContent    = 'P&L: —';
+        trades.textContent = '0 trades';
+    } else {
+        dot.style.color = '#4CAF50';
+        status.textContent = `RUNNING  ${data.as_of}`;
+        bars.textContent   = `${(data.bars_processed || 0).toLocaleString()} bars`;
+        const p = data.session_pnl || 0;
+        pnl.textContent = `P&L: ${p >= 0 ? '+' : ''}$${p.toFixed(2)}`;
+        trades.textContent = `${data.completed_trades || 0} trades`;
+    }
+
+    // Watchlist
+    const watchlist = data.watchlist || [];
+    document.getElementById('ltWatchCount').textContent = watchlist.length;
+    const tbody = document.getElementById('ltWatchBody');
+    tbody.innerHTML = watchlist.map(w => {
+        const gateColor = w.last_gate ? '#c0392b' : '#27ae60';
+        const gateDot   = w.last_gate ? '✗' : '✓';
+        return `
+        <tr style="border-top:1px solid #e8e8e8;" title="${w.last_gate || 'All gates passed'}">
+            <td style="padding:2px 4px; font-weight:bold; font-size:11px;">
+                <span style="color:${gateColor}; font-size:9px; margin-right:2px;">${gateDot}</span>${w.symbol}
+            </td>
+            <td style="padding:2px 4px; text-align:right; font-size:11px;">$${w.price.toFixed(2)}</td>
+            <td style="padding:2px 4px; text-align:right; font-size:11px; color:${w.gain_pct >= 0 ? '#2e7d32' : '#c62828'}; font-weight:bold;">
+                +${w.gain_pct.toFixed(0)}%
+            </td>
+            <td style="padding:2px 4px; text-align:right; font-size:11px; color:#555;">${w.rel_vol.toFixed(0)}x</td>
+        </tr>`;
+    }).join('');
+
+    // Active position
+    const posEl = document.getElementById('ltPosition');
+    if (!data.active_position) {
+        posEl.innerHTML = '<span style="color:#aaa; font-size:11px;">None</span>';
+    } else {
+        const p = data.active_position;
+        posEl.innerHTML = `
+            <div style="font-weight:bold; font-size:12px; margin-bottom:4px;">${p.symbol} <span style="color:#888; font-weight:normal;">${p.pattern}</span></div>
+            <div style="margin-bottom:2px;">Entry <strong>$${p.entry_price}</strong> × ${p.shares.toLocaleString()}</div>
+            <div style="color:#c62828;">Stop $${p.stop_loss}</div>
+            <div style="color:#2e7d32;">T1 $${p.target1}</div>
+        `;
+    }
+}
+
+function ltColorize(line) {
+    return line
+        .replace(/(ENTRY SIGNAL)/g, '<span style="color:#FFD700;">$1</span>')
+        .replace(/(EXIT SIGNAL)/g,  '<span style="color:#FF8C00;">$1</span>')
+        .replace(/(GAPRUN)/g,       '<span style="color:#87CEEB;">$1</span>')
+        .replace(/(Gate[234])/g,    '<span style="color:#B0B0B0;">$1</span>');
+}
+
+function ltLineMatchesFilter(line, filter) {
+    if (!filter) return true;
+    return line.toLowerCase().includes(filter.toLowerCase());
+}
+
+function ltAppendLine(line) {
+    // Always store the raw line
+    _ltAllLines.push(line);
+    if (_ltAllLines.length > 2000) _ltAllLines.shift();
+
+    const filter = document.getElementById('ltFilter').value.trim();
+    if (!ltLineMatchesFilter(line, filter)) return;
+
+    const logEl = document.getElementById('ltLog');
+    const div = document.createElement('div');
+    div.innerHTML = ltColorize(line);
+    logEl.appendChild(div);
+
+    while (logEl.children.length > 2000) logEl.removeChild(logEl.firstChild);
+
+    if (document.getElementById('ltAutoScroll').checked) {
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+}
+
+function ltRefilter() {
+    const filter = document.getElementById('ltFilter').value.trim();
+    const logEl  = document.getElementById('ltLog');
+    logEl.innerHTML = '';
+    for (const line of _ltAllLines) {
+        if (!ltLineMatchesFilter(line, filter)) continue;
+        const div = document.createElement('div');
+        div.innerHTML = ltColorize(line);
+        logEl.appendChild(div);
+    }
+    if (document.getElementById('ltAutoScroll').checked) {
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+}
+
+function ltSetFilter(text) {
+    document.getElementById('ltFilter').value = text;
+    ltRefilter();
+}
+
+function ltClearFilter() {
+    ltSetFilter('');
 }

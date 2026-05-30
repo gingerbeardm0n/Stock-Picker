@@ -7,6 +7,7 @@ Fetch historical data from TimescaleDB for backtesting and analysis.
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
+import socket as _socket
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import pytz
@@ -22,8 +23,20 @@ ET = pytz.timezone('America/New_York')
 class StockDataDB:
     """Database interface for historical stock data"""
 
-    def __init__(self):
-        self.conn = psycopg2.connect(DB_CONN)
+    def __init__(self, socket_timeout: float = 60.0):
+        # socket.setdefaulttimeout() applies to all sockets created in this call,
+        # including psycopg2's internal socket — works on Windows unlike fromfd().
+        _prev = _socket.getdefaulttimeout()
+        if socket_timeout > 0:
+            _socket.setdefaulttimeout(socket_timeout)
+        try:
+            self.conn = psycopg2.connect(
+                DB_CONN,
+                connect_timeout=10,
+                options="-c statement_timeout=55000",
+            )
+        finally:
+            _socket.setdefaulttimeout(_prev)  # restore global default
 
     def close(self):
         """Close database connection"""
@@ -549,6 +562,92 @@ class StockDataDB:
                 'industry':     row['industry'],
             }
             for row in results
+        }
+
+    def get_intraday_bars_batch(self, symbols: list, trade_date, until_utc) -> dict:
+        """
+        Get all 1-minute bars for symbols from 4am ET on trade_date up to until_utc.
+
+        Used by LiveScanner.startup_preload() to seed _bar_history on restart so
+        patterns/trend/EMA/MACD are calculable immediately rather than waiting
+        35–40 minutes for enough bars to accumulate via WebSocket.
+
+        Returns:
+            Dict of {symbol: [bar_dicts]} where each bar dict matches AlpacaBarStream
+            output: {'symbol', 'time' (UTC-aware), 'open', 'high', 'low', 'close', 'volume'}
+        """
+        from datetime import time as dtime
+        start_et  = ET.localize(datetime.combine(trade_date, dtime(4, 0)))
+        start_utc = start_et.astimezone(pytz.UTC)
+
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        query = """
+            SELECT time, symbol, open, high, low, close, volume
+            FROM stock_candles_1m
+            WHERE symbol = ANY(%s)
+              AND time >= %s
+              AND time <= %s
+            ORDER BY symbol, time
+        """
+        cursor.execute(query, [symbols, start_utc, until_utc])
+        rows = cursor.fetchall()
+        cursor.close()
+
+        data: dict = {}
+        for row in rows:
+            sym = row['symbol']
+            if sym not in data:
+                data[sym] = []
+            t = row['time']
+            if t.tzinfo is None:
+                t = pytz.UTC.localize(t)
+            data[sym].append({
+                'symbol': sym,
+                'time':   t,
+                'open':   float(row['open']),
+                'high':   float(row['high']),
+                'low':    float(row['low']),
+                'close':  float(row['close']),
+                'volume': int(row['volume']),
+            })
+
+        return data
+
+    def get_premarket_snapshot(self, trade_date, snapshot_time_utc):
+        """
+        Get premarket state for all symbols: last price and cumulative volume
+        from 4am ET up to snapshot_time_utc.
+
+        Used by the 9:25 / 9:28 premarket DB scan to build the watchlist
+        before market open. Reads from what collect_data.py has already written.
+
+        Returns:
+            Dict of {symbol: {'last_close': float, 'total_volume': int}}
+        """
+        from datetime import time as dtime
+        start_et = ET.localize(datetime.combine(trade_date, dtime(4, 0)))
+        start_utc = start_et.astimezone(pytz.UTC)
+
+        cursor = self.conn.cursor()
+        query = """
+            SELECT
+                symbol,
+                SUM(volume)                               AS total_volume,
+                (array_agg(close ORDER BY time DESC))[1]  AS last_close
+            FROM stock_candles_1m
+            WHERE time >= %s
+              AND time <= %s
+            GROUP BY symbol
+            HAVING SUM(volume) > 0
+        """
+        cursor.execute(query, [start_utc, snapshot_time_utc])
+        rows = cursor.fetchall()
+        cursor.close()
+
+        return {
+            row[0]: {'last_close': float(row[2]), 'total_volume': int(row[1])}
+            for row in rows
+            if row[2] is not None
         }
 
     # ========================================================================

@@ -15,7 +15,7 @@ Exit priority (checked in order, first match wins):
     6. MACD flip          — histogram crosses zero (Phase 3)     → scale out (if enabled)
     7. Resistance touch   — N-th test of prior-day high (Ph. 3) → scale out (if enabled)
     8. Early time decay   — before 11 AM, no major gains (Ph. 4)→ exit if enabled
-    9. Time decay         — after 12 PM ET, profitable           → exit remaining
+    9. Time decay         — at/after 11 AM ET, profitable         → exit remaining
    10. Selling pressure   — selling vol > buying vol × ratio     → scale out
    11. Volume dry-up      — buying vol collapsed vs avg (Ph. 4)  → scale out (if enabled)
 
@@ -213,8 +213,13 @@ def evaluate_exit(
                     qty=shares_remaining,
                 )
 
-    # ── 9. Time decay — after 12:00 PM ET ─────────────────────────────────────
-    # Exit open positions before the midday cutoff.
+    # ── 9. Time decay — at/after time_decay_hour (default 11:00 AM ET) ─────────
+    # RC: 11 AM = dead zone; exit profitable positions at the morning cutoff.
+    # NOTE: flat hour for all regimes — concept_market_temperature §9 wants this
+    # per-temperature (HOT 12:00 / NEUTRAL 11:00 / COLD 10:30 / CHOP 10:00). See
+    # docs/CORPUS_THRESHOLD_AUDIT.md E1. Tested 2025-Q1 (per-temp via TemperatureState):
+    # marginally worse on the losing baseline (obj −1635 vs −1624) — reverted. Revisit
+    # with a profitable config + better COLD-detecting classifier.
     if in_profit and et_time.hour >= cfg.time_decay_hour:
         return ExitSignal(
             reason='TIME_DECAY',

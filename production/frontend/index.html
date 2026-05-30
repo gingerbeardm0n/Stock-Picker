@@ -21,6 +21,7 @@
             <div class="mode-toggle">
                 <button id="liveMode" class="mode-btn active">📊 Live Mode</button>
                 <button id="backtestMode" class="mode-btn">📈 Backtest</button>
+                <button id="liveTradingMode" class="mode-btn">⚡ Live Trading</button>
             </div>
 
             <!-- Date & Time Picker (only visible in backtest mode) -->
@@ -102,6 +103,86 @@
             <div id="modalArticles" class="modal-articles"></div>
         </div>
     </div>
+
+    <!-- Live Trading Tab (hidden by default; shown via JS tab logic) -->
+    <div id="liveTradingTab" style="display:none; margin-top:1rem;">
+
+        <!-- Status bar -->
+        <div id="ltStatusBar" style="
+            background:#1a1a2e; color:#e0e0e0; padding:8px 14px;
+            border-radius:6px; display:flex; gap:16px; align-items:center;
+            font-family:monospace; font-size:12px; margin-bottom:8px;">
+            <span id="ltDot" style="color:#888;">●</span>
+            <span id="ltStatus">Not running</span>
+            <span style="color:#555;">|</span>
+            <span id="ltBars">0 bars</span>
+            <span style="color:#555;">|</span>
+            <span id="ltPnl">P&amp;L: —</span>
+            <span style="color:#555;">|</span>
+            <span id="ltTrades">0 trades</span>
+        </div>
+
+        <!-- Main body: sidebar left, logs right -->
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+
+            <!-- LEFT SIDEBAR: Watchlist + Position (fixed narrow width) -->
+            <div style="width:220px; flex-shrink:0; display:flex; flex-direction:column; gap:8px;">
+
+                <!-- Watchlist -->
+                <div style="background:#f4f4f4; border:1px solid #ddd; border-radius:6px; padding:8px;">
+                    <div style="font-size:11px; font-weight:bold; color:#444; margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em;">
+                        Watchlist (<span id="ltWatchCount">0</span>)
+                    </div>
+                    <table id="ltWatchTable" style="width:100%; border-collapse:collapse; font-size:11px;">
+                        <thead>
+                            <tr style="color:#888; text-align:left; border-bottom:1px solid #ddd;">
+                                <th style="padding:2px 4px; font-weight:600;">Sym</th>
+                                <th style="padding:2px 4px; font-weight:600; text-align:right;">$</th>
+                                <th style="padding:2px 4px; font-weight:600; text-align:right;">Gain</th>
+                                <th style="padding:2px 4px; font-weight:600; text-align:right;">RVol</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ltWatchBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- Active Position -->
+                <div style="background:#f4f4f4; border:1px solid #ddd; border-radius:6px; padding:8px;">
+                    <div style="font-size:11px; font-weight:bold; color:#444; margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em;">
+                        Position
+                    </div>
+                    <div id="ltPosition" style="font-size:11px; color:#555;">None</div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT: Log stream (fills remaining space) -->
+            <div style="flex:1; background:#111; border-radius:6px; padding:10px; min-width:0;">
+                <!-- Filter bar -->
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
+                    <input id="ltFilter" type="text" placeholder="filter..."
+                        style="width:110px; background:#222; color:#eee; border:1px solid #444;
+                               border-radius:4px; padding:2px 6px; font-size:11px;">
+                    <button onclick="ltSetFilter('ENTRY SIGNAL')" style="background:#2a2500; color:#FFD700; border:1px solid #554400; border-radius:3px; padding:1px 7px; font-size:11px; cursor:pointer;">ENTRY</button>
+                    <button onclick="ltSetFilter('EXIT')"         style="background:#2a1500; color:#FF8C00; border:1px solid #552200; border-radius:3px; padding:1px 7px; font-size:11px; cursor:pointer;">EXIT</button>
+                    <button onclick="ltSetFilter('GAPRUN')"       style="background:#001a2a; color:#87CEEB; border:1px solid #004466; border-radius:3px; padding:1px 7px; font-size:11px; cursor:pointer;">GAPRUN</button>
+                    <button onclick="ltSetFilter('Gate3')"        style="background:#1a1a1a; color:#aaa;    border:1px solid #444;    border-radius:3px; padding:1px 7px; font-size:11px; cursor:pointer;">Gate3</button>
+                    <button onclick="ltSetFilter('Gate4')"        style="background:#1a1a1a; color:#aaa;    border:1px solid #444;    border-radius:3px; padding:1px 7px; font-size:11px; cursor:pointer;">Gate4</button>
+                    <button onclick="ltClearFilter()"             style="background:#1a1a1a; color:#666;    border:1px solid #333;    border-radius:3px; padding:1px 7px; font-size:11px; cursor:pointer;">Clear</button>
+                    <label style="color:#666; font-size:11px; margin-left:auto;">
+                        <input type="checkbox" id="ltAutoScroll" checked> scroll
+                    </label>
+                </div>
+                <div id="ltLog" style="
+                    height:560px; overflow-y:auto; font-family:monospace;
+                    font-size:11px; color:#c8f7c5; white-space:pre-wrap;
+                    word-break:break-all; line-height:1.4;"></div>
+            </div>
+
+        </div>
+
+    </div>
+    <!-- /Live Trading Tab -->
 
     <!-- AG Grid JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.3/dist/ag-grid-community.min.js"></script>

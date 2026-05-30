@@ -32,9 +32,12 @@ from trading.indicators import get_current_ema, calculate_macd, estimate_buy_sel
 from trading.portfolio_manager import PortfolioManager
 from trading.models import ExitConfig, ScannerConfig, EntryConfig, MarketTemperatureConfig, AddOnConfig, ScoringConfig, ExitSignal
 from trading.trading_engine import Trade, PositionManager
+from simulator.sim_broker import SimBroker
+from trading.orchestrator import Orchestrator
 from trading.market_temperature import (
     TemperatureState, classify_premarket, update_from_trade_result, is_session_over
 )
+from trading.entry_gate import entry_blocked_reason, PORTFOLIO_RULE
 from datetime import datetime, timedelta
 import pytz
 from collections import defaultdict
@@ -50,11 +53,28 @@ ET = pytz.timezone('US/Eastern')
 UTC = pytz.UTC
 
 # How many bars of history to keep per symbol for pattern detection
-BAR_HISTORY_SIZE = 30  # 30 minutes is enough for all patterns + MACD seed
+BAR_HISTORY_SIZE = 40  # H0 FIX: was 30 < 35 (=slow26+signal9) so calculate_macd ALWAYS
+                       # returned None → MACD entry/exit gates were silently DEAD in the sim
+                       # (optimizer tuned with MACD off). 40 matches live BAR_HISTORY_DEPTH.
 
 # Cache to reuse data across trials (keyed by trade date).
-_DATA_CACHE = {}
+_DATA_CACHE: dict = {}          # date → cached day data
+_DATA_CACHE_MAX = 250           # LRU safety cap
 _PERSIST_CACHE_VERSION = "v2"  # bumped: added rel_vol_30d column
+
+# Global symbol table — maps symbol string ↔ uint16 index.
+# Shared across all days so each unique string is allocated once.
+_SYM_TO_IDX: dict = {}         # 'TSLA' → 0
+_IDX_TO_SYM: list = []         # 0 → 'TSLA'
+
+def _intern_symbol(sym: str) -> int:
+    """Return uint16 index for symbol, registering if new."""
+    idx = _SYM_TO_IDX.get(sym)
+    if idx is None:
+        idx = len(_IDX_TO_SYM)
+        _SYM_TO_IDX[sym] = idx
+        _IDX_TO_SYM.append(sym)
+    return idx
 
 
 def _cushion_size_multiplier(daily_pnl: float, daily_goal: float) -> float:
@@ -97,7 +117,6 @@ class SimulationRunner:
                  scoring_config=None,
                  debug=False, cache_data=False, cache_dir: str | None = None,
                  symbol_universe: list | None = None,
-                 max_trades_per_day: int = 3,
                  temp_config=None,
                  enable_news_cache: bool = True):
         if isinstance(date, str):
@@ -109,9 +128,13 @@ class SimulationRunner:
         self.max_position_pct = max_position_pct
         self.verbose = verbose
 
-        self.position_manager = PositionManager(
-            account_size, risk_pct, max_position_pct=max_position_pct
+        # Step 3 (de-logic): orders go through the SimBroker adapter, not PositionManager
+        # directly. self.position_manager stays pointed at the SAME PM instance so all
+        # existing reporting/stat refs are unchanged — only enter/exit/add_on are routed.
+        self.broker = SimBroker(
+            account_size, risk_pct=risk_pct, max_position_pct=max_position_pct
         )
+        self.position_manager = self.broker.position_manager
         self.portfolio_manager = PortfolioManager(
             account_size,
             daily_max_loss_pct=daily_max_loss_pct,
@@ -131,7 +154,8 @@ class SimulationRunner:
         self._universe_key = frozenset(symbol_universe) if symbol_universe else None
 
         self.minute_bars = []
-        self.minute_array = None
+        self.minute_array = None   # float64 array: [unix_ts, open, high, low, close, volume, rel_vol, vwap]
+        self.minute_syms = None    # object array of symbol strings, parallel to minute_array rows
         self.time_index = None
         self.trade_log = []
         self.portfolio_summary = None   # Populated at end of run()
@@ -157,10 +181,9 @@ class SimulationRunner:
         # Persistent DB connection kept open during simulation loop
         self._db = None
 
-        self.max_trades_per_day = max_trades_per_day
 
         # Market temperature — classifies HOT/NEUTRAL/COLD/CHOP at 9:25 AM ET
-        # and adjusts max_position_pct, max_trades_per_day, session_stop_time dynamically.
+        # and adjusts max_position_pct, session_stop_time dynamically.
         self.temp_config: MarketTemperatureConfig = temp_config or MarketTemperatureConfig()
         self.temp_state: TemperatureState = TemperatureState()  # Starts COLD (safe default)
 
@@ -195,6 +218,7 @@ class SimulationRunner:
         if self.cache_data and self.date in _DATA_CACHE:
             cached = _DATA_CACHE[self.date]
             self.minute_array = cached['minute_array']
+            self.minute_syms = cached['minute_syms']
             self.time_index = cached['time_index']
             self.daily_bars_by_symbol = cached['daily_bars_by_symbol']
             self.prior_close = cached['prior_close']
@@ -303,13 +327,27 @@ class SimulationRunner:
         for symbol, vol in premarket_volume.items():
             self._cumulative_volume[symbol] = vol
 
-        self.minute_array = np.array(
-            minute_rows,
-            dtype=object,
-        )
-        self.time_index = defaultdict(list)
-        for idx, row in enumerate(self.minute_array):
-            self.time_index[row[0]].append(idx)
+        # Split into efficient arrays: float64 numerics + uint16 symbol indices.
+        # Avoids ~86 MB/day Python object overhead from dtype=object.
+        # Columns: [unix_ts, open, high, low, close, volume, rel_vol_or_nan, vwap]
+        if minute_rows:
+            self.minute_syms = np.array([_intern_symbol(r[1]) for r in minute_rows], dtype=np.uint16)
+            self.minute_array = np.array(
+                [(r[0].timestamp(), r[2], r[3], r[4], r[5], r[6],
+                  float('nan') if r[7] is None else r[7], r[8])
+                 for r in minute_rows],
+                dtype=np.float64,
+            )
+        else:
+            self.minute_syms = np.array([], dtype=np.uint16)
+            self.minute_array = np.empty((0, 8), dtype=np.float64)
+        _ti: dict = {}
+        for idx in range(len(self.minute_array)):
+            dt = datetime.fromtimestamp(self.minute_array[idx, 0], tz=ET)
+            if dt not in _ti:
+                _ti[dt] = []
+            _ti[dt].append(idx)
+        self.time_index = {k: np.array(v, dtype=np.uint32) for k, v in _ti.items()}
 
         if self.minute_array.size == 0:
             logger.warning(f"No minute bars found for {self.date}")
@@ -329,6 +367,7 @@ class SimulationRunner:
         if self.cache_data:
             _DATA_CACHE[self.date] = {
                 'minute_array': self.minute_array,
+                'minute_syms': self.minute_syms,
                 'time_index': dict(self.time_index),
                 'premarket_volume_by_symbol': dict(premarket_volume),
                 'daily_bars_by_symbol': self.daily_bars_by_symbol,
@@ -339,6 +378,9 @@ class SimulationRunner:
                 'hot_symbols': self.hot_symbols,
                 'universe_key': self._universe_key,
             }
+            # LRU eviction: keep at most _DATA_CACHE_MAX days in memory
+            while len(_DATA_CACHE) > _DATA_CACHE_MAX:
+                _DATA_CACHE.pop(next(iter(_DATA_CACHE)))
         if self.cache_data and self.cache_dir:
             self._persist_cache(dict(premarket_volume), symbols)
         return True
@@ -359,14 +401,14 @@ class SimulationRunner:
         MIN_GAIN  = 10.0
 
         hot = set()
-        for row in self.minute_array:
-            symbol = row[1]
+        for idx in range(len(self.minute_array)):
+            symbol = _IDX_TO_SYM[self.minute_syms[idx]]
             if symbol in hot:
                 continue
             prior = self.prior_close.get(symbol)
             if not prior or prior <= 0:
                 continue
-            close = float(row[5])
+            close = self.minute_array[idx, 4]   # col 4 = close (0=unix_ts,1=open,2=high,3=low,4=close)
             if close < MIN_PRICE or close > MAX_PRICE:
                 continue
             if (close - prior) / prior * 100 < MIN_GAIN:
@@ -486,6 +528,32 @@ class SimulationRunner:
         self.stop_hit_counts = {}
         self.portfolio_manager.reset_day()
 
+        # De-logic: the per-minute decision pipeline now lives in the shared Orchestrator.
+        # It drives the SAME broker/PositionManager (so trades_completed + balance, which
+        # reporting reads, are unchanged) and owns fresh per-day decision state. The sim is
+        # now only a data-feed loader + SimBroker. rel_vol DB lookups stay in the sim via the
+        # injected resolver (orchestrator imports no DB).
+        self.orch = Orchestrator(
+            broker=self.broker,
+            scanner_config=self.scanner_config,
+            entry_config=self.entry_config,
+            exit_config=self.exit_config,
+            scoring_config=self.scoring_config,
+            add_on_config=self.add_on_config,
+            temp_config=self.temp_config,
+            portfolio_manager=self.portfolio_manager,
+            hot_symbols=self.hot_symbols,
+            prior_close=self.prior_close,
+            fundamentals=self.fundamentals,
+            prior_day_high=self.prior_day_high,
+            symbol_universe=self.symbol_universe,
+            news_cache=self.news_cache,
+            rel_vol_resolver=self._resolve_rel_vol,
+            max_position_pct=self.max_position_pct,
+            verbose=self.verbose,
+            debug=self.debug,
+        )
+
         # Keep one DB connection open for the whole simulation loop
         # (rel-vol batch queries use this instead of opening per symbol)
         t0 = time.perf_counter()
@@ -495,21 +563,22 @@ class SimulationRunner:
                 bars = []
                 if self.minute_array is not None:
                     for idx in bars_by_time[minute_time]:
-                        row = self.minute_array[idx]
+                        r = self.minute_array[idx]   # float64: [unix_ts,open,high,low,close,vol,rel_vol,vwap]
+                        rv = r[6]
                         bars.append({
-                            'time': row[0],
-                            'symbol': row[1],
-                            'open': row[2],
-                            'high': row[3],
-                            'low': row[4],
-                            'close': row[5],
-                            'volume': row[6],
-                            'rel_vol_30d': row[7],
-                            'vwap': row[8],
+                            'time': minute_time,
+                            'symbol': _IDX_TO_SYM[self.minute_syms[idx]],
+                            'open': r[1],
+                            'high': r[2],
+                            'low': r[3],
+                            'close': r[4],
+                            'volume': r[5],
+                            'rel_vol_30d': None if (rv != rv) else rv,  # NaN → None
+                            'vwap': r[7],
                         })
                 else:
                     bars = bars_by_time[minute_time]
-                self._process_minute(minute_time, bars)
+                self.orch.on_minute(minute_time, bars)
             self._db = None
         if self.debug:
             self._stats['simulation_seconds'] = time.perf_counter() - t0
@@ -523,6 +592,42 @@ class SimulationRunner:
         if self.debug:
             self._log_debug_summary()
         return True
+
+    def _resolve_rel_vol(self, candidates, et_time):
+        """Injected into the Orchestrator: resolve avg-volume denominators for rel-vol via
+        the DB (the one sim/data concern that must NOT live in the engine). Mirrors the old
+        _scan_for_entry DB block. Returns {symbol: avg_vol}. Only called for symbols whose
+        bar lacks a precomputed rel_vol_30d, in the trading window, in non-universe mode."""
+        avg_vols = {}
+        in_trading_window = (
+            et_time.hour > 9 or (et_time.hour == 9 and et_time.minute >= 30)
+        )
+        symbols_need_query = (
+            [sym for sym, bar, _ in candidates if bar.get('rel_vol_30d') is None]
+            if in_trading_window else []
+        )
+        if symbols_need_query and self._db:
+            minute_key = et_time.hour * 60 + et_time.minute
+            day_avg_cache = None
+            if self.cache_data and self.date in _DATA_CACHE:
+                day_avg_cache = _DATA_CACHE[self.date].setdefault('avg_vols_by_minute', {})
+                cached_avgs = day_avg_cache.get(minute_key)
+                if cached_avgs is not None:
+                    avg_vols = cached_avgs
+                    symbols_need_query = []
+            if symbols_need_query:
+                try:
+                    avg_vols = self._db.get_avg_volume_at_time_batch(
+                        symbols_need_query, self.date,
+                        et_time.hour, et_time.minute,
+                        lookback_days=20,
+                        include_premarket_hourly=True,
+                    )
+                    if day_avg_cache is not None:
+                        day_avg_cache[minute_key] = avg_vols
+                except Exception:
+                    pass
+        return avg_vols
 
     def _process_minute(self, current_time, bars):
         """
@@ -548,7 +653,6 @@ class SimulationRunner:
                 bars_snapshot=bars,
             )
             # Apply temperature-derived limits (override constructor defaults)
-            self.max_trades_per_day = self.temp_state.max_trades_per_day
             self.max_position_pct   = self.temp_state.max_position_pct
             self.position_manager.max_position_pct = self.temp_state.max_position_pct
             if self.verbose:
@@ -557,43 +661,17 @@ class SimulationRunner:
                     f"  gapper={self.temp_state.leading_gapper_pct:.0f}%"
                     f"  symbols={self.temp_state.qualifying_symbols_count}"
                     f"  → max_pos={self.temp_state.max_position_pct:.0f}%"
-                    f"  max_trades={self.temp_state.max_trades_per_day}"
                     f"  stop={self.temp_state.session_stop_hour}:{self.temp_state.session_stop_minute:02d}"
                 )
 
-        # ── Temperature: force-close open position at session stop time ───────
-        if (self.temp_state.premarket_classified
-                and is_session_over(self.temp_state, current_time)
-                and self.position_manager.position):
-            pos = self.position_manager.position
-            pos_bar = next((b for b in bars if b['symbol'] == pos.symbol), None)
-            close_price = float(pos_bar['close']) if pos_bar else pos.entry_price
-            force_exit = ExitSignal(
-                reason='SESSION_STOP',
-                price=close_price,
-                qty=pos.shares_remaining,
-            )
-            pnl = self.position_manager.apply_exit_signal(force_exit, current_time)
-            self.trade_log.append({
-                'time': current_time,
-                'action': 'SESSION_STOP',
-                'symbol': pos.symbol,
-                'price': close_price,
-                'qty': force_exit.qty,
-                'pnl': round(pnl, 2),
-            })
-            self.portfolio_manager.update(
-                current_time=current_time,
-                pnl_delta=pnl,
-                trades_completed=len(self.position_manager.trades_completed),
-            )
-            if self.verbose:
-                logger.info(
-                    f"  {et_time.strftime('%H:%M')} SESSION_STOP"
-                    f"  {pos.symbol:6} @ ${close_price:.2f}"
-                    f"  P&L ${pnl:+.2f}"
-                    f"  ({self.temp_state.temperature.value} session stop)"
-                )
+        # ── Temperature: session stop time reached — no new entries (see below) ─
+        # Do NOT force-close the open position here. Let the exit engine manage it:
+        #   - Stop hit naturally → STOP_HIT
+        #   - T1/T2 target reached → TARGET_1 / TARGET_2
+        #   - 12 PM profitable position → TIME_DECAY (exit engine gate 9)
+        # Forcing a close at session stop ignores the exit engine's priority logic
+        # and exits at an arbitrary price rather than a meaningful level.
+        # Ross: "begin exiting at next favorable candle" (concept_stop_management.md §6.10)
 
         # Step 1: Update bar history and cumulative volume
         for bar in bars:
@@ -632,7 +710,9 @@ class SimulationRunner:
 
                 # Build enriched indicators dict
                 macd_hist = macd['histogram'] if macd else None
-                macd_line = macd['macd_line'] if macd else None
+                macd_line = macd['macd'] if macd else None  # H0 FIX: key is 'macd' not 'macd_line'
+                                                            # (calculate_macd returns macd/signal/histogram).
+                                                            # Was masked while BAR_HISTORY_SIZE<35 kept macd=None.
                 indicators = {
                     'ema9': ema9,
                     'macd_line': macd_line,
@@ -655,7 +735,7 @@ class SimulationRunner:
                 )
 
                 if exit_signal:
-                    pnl = self.position_manager.apply_exit_signal(exit_signal, current_time)
+                    pnl = self.broker.exit(exit_signal, current_time)
                     self.trade_log.append({
                         'time': current_time,
                         'action': exit_signal.reason,
@@ -713,7 +793,7 @@ class SimulationRunner:
                 macd_ao = calculate_macd(prices)
                 indicators_ao = {
                     'ema9': ema9_ao,
-                    'macd_line': macd_ao['macd_line'] if macd_ao else None,
+                    'macd_line': macd_ao['macd'] if macd_ao else None,  # H0 FIX: key 'macd' not 'macd_line'
                 }
 
                 add_on_sig = evaluate_add_on(
@@ -726,7 +806,7 @@ class SimulationRunner:
                     temperature=self.temp_state,
                 )
                 if add_on_sig:
-                    added_qty = self.position_manager.apply_add_on(add_on_sig, current_time)
+                    added_qty = self.broker.add_on(add_on_sig, current_time)
                     if added_qty > 0:
                         self.trade_log.append({
                             'time': current_time,
@@ -750,31 +830,27 @@ class SimulationRunner:
                 if bar_high > pos.session_high_at_add:
                     pos.session_high_at_add = bar_high
 
-        # Step 3: Entry scan
-        # Portfolio rules (DAILY_MAX_LOSS, GREEN_TO_RED, GIVE_BACK_HALF) block
-        # all new entries once fired — enforced here, not just observed.
-        if self.position_manager.can_enter_trade():
-            completed_today = len(self.position_manager.trades_completed)
-            # Temperature-driven session stop: no new entries after session_stop_hour:min
-            if self.temp_state.premarket_classified and is_session_over(self.temp_state, current_time):
-                pass  # silent — session stop already logged on position close
-            elif self.portfolio_manager.any_rule_fired():
-                if self.verbose:
-                    rule = next(
-                        r for r, fired in self.portfolio_manager._rule_fired.items() if fired
-                    )
-                    et_str = current_time.astimezone(ET).strftime('%H:%M')
-                    logger.info(
-                        f"  {et_str} [HALTED] {rule} fired — no new entries today"
-                    )
-            elif completed_today >= self.max_trades_per_day:
-                if self.verbose:
-                    et_str = current_time.astimezone(ET).strftime('%H:%M')
-                    logger.info(
-                        f"  {et_str} [HALTED] max trades/day reached ({completed_today}/{self.max_trades_per_day})"
-                    )
-            else:
-                self._scan_for_entry(current_time, bars)
+        # Step 3: Entry scan — shared gate (trading/entry_gate.py).
+        # The block/allow decision (capacity → temperature session-stop → portfolio
+        # risk rules DAILY_MAX_LOSS/GREEN_TO_RED/GIVE_BACK_HALF) is a de-logic'd pure
+        # function so the live orchestrator inherits the IDENTICAL enforcement instead
+        # of it being a simulator-only behavior.
+        block = entry_blocked_reason(
+            can_enter_trade=self.position_manager.can_enter_trade(),
+            premarket_classified=self.temp_state.premarket_classified,
+            session_over=is_session_over(self.temp_state, current_time),
+            any_rule_fired=self.portfolio_manager.any_rule_fired(),
+        )
+        if block is None:
+            self._scan_for_entry(current_time, bars)
+        elif block == PORTFOLIO_RULE and self.verbose:
+            rule = next(
+                r for r, fired in self.portfolio_manager._rule_fired.items() if fired
+            )
+            et_str = current_time.astimezone(ET).strftime('%H:%M')
+            logger.info(
+                f"  {et_str} [HALTED] {rule} fired — no new entries today"
+            )
 
     def _scan_for_entry(self, current_time, bars):
         """Evaluate all symbols and enter on the best signal.
@@ -965,14 +1041,10 @@ class SimulationRunner:
 
             size_mult = gap14_mult * score_mult * cushion_mult
 
-            trade = self.position_manager.enter_position(
-                symbol=best_signal.symbol,
-                entry_price=pat.entry_price,
-                entry_time=current_time,
-                stop_loss_price=pat.stop_price,
-                target1=pat.target1,
-                target2=pat.target2,
-                pattern_type=pat.pattern_type,
+            trade = self.broker.enter(
+                best_signal,
+                when=current_time,
+                ref_price=pat.entry_price,
                 float_shares=fund.get('float_shares'),  # GAP-11: float-bucket cap
                 size_multiplier=size_mult,               # GAP-14: cooldown sizing
             )
@@ -1050,16 +1122,24 @@ class SimulationRunner:
         fundamentals_tbl = pq.read_table(fundamentals_path)
 
         minute_rows = minute_tbl.to_pylist()
-        self.minute_array = np.array(
-            [
-                (r['time'], r['symbol'], r['open'], r['high'], r['low'], r['close'], r['volume'], r.get('rel_vol_30d'), r['vwap'])
-                for r in minute_rows
-            ],
-            dtype=object,
-        )
-        self.time_index = defaultdict(list)
-        for idx, row in enumerate(self.minute_array):
-            self.time_index[row[0]].append(idx)
+        if minute_rows:
+            self.minute_syms = np.array([_intern_symbol(r['symbol']) for r in minute_rows], dtype=np.uint16)
+            self.minute_array = np.array(
+                [(r['time'].timestamp(), r['open'], r['high'], r['low'], r['close'],
+                  r['volume'], float('nan') if r.get('rel_vol_30d') is None else r['rel_vol_30d'], r['vwap'])
+                 for r in minute_rows],
+                dtype=np.float64,
+            )
+        else:
+            self.minute_syms = np.array([], dtype=np.uint16)
+            self.minute_array = np.empty((0, 8), dtype=np.float64)
+        _ti: dict = {}
+        for idx in range(len(self.minute_array)):
+            dt = datetime.fromtimestamp(self.minute_array[idx, 0], tz=ET)
+            if dt not in _ti:
+                _ti[dt] = []
+            _ti[dt].append(idx)
+        self.time_index = {k: np.array(v, dtype=np.uint32) for k, v in _ti.items()}
         premarket_rows = premarket_tbl.to_pylist()
         self.prior_close = {r['symbol']: float(r['close']) for r in prior_tbl.to_pylist()}
         self.prior_day_high = {r['symbol']: float(r['high']) for r in prior_tbl.to_pylist()}
@@ -1092,6 +1172,7 @@ class SimulationRunner:
         self.hot_symbols = self._build_hot_symbols()
         _DATA_CACHE[self.date] = {
             'minute_array': self.minute_array,
+            'minute_syms': self.minute_syms,
             'time_index': dict(self.time_index),
             'premarket_volume_by_symbol': {r['symbol']: float(r['volume']) for r in premarket_rows},
             'daily_bars_by_symbol': self.daily_bars_by_symbol,
@@ -1102,6 +1183,9 @@ class SimulationRunner:
             'hot_symbols': self.hot_symbols,
             'universe_key': self._universe_key,
         }
+        # LRU eviction
+        while len(_DATA_CACHE) > _DATA_CACHE_MAX:
+            _DATA_CACHE.pop(next(iter(_DATA_CACHE)))
         return True
 
     def _persist_cache(self, premarket_volume: dict, symbols: list[str]) -> None:
@@ -1123,17 +1207,17 @@ class SimulationRunner:
         minute_tbl = pa.Table.from_pylist(
             [
                 {
-                    'time': row[0],
-                    'symbol': row[1],
-                    'open': row[2],
-                    'high': row[3],
-                    'low': row[4],
-                    'close': row[5],
-                    'volume': row[6],
-                    'rel_vol_30d': row[7],
-                    'vwap': row[8],
+                    'time': datetime.fromtimestamp(self.minute_array[i, 0], tz=ET),
+                    'symbol': _IDX_TO_SYM[self.minute_syms[i]],
+                    'open': self.minute_array[i, 1],
+                    'high': self.minute_array[i, 2],
+                    'low': self.minute_array[i, 3],
+                    'close': self.minute_array[i, 4],
+                    'volume': self.minute_array[i, 5],
+                    'rel_vol_30d': None if (self.minute_array[i, 6] != self.minute_array[i, 6]) else self.minute_array[i, 6],
+                    'vwap': self.minute_array[i, 7],
                 }
-                for row in self.minute_array
+                for i in range(len(self.minute_array))
             ]
         )
         premarket_tbl = pa.Table.from_pylist(
