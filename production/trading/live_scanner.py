@@ -45,9 +45,14 @@ import pytz
 from trading.entry_engine import evaluate_entry
 from trading.exit_engine import evaluate_exit
 from trading.indicators import get_current_ema, calculate_macd, estimate_buy_sell_volume, is_trending_up
-from trading.models import ScannerConfig, EntryConfig, ExitConfig
+from trading.models import (
+    ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig, MarketTemperatureConfig,
+)
 from trading.order_manager import LiveTradeManager
 from trading.broker.base import DataFeedInterface
+from trading.orchestrator import Orchestrator
+from trading.live_broker import LiveBroker
+from trading.portfolio_manager import PortfolioManager
 from utils.query_helpers import StockDataDB
 
 logger = logging.getLogger(__name__)
@@ -225,6 +230,15 @@ class LiveScanner:
         self._best_signal_candidate: dict | None = None   # {signal, symbol, bar}
         self._scan_minute: tuple[int, int] | None = None  # (hour, minute) of current batch
 
+        # ── Orchestrator path (de-logic flip), flag-gated — default OFF (old path runs) ──
+        # When True, process_bar batches the minute's bars and runs the shared Orchestrator
+        # (full strategy: temperature/scoring/add-ons/portfolio) instead of the per-bar
+        # collect/execute/exit code. Flip to True from run_trading only after a dry-run
+        # session has been verified against a sim of the same day.
+        self._use_orchestrator: bool = False
+        self._minute_bars: list[dict] = []
+        self._minute_bars_ts = None
+
         # Symbols that exited via TIME_DECAY — blocked from re-entry same day
         # (matches simulator's time_decay_exits set)
         self._time_decay_exits: set[str] = set()
@@ -303,6 +317,20 @@ class LiveScanner:
             self._run_premarket_db_snapshot(now_et)
             self._premarket_scans_done.add(hm)
             self.status_write_requested = True   # signal main loop to flush status now
+
+        # ── Orchestrator path (flag-gated) ───────────────────────────────────
+        # Batch the minute's bars; at the minute boundary run the shared engine once.
+        # Replaces the per-bar collect/execute/exit path below. Default OFF.
+        if self._use_orchestrator:
+            minute_key = (now_et.hour, now_et.minute)
+            if self._scan_minute is not None and minute_key != self._scan_minute and self._minute_bars:
+                self._ensure_orchestrator().on_minute(self._minute_bars_ts, self._minute_bars)
+                self._minute_bars = []
+            self._scan_minute = minute_key
+            if not self._minute_bars:
+                self._minute_bars_ts = now_utc
+            self._minute_bars.append(bar)
+            return
 
         # ── Entry evaluation (9:30am up to entry_hour_end, gap-run symbols) ────
         after_open    = now_et.hour > 9 or (now_et.hour == 9 and now_et.minute >= 30)
@@ -782,6 +810,57 @@ class LiveScanner:
             logger.info("  No stocks passed all premarket filters")
 
         logger.info(f"=== END PREMARKET SCAN ({label}) ===")
+
+    # ── Orchestrator wiring (de-logic: live runs the SAME engine as the sim) ─────
+    # Additive for now: built lazily, used by the (pending) on_minute path in process_bar.
+    # The existing per-bar _collect/_execute/_try_exit path remains until the rewire flips over.
+
+    def _live_rel_vol_resolver(self, candidates, et_time):
+        """rel_vol resolver injected into the Orchestrator (keeps DB out of the engine).
+        candidates = [(symbol, bar, history), ...]. Returns {symbol: avg_vol} via the same
+        batch query live already uses, cached per minute. Orchestrator computes
+        rel_vol = cumulative_volume / avg_vol from this."""
+        minute_key = (et_time.hour, et_time.minute)
+        if self._avg_vol_cache_minute != minute_key:
+            syms = [c[0] for c in candidates] or list(self._gaprun_qualified)
+            try:
+                self._avg_vol_cache = self._db.get_avg_volume_at_time_batch(
+                    symbols=syms, as_of_date=et_time.date(),
+                    current_hour=et_time.hour, current_minute=et_time.minute,
+                    lookback_days=20, include_premarket_hourly=True,
+                )
+            except Exception as e:
+                logger.warning(f"rel-vol resolver DB query failed: {e}")
+                self._avg_vol_cache = {}
+            self._avg_vol_cache_minute = minute_key
+        return self._avg_vol_cache
+
+    def _ensure_orchestrator(self) -> Orchestrator:
+        """Build the shared Orchestrator over a LiveBroker once. Gives live the FULL strategy
+        (temperature, scoring-sized entries, add-ons, portfolio risk rules) the old live path
+        lacked — and which parity_check proved matches the sim. hot_symbols is the live
+        gap-run watchlist (shared set, grows as the scanner qualifies symbols)."""
+        if getattr(self, '_orch', None) is None:
+            self._orch = Orchestrator(
+                broker=LiveBroker(self._trade_manager),
+                scanner_config=self._scanner_config,
+                entry_config=self._entry_config,
+                exit_config=self._exit_config,
+                scoring_config=ScoringConfig(),
+                add_on_config=AddOnConfig(),
+                temp_config=MarketTemperatureConfig(),
+                portfolio_manager=PortfolioManager(account_size=self._trade_manager.account_balance),
+                hot_symbols=self._gaprun_qualified,       # shared ref — live watchlist
+                prior_close=self._prior_close,
+                fundamentals=self._fundamentals,
+                prior_day_high={},                        # resistance exit off by default
+                symbol_universe=None,                     # live = scanner mode (hot_symbols + gates)
+                news_cache={},
+                rel_vol_resolver=self._live_rel_vol_resolver,
+                max_position_pct=self._trade_manager.max_position_pct,
+                verbose=False,
+            )
+        return self._orch
 
     def _get_relative_volume(self, symbol: str, now_et: datetime) -> float:
         """

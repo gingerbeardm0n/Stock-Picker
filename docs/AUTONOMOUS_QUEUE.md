@@ -245,9 +245,26 @@ The engine+LiveBroker path is now PROVEN to match the sim. Three real live bugs 
 Temp debug prints (CS_DEBUG/ADD_DEBUG/EXIT_DEBUG) removed. golden + parity BOTH green post-cleanup.
 
 ### REMAINING (engine is verified; these are wiring + polish):
-- **live_scanner runtime restructure** (spec B above) — the ONLY thing left to actually run live on the
-  engine: batch per-minute bars in process_bar → call orch.on_minute. Parity PROVES it will match once
-  wired. This is the flip; do it, then a live dry-run session vs a sim of the same day as final confidence.
+- **live_scanner runtime restructure (flip) — STARTED 2026-05-30:**
+  - ✅ Additive foundation added (live still runs its OLD path — nothing broken): `_live_rel_vol_resolver`
+    (injects live's batch avg-vol query into the engine) + `_ensure_orchestrator()` (builds the shared
+    Orchestrator over a LiveBroker; gives live the FULL strategy it lacked — temperature/scoring-sizing/
+    add-ons/portfolio rules — with default ScoringConfig/AddOnConfig/MarketTemperatureConfig +
+    PortfolioManager(account_balance); hot_symbols = live gap-run watchlist shared set). Compiles+imports.
+  - ✅ THE REWIRE DONE (flag-gated, default OFF — compiles, live behavior UNCHANGED until enabled):
+    `process_bar` now, when `self._use_orchestrator` is True, batches the minute's bars and calls
+    `self._ensure_orchestrator().on_minute(ts, minute_bars)` at the minute boundary (early-returns,
+    skipping the old per-bar collect/execute/exit). `_use_orchestrator=False` default → old path runs.
+  - ⏭ REMAINING to actually go live on the engine:
+    1. VERIFY the live plumbing: feed golden-day bars through `live_scanner.process_bar` with
+       `_use_orchestrator=True` + LiveBroker(dry executor), compare trades to the sim (extend parity_check
+       to route through process_bar). Parity already proved the ENGINE; this confirms batching/watchlist/
+       resolver. ← do this BEFORE flipping the flag.
+    2. Thread real configs (scoring/add_on/temp + the chosen Optuna config) into `_ensure_orchestrator`
+       via the constructor; update run_trading.py to pass them + set use_orchestrator=True.
+    3. Load `prior_day_high` at startup_preload (currently {} — resistance exit off, ok for now).
+  - SAFETY: do not set use_orchestrator=True for real/paper orders until step 1 verifies.
+  - All live_scanner changes UNCOMMITTED (branch has parity commit 5711b05; this is on top).
 - Cleanup: delete dead sim `_process_minute`/`_scan_for_entry`/`_cushion_size_multiplier` (golden after).
 - Realism (USER DECISION): model cent-rounding + Ross's +$0.10 entry buffer in the sim fill path for
   honest backtests (currently sim fills sub-penny/no-buffer; harness isolates this via _ExactExecutor).
