@@ -232,3 +232,15 @@ Ross Cameron Day Trading Videos/Text transcriptions/
 
 # Local Claude workspace config
 Ross Cameron Day Trading Videos/.claude/
+
+# ── Custodian: local-only data / binaries (keep out of git) ──
+*.db
+*.parquet
+*.log
+*.log.*
+*_progress.json
+analysis/gapper_universe.csv
+research/optimizer/data/*.csv
+production/services/stocks_in_price_range.json
+production/services/stocks_in_price_range.txt
+temp_*.txt

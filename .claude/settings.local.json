@@ -14,7 +14,10 @@
       "Bash(xargs -I {} bash -c 'echo \"\"=== {} ===\"\" && head -20 \"\"{}\"\"')",
       "Bash(du -sh *)",
       "Bash(sqlite3 optimizer/pillar23_results.db \".tables\")",
-      "Bash(sqlite3 optimizer/pillar23_results.db \".schema\")"
+      "Bash(sqlite3 optimizer/pillar23_results.db \".schema\")",
+      "Bash(where:*)",
+      "Bash(\"C:/Repositories/Stock-Picker/.venv/Scripts/pip.exe\" list)",
+      "Bash(.venv/Scripts/python.exe:*)"
     ]
   }
 }
