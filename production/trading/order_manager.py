@@ -266,8 +266,16 @@ class LiveTradeManager:
             self._on_position_closed(pnl)
         else:
             trade.scale_out(fill_qty, fill_price, exit_signal.reason, current_time)
-            self.account_balance += pnl
-            self.realized_pnl    += pnl
+            # H1/M1 parity: do NOT realize partials into account_balance incrementally
+            # (that double-counts vs the full close, and per-fill deltas ignore add-on
+            # cost basis). Realize the full add-on-corrected trade P&L once at close
+            # (see _on_position_closed). Matches PositionManager's H1-fixed accounting.
+
+            # Parity with PositionManager.apply_exit_signal: mark T1 taken so the add-on
+            # engine knows a partial fired (GAP-03). Live previously never set this, so
+            # post-T1 add-on/scale behavior diverged from the sim.
+            if exit_signal.reason in ('TARGET_1', 'TARGET_1_COLD'):
+                trade.t1_hit = True
 
             # Move stop to breakeven after T1
             if exit_signal.move_stop_to_breakeven:
@@ -306,6 +314,14 @@ class LiveTradeManager:
 
         trade = self.active_trade
         qty   = add_on_signal.qty
+        if qty <= 0:
+            return 0
+
+        # Cap total position at 3x initial_shares — parity with PositionManager.apply_add_on
+        # (sim caps here; live previously did not → could over-pyramid live).
+        if trade.shares >= trade.initial_shares * 3:
+            return 0
+        qty = min(qty, trade.initial_shares * 3 - trade.shares)
         if qty <= 0:
             return 0
 
@@ -450,10 +466,15 @@ class LiveTradeManager:
         logger.info(f"Stop replaced: {self.stop_order_id} @ ${new_stop_price:.2f}")
 
     def _on_position_closed(self, pnl: float):
-        """Called when position is fully closed. Cleans up all state."""
+        """Called when position is fully closed. Cleans up all state.
+
+        Realize the FULL add-on-corrected trade P&L once here (Trade.get_pnl()), matching
+        PositionManager's H1-fixed accounting — partials no longer add to account_balance
+        incrementally, and add-on cost basis is handled correctly (fixes M1)."""
+        trade_pnl = self.active_trade.get_pnl()
         self.completed_trades.append(self.active_trade)
-        self.account_balance += pnl
-        self.realized_pnl    += pnl
+        self.account_balance += trade_pnl
+        self.realized_pnl    += trade_pnl
 
         # Cancel stop if still open (e.g. we hit T2 before stop triggered)
         if self.stop_order_id:

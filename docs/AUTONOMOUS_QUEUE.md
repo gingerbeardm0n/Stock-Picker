@@ -198,8 +198,60 @@ per-bar accumulation + minute-boundary detection; at the boundary call `self._or
 minute_bars)`; delete `_collect_entry_candidate`/`_execute_pending_entry`/`_try_exit`. Construct Orchestrator
 once with broker=LiveBroker(self._trade_manager), hot_symbols=self._gaprun_qualified, prior_close/
 fundamentals/prior_day_high, rel_vol_resolver=live's `_get_relative_volume`-style fn.
-**C. SAFETY GATE:** do not flip live onto the engine until A passes (and ideally a live dry-run session
-matches a sim of the same day). No paper/real orders through the new path until parity-proven.
+**A. PARITY HARNESS BUILT** (`research/optimizer/parity_check.py`, 2026-05-30) — runs golden bars through
+sim-orch (SimBroker) vs live-orch (LiveBroker + _DryRunBroker, exact-fill via _ExactExecutor). RESULT:
+**3/5 golden days byte-identical**; 2 divergences + 1 realism finding surfaced:
+  - 🔴 **GV 2025-03-05: sizing divergence** — first trade, same entry $2.29, sim=783 sh vs live=514 sh
+    (~1.52×). Balance=$5000 both (first trade) so NOT balance drift → a real compute_shares input diff
+    between SimBroker(PM) and LiveBroker(ltm). PIN by instrumenting compute_shares inputs both paths
+    (risk_pct / max_position_pct / size_multiplier / float_shares / had_loss_today / current_balance).
+    **PINNED (instrumented compute_shares):** initial sizing is IDENTICAL — both compute 392 sh for GV
+    (entry=2.29 stop=2.21 bal=5000 mult=0.9). The 783-vs-514 divergence is ENTIRELY in the ADD-ON/EXIT
+    LIFECYCLE: position starts 392 both, then grows differently. Concrete divergence found:
+    `PositionManager.apply_add_on` (trading_engine ~246-252) caps total at 3×initial_shares; live
+    `LiveTradeManager.execute_add_on` (order_manager ~308) has NO cap — fills signal qty directly. Also
+    Trade lifecycle (t1_hit/session_high_at_add/add_on_count via partials) evolves differently PM vs ltm.
+    **FIX:** make execute_add_on apply the 3×initial cap (mirror PM.apply_add_on) ✅ DONE (real bug: live
+    could over-pyramid). Didn't move GV (cap didn't bind). **DEEPER PIN (ADD_DEBUG trace):** GV first add
+    IDENTICAL both (+122@2.30 → 514 sh). Then SIM adds 3 more (+122@2.48,+98@2.60,+49@2.82 → 783, ends
+    STOP_HIT) while LIVE adds ZERO more and exits TARGET_2 @ 2.66 (514 sh). So the EXIT decision diverges
+    at bars after add#1 despite shared exit code + same pos → subtle PM vs ltm Trade-state diff after a
+    fill (suspect T1-partial handling: t1_hit / shares_remaining / is_full_close reason-list differs —
+    ltm.execute_exit treats TRAILING_STOP/TIME_DECAY/etc as full-close; PM only STOP_HIT or qty>=remaining;
+    AND ltm partial accounting differs M1). NEXT: bar-level trace of evaluate_exit decisions for GV both
+    paths (env-gate a print in orchestrator._check_exit) → find first diverging exit → align ltm to PM.
+    (temp env-gated prints left: CS_DEBUG in sizing.py, ADD_DEBUG in trading_engine.py — remove after.)
+  - 🟡 **FGL 2025-01-06: ±1 share** — trade #2; prior-trade balance drift (H1 realize-once vs live
+    incremental per-fill accounting differ by cents → next trade int() boundary). Tied to making live
+    exit accounting match (M1-adjacent).
+  - 🟢 **Realism finding (separate from engine parity):** sim fills SUB-PENNY and ignores Ross's +$0.10
+    marketable-limit buffer; live rounds to cents (`OrderExecutor.place_entry round(ask+buf,2)`) + pays
+    buffer. Backtests are slightly optimistic AND the diff CASCADES across trades. FIX (realism, needs
+    re-baseline golden + maybe re-tune): model cent-rounding + the +10¢ entry buffer in the sim fill path
+    (SimBroker.enter). This both honest-ifies backtests and removes the cascade. **USER DECISION** (changes
+    results). Harness neutralizes it (_ExactExecutor) to isolate engine parity.
+**C. SAFETY GATE:** do not flip live onto the engine until parity (A) is GREEN. No paper/real orders
+through the new path until proven.
+
+### ✅✅ PARITY GREEN (2026-05-30) — sim and live make IDENTICAL decisions on all 5 golden days.
+The engine+LiveBroker path is now PROVEN to match the sim. Three real live bugs fixed to get here
+(all surfaced by the harness — these were genuine live-trading correctness issues):
+  1. `execute_add_on` missing the 3×initial-shares cap → live could over-pyramid. ADDED.
+  2. `execute_exit` never set `trade.t1_hit` on TARGET_1 → live's post-T1 add-on lifecycle diverged
+     (sim kept pyramiding, live scaled out). FIXED.
+  3. M1/H1 accounting: live realized partials into account_balance incrementally with per-fill deltas
+     that ignored add-on cost basis → sizing of later trades drifted. Now realizes Trade.get_pnl() once
+     at close (mirrors PM's H1 fix). FIXED.
+Temp debug prints (CS_DEBUG/ADD_DEBUG/EXIT_DEBUG) removed. golden + parity BOTH green post-cleanup.
+
+### REMAINING (engine is verified; these are wiring + polish):
+- **live_scanner runtime restructure** (spec B above) — the ONLY thing left to actually run live on the
+  engine: batch per-minute bars in process_bar → call orch.on_minute. Parity PROVES it will match once
+  wired. This is the flip; do it, then a live dry-run session vs a sim of the same day as final confidence.
+- Cleanup: delete dead sim `_process_minute`/`_scan_for_entry`/`_cushion_size_multiplier` (golden after).
+- Realism (USER DECISION): model cent-rounding + Ross's +$0.10 entry buffer in the sim fill path for
+  honest backtests (currently sim fills sub-penny/no-buffer; harness isolates this via _ExactExecutor).
+- All parity work is UNCOMMITTED (branch claude/orchestrator-migration has the earlier commit only).
 **Cleanup (anytime):** delete dead sim `_process_minute`/`_scan_for_entry`/`_cushion_size_multiplier`
 (golden --check after).
 - ⏭ Step 5 ReplayFeed (cosmetic) · Step 7 parity_check.py.
