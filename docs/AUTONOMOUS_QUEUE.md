@@ -360,6 +360,25 @@ genuinely underperforms in 2025. Findings are judged on RELATIVE improvement vs 
 + `detect_vwap_break_curl` BEFORE the MACD-line gate (alongside gap_and_go), and remove them from the
 post-gate chain. Preserves priority (gap_and_go > vwap_reclaim > vwap_break_curl > rest). Revert after run.
 
+## 🔭 INTRADAY MOMENTUM SCANNER (high-day-momo) — capability gap + sim/live divergence (2026-05-30)
+Investigated per user. Findings:
+- **LIVE scans WATCHLIST ONLY intraday.** `TradierBarPoller._poll_all` polls `self._watchlist` only;
+  watchlist built premarket (startup + 9:25/9:28 all-symbol get_quotes) then FROZEN (grows only via
+  gap-run of already-streaming symbols — circular). No full-universe rescan after 9:28 → off-watchlist
+  intraday surgers are INVISIBLE to live.
+- **SIM catches them:** `_build_hot_symbols` scans the WHOLE day's bars → any stock hitting $2-20/+10% at
+  ANY bar is a candidate (incl. intraday movers). → backtests include trades live can't make = DIVERGENCE
+  (backtests overstate vs live for off-watchlist names). [Parity harness uses the gapper universe so it
+  didn't surface this; it's a candidate-discovery divergence, separate from engine parity.]
+- **CORPUS: this is core to Ross's edge, NOT an edge case.** `high-day-momo` = 2,978 mentions across the
+  19 chunk files (+ momentum scanner 335, scanner pop 119, scanner hit 88). His real-time high-of-day /
+  gainers scanner surfaces movers mid-session continuously; many trades come from it, not the AM watchlist.
+- **FIX (corpus-validated 2-tier, DEFER — doesn't block first live):**
+  1. Discovery: batched all-~4000 quote scan EVERY MINUTE (Tradier quotes endpoint handles 4000+ in one
+     call) → flag new-HOD / gainers (up X% + new high-of-day + rel-vol) → add to watchlist.
+  2. Action: stream 1-min bars + run engine only on the discovered watchlist.
+  Adds the capability AND closes the sim/live discovery divergence. One quote call/min, not 4000 streams.
+
 ## NOTES / BLOCKERS (for user review)
 - **M6 deferred (not a clean single-file fix).** Bug: `trading_engine.apply_add_on` (line 80-81) advances `session_high_at_add` to the add **price** (close), not the bar **high**, so `add_on_engine` NEW_HIGH gate (line 138-148) can re-trigger cheaply on the next bar. BUT `simulation_engine` (~line 755-758) already advances the watermark to bar-high every bar independently, so the **sim/optimized path is NOT affected** — only the LIVE add-on path is, and live add-on accounting is already incompletely wired (see audit H2/M1). A correct fix touches `apply_add_on` signature + both callers, or adds a watermark field to `AddOnSignal`. Right home = the live-parity refactor wave (with H2/M1/M5), not an isolated unattended patch. Low impact (audit: "minor", bounded by 3×-initial cap).
 - **Task 6 DONE (20:21)** — labels: HOT 531 / NEUTRAL 254 / COLD 370 days (1155 total, dist 46/22/32% = corpus match). Oracle prereq satisfied.
