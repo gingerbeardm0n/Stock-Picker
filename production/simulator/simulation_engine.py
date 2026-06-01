@@ -222,8 +222,11 @@ class SimulationRunner:
             if self.verbose:
                 logger.info(f"Loaded {len(self.minute_array):,} minute bars for {self.date} (memory cache)")
                 logger.info(f"Seeded cumulative volume from 4am-8am hourly bars for {len(premarket_volume)} symbols")
-            # hot_symbols is already stored in _DATA_CACHE from a prior load
-            self.hot_symbols = cached.get('hot_symbols', set())
+            # Always rebuild hot_symbols from the cached minute_array rather than
+            # restoring the saved set. The saved set may be stale if MIN_GAIN changed
+            # between runs (e.g. optimizer tuning m_min_intraday_gain). Rebuild is
+            # fast (one numpy-backed loop) vs. loading all bars from DB.
+            self.hot_symbols = self._build_hot_symbols()
             return True
 
         if self.cache_data and self.cache_dir:
@@ -382,7 +385,7 @@ class SimulationRunner:
         """
         MIN_PRICE = 2.0
         MAX_PRICE = 20.0
-        MIN_GAIN  = 2.0   # floor of m_min_intraday_gain search space [2, 15]
+        MIN_GAIN  = 5.0   # safe superset floor — Optuna rarely benefits below 5% intraday gain
 
         hot = set()
         for idx in range(len(self.minute_array)):
@@ -544,15 +547,29 @@ class SimulationRunner:
         t0 = time.perf_counter()
         with StockDataDB() as db:
             self._db = db
+            # Pre-compute relevant symbol set for this day: hot_symbols + any
+            # open position symbol (needed for exit evaluation even if not hot).
+            # Pre-filtering bars before on_minute eliminates bar_history updates
+            # for the ~4000 irrelevant symbols (360,000 no-op dict writes/day).
+            relevant_syms = set(self.hot_symbols)
+
             for minute_time in sorted(bars_by_time.keys()):
+                # Include open position symbol so exit logic always sees its bars.
+                pos = self.orch.broker.position
+                if pos is not None:
+                    relevant_syms.add(pos.symbol)
+
                 bars = []
                 if self.minute_array is not None:
                     for idx in bars_by_time[minute_time]:
+                        sym = _IDX_TO_SYM[self.minute_syms[idx]]
+                        if sym not in relevant_syms:
+                            continue  # skip non-hot symbols — saves ~360k dict ops/day
                         r = self.minute_array[idx]   # float64: [unix_ts,open,high,low,close,vol,rel_vol,vwap]
                         rv = r[6]
                         bars.append({
                             'time': minute_time,
-                            'symbol': _IDX_TO_SYM[self.minute_syms[idx]],
+                            'symbol': sym,
                             'open': r[1],
                             'high': r[2],
                             'low': r[3],
@@ -562,7 +579,8 @@ class SimulationRunner:
                             'vwap': r[7],
                         })
                 else:
-                    bars = bars_by_time[minute_time]
+                    bars = [b for b in bars_by_time[minute_time]
+                            if b['symbol'] in relevant_syms]
                 self.orch.on_minute(minute_time, bars)
             self._db = None
         if self.debug:
