@@ -4,7 +4,7 @@ Living record of what was built, when, why — plus a component index and file-h
 Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pass written manually
 2026-05-31 from git history + session context; incremental passes append from `git log`.
 
-**History watermark (last commit folded in):** `8dfc583` (2026-05-31)
+**History watermark (last commit folded in):** `6a329e3` (2026-05-31)
 
 ---
 
@@ -100,16 +100,20 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 
 ---
 
-## Hygiene flags (for user review — NEVER auto-deleted)
-- **Root-level `.py` (violate file-org rule "none except config.py"):** `production/cancel_stop_and_sell.py`,
-  `compare_entry_logic.py`, `compare_signals.py`, `connect_alpaca.py`, `diagnostic_march6.py`,
-  `manual_sell_breakeven.py`. → move to `research/maintenance/diagnostics/` or `archive/`.
-- **Untracked binaries/data that should be `.gitignore`'d:** `research/optimizer/*.db` (optuna/results),
-  `*.parquet` cache, `*.log`/`*.log.err`, `research/optimizer/data/gapper_universe.csv` (2.8 MB),
-  `production/services/stocks_in_price_range.{json,txt}`, backfill `*_progress.json`, `temp_0295.txt`.
-- **Stale-ish docs to reconcile:** `LIVE_SIM_PARITY_SPEC.md` (migration now mostly done — mark complete),
-  `PROJECT_STATUS_AND_PLAN.md` (overlaps AUTONOMOUS_QUEUE; consider merging), `FILE_ORGANIZATION_SETUP.md`
-  (untracked root — clarify or place).
-- **Worktrees/branches:** 8 `claude/*` worktree branches all at/behind main → prune stale ones.
-- **Concept pages dated 2026-05-21** but reflect newer code in places (e.g. front_side_back_side describes a
-  pre-fix MACD state) — refresh against current engine.
+## Hygiene flags — custodian pass 2026-05-31
+- ✅ **RESOLVED — root-level `.py`:** moved `cancel_stop_and_sell`, `compare_entry_logic`, `compare_signals`,
+  `connect_alpaca`, `diagnostic_march6`, `manual_sell_breakeven` → `research/maintenance/diagnostics/`
+  (`f41cf86`). Root now = `config.py` + `run_trading.py` only.
+- ✅ **RESOLVED — data/binaries out of git:** untracked ~62MB (`archive/optunaDBfiles/*.db`,
+  `*_progress.json`, `database/*.log`, `optimizer/pillar23_results.db`, `analysis/gapper_universe.csv`)
+  + added `.gitignore` patterns (`c977030`). Kept local; no history rewrite.
+- ✅ **RESOLVED — dead sim methods:** deleted `_process_minute`/`_scan_for_entry`/`_cushion_size_multiplier`
+  (`7f0c244`). golden + parity still green.
+- ✅ **RESOLVED — stale docs:** `LIVE_SIM_PARITY_SPEC.md` marked DONE, `PROJECT_STATUS_AND_PLAN.md` marked
+  SUPERSEDED (`6a329e3`). Kept for history.
+- ⏭ **OPEN — worktree branches:** 8 `claude/*` branches at/behind main. NOT pruned — they back active
+  harness worktrees (`.claude/worktrees/`); deleting risks breaking sessions. Let the harness reap them,
+  or prune manually when sure they're idle.
+- ⏭ **OPEN — concept pages dated 2026-05-21** describe pre-fix code in places (e.g. front_side_back_side
+  MACD state) — refresh against the current engine (low priority).
+- ⏭ **OPEN — `FILE_ORGANIZATION_SETUP.md`** (untracked root) — clarify purpose or place.
