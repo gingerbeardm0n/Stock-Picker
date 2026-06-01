@@ -370,15 +370,19 @@ class SimulationRunner:
         Scan minute_array once to find symbols that are worth evaluating this day.
 
         A symbol qualifies if ANY of its bars has price in [min_price, max_price]
-        AND gain% >= min_gain vs prior_close.  We use hardcoded defaults (price
-        $2-$20, gain 10%) regardless of the current trial's scanner_config so the
-        result can be safely cached and shared across all trials in the same process.
-        This makes hot_symbols a safe superset — the per-minute Stage 1 checks still
-        apply the exact trial thresholds as a secondary filter.
+        AND gain% >= min_gain vs prior_close.  We use hardcoded defaults regardless
+        of the current trial's config so the result can be safely cached and shared
+        across all trials in the same process.
+
+        MIN_GAIN must be <= the Optuna search space floor for m_min_intraday_gain
+        (currently 2.0) so this set is always a true superset of what
+        qualifies_momentum() could approve at any gain threshold Optuna tries.
+        qualifies_momentum() is the authoritative gate — this is only a coarse
+        pre-filter to avoid scanning all 4000 symbols every minute.
         """
         MIN_PRICE = 2.0
         MAX_PRICE = 20.0
-        MIN_GAIN  = 10.0
+        MIN_GAIN  = 2.0   # floor of m_min_intraday_gain search space [2, 15]
 
         hot = set()
         for idx in range(len(self.minute_array)):
