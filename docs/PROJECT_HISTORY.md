@@ -4,7 +4,7 @@ Living record of what was built, when, why — plus a component index and file-h
 Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pass written manually
 2026-05-31 from git history + session context; incremental passes append from `git log`.
 
-**History watermark (last commit folded in):** `6a329e3` (2026-05-31)
+**History watermark (last commit folded in):** `b7e50ec` (2026-06-01)
 
 ---
 
@@ -40,6 +40,13 @@ Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pa
 - `entry_gate.py` (risk-rule enforcement extracted), engine audit (ENGINE_AUDIT), MED fixes M2-M5,
   H1 (partial-scale double-count), corpus threshold audit (CORPUS_THRESHOLD_AUDIT), exit audit.
 
+### Phase 6 — Intraday momentum scanner (2026-06-01)
+- `8ce62f1` — **`momentum_scanner.py`**: pure `qualifies_momentum()` + `MomentumScanConfig` (38-test truth-table).
+- `e814136` — `Orchestrator._scan_for_entry`: `_high_of_day` state (time-forward HOD); scanner pre-filter replaced by `qualifies_momentum()`.
+- `eae054e` — golden re-baseline (behavior changed: realistic discovery) + parity PASS.
+- `d1cd5cd` — `live_scanner`: `_run_intraday_momentum_scan()` (6 scan times 9:35-10:45; cap=50; seeds bar history); intraday trigger in `process_bar`.
+- `b7e50ec` — `MomentumScanConfig` wired through `RunConfig`→`simulate_one`→`SimulationRunner`→`Orchestrator`; `optuna_run.py` adds Category M search space (m_min_intraday_gain, m_scan_end_hour, m_hod_tol).
+
 ### Phase 5 — Orchestrator migration + parity (2026-05-30 → 05-31)
 - `c2fa532` 05-30 — **migrate per-minute decision logic into the shared `Orchestrator`** (sim/live one engine);
   H0 fix (sim MACD was dead: BAR_HISTORY_SIZE 30→40 + wrong key). golden-day regression byte-identical.
@@ -56,7 +63,8 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 ### The engine (`production/trading/` — ONE copy, sim + live share it)
 | File | Purpose | Status | Since |
 |---|---|---|---|
-| `orchestrator.py` | The one per-minute decision pipeline (`on_minute`). Broker-agnostic. | 🟢 | c2fa532 |
+| `orchestrator.py` | The one per-minute decision pipeline (`on_minute`). Broker-agnostic. Tracks `_high_of_day` per symbol; scanner mode uses `qualifies_momentum()`. | 🟢 | e814136 |
+| `momentum_scanner.py` | Pure `qualifies_momentum()` — 6 corpus gates (G1-G6). ONE shared fn for sim + live discovery parity. | 🟢 | 8ce62f1 |
 | `execution.py` | Broker Protocol (the only order interface the engine touches) | 🟢 | c2fa532 |
 | `entry_engine.py` / `exit_engine.py` / `add_on_engine.py` | pure evaluators | 🟢 | phases 1-3 |
 | `scoring_engine.py` | composite entry score (sizing + threshold) | 🟢 | 7401d8d |
@@ -70,7 +78,7 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 | `models.py` | all config dataclasses (Scanner/Entry/Exit/Scoring/AddOn/Temp) | 🟢 | phase 1+ |
 | `order_manager.py` | `OrderExecutor` + `LiveTradeManager` (real broker lifecycle) | 🟢 | cf1a431 |
 | `live_broker.py` | LiveBroker (Broker over LiveTradeManager) | 🟢 | c2fa532 |
-| `live_scanner.py` | live runtime: watchlist discovery + (flag-gated) orchestrator path | 🟡 flip default-OFF | b0f8c66 |
+| `live_scanner.py` | live runtime: premarket scan + **intraday momentum scan** (9:35-10:45, cap=50) + (flag-gated) orchestrator path | 🟡 flip default-OFF | d1cd5cd |
 | `broker/base.py`,`broker/tradier.py` | broker/data-feed interfaces + Tradier impl | 🟢 | cf1a431 |
 
 ### Simulator (`production/simulator/` — adapters only, ZERO logic)
