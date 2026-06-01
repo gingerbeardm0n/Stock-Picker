@@ -47,7 +47,9 @@ from trading.exit_engine import evaluate_exit
 from trading.indicators import get_current_ema, calculate_macd, estimate_buy_sell_volume, is_trending_up
 from trading.models import (
     ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig, MarketTemperatureConfig,
+    MomentumScanConfig,
 )
+from trading.momentum_scanner import qualifies_momentum
 from trading.order_manager import LiveTradeManager
 from trading.broker.base import DataFeedInterface
 from trading.orchestrator import Orchestrator
@@ -76,6 +78,13 @@ PREMARKET_SCAN_TIMES = [(9, 25), (9, 28)]
 PREMARKET_MIN_GAIN_PCT   = 10.0          # Pillar 2: up 10%+ from prior close
 PREMARKET_MIN_REL_VOL    = 5.0           # Pillar 3: 5x relative volume minimum
 PREMARKET_MAX_FLOAT      = 100_000_000   # Pillar 4: 100M share float cap (skip if no data)
+
+# Intraday momentum scan: runs at these ET times after market open
+# (Ross's "high-day-momo" scanner — discovers off-watchlist intraday surgers)
+INTRADAY_SCAN_TIMES = [(9, 35), (9, 45), (10, 0), (10, 15), (10, 30), (10, 45)]
+
+# Maximum total watchlist size for bar_poller (1 HTTP/symbol/min -> cap protects 1-min cycle)
+INTRADAY_WATCHLIST_CAP = 50
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -170,6 +179,7 @@ class LiveScanner:
         exit_config: ExitConfig | None = None,
         entry_hour_end: int = 11,
         dry_run: bool = False,
+        momentum_config: MomentumScanConfig | None = None,
     ):
         self._trade_manager  = trade_manager
         self._symbols        = symbols
@@ -179,6 +189,7 @@ class LiveScanner:
         self._exit_config    = exit_config
         self._entry_hour_end = entry_hour_end   # ET hour to stop looking for entries (default 11am)
         self._dry_run        = dry_run          # If True: log signals but don't place orders
+        self._momentum_config = momentum_config or MomentumScanConfig()  # intraday scanner config
 
         # Per-symbol rolling bar history (oldest first)
         self._bar_history: dict[str, deque] = defaultdict(
@@ -199,6 +210,9 @@ class LiveScanner:
 
         # Tracks which (hour, minute) premarket scans have already run today
         self._premarket_scans_done: set[tuple] = set()
+
+        # Tracks which (hour, minute) intraday momentum scans have already run today
+        self._intraday_scans_done: set[tuple] = set()
 
         # Prior day close prices (pre-loaded from DB at startup)
         self._prior_close: dict[str, float] = {}
@@ -318,6 +332,13 @@ class LiveScanner:
             self._premarket_scans_done.add(hm)
             self.status_write_requested = True   # signal main loop to flush status now
 
+        # ── Intraday momentum scan (9:35–10:45 at 15-min intervals) ──────────
+        if hm in INTRADAY_SCAN_TIMES and hm not in self._intraday_scans_done:
+            self._run_intraday_momentum_scan(now_et)
+            self._intraday_scans_done.add(hm)
+            # status_write_requested set inside the method; run_trading.py syncs
+            # bar_poller.set_watchlist() at lines 316-321 on next loop iteration
+
         # ── Orchestrator path (flag-gated) ───────────────────────────────────
         # Batch the minute's bars; at the minute boundary run the shared engine once.
         # Replaces the per-bar collect/execute/exit path below. Default OFF.
@@ -378,6 +399,7 @@ class LiveScanner:
         self._gaprun_qualified.clear()
         self._premarket_qualified.clear()
         self._premarket_scans_done.clear()
+        self._intraday_scans_done.clear()
         self._avg_vol_cache.clear()
         self._avg_vol_cache_minute = None
         self._best_signal_candidate = None
@@ -810,6 +832,176 @@ class LiveScanner:
             logger.info("  No stocks passed all premarket filters")
 
         logger.info(f"=== END PREMARKET SCAN ({label}) ===")
+
+    def _run_intraday_momentum_scan(self, now_et: datetime):
+        """
+        Intraday high-day-momo scan — adds off-watchlist surgers discovered mid-session.
+
+        Mirrors _run_premarket_db_snapshot structure but uses qualifies_momentum()
+        (the ONE shared function also called by Orchestrator._scan_for_entry in
+        scanner mode), guaranteeing sim/live discovery parity.
+
+        Flow:
+          Step 1: get_quotes all ~4000 symbols (batched, ~20 HTTP calls)
+          Step 2: cheap pre-filter (price + gain%) -> small candidate list
+          Step 3: get_bars_since_4am for candidates -> cumulative volume + HOD
+          Step 4: DB batch for historical avg vol denominator (rel_vol)
+          Step 5: qualifies_momentum() gate + rank by momentum score
+          Step 6: add top-N to watchlist up to INTRADAY_WATCHLIST_CAP; seed state
+
+        Sets status_write_requested=True so run_trading.py syncs bar_poller.
+        """
+        label = f"{now_et.hour}:{now_et.minute:02d}"
+        logger.info(f"=== INTRADAY MOMENTUM SCAN ({label} ET) ===")
+
+        mcfg = self._momentum_config
+        today = now_et.date()
+        now_utc = now_et.astimezone(pytz.UTC)
+
+        if self._data_feed is None:
+            logger.warning("  No data feed configured — skipping intraday scan.")
+            logger.info(f"=== END INTRADAY SCAN ({label}) ===")
+            return
+
+        # ── Step 1: quotes for all symbols ───────────────────────────────────
+        logger.info(f"  Fetching quotes for {len(self._symbols):,} symbols...")
+        quotes = self._data_feed.get_quotes(self._symbols)
+        logger.info(f"  Got {len(quotes):,} quotes")
+
+        if not quotes:
+            logger.warning("  No quote data returned — check data feed")
+            return
+
+        # ── Step 2: cheap filter (price range + gain%) ────────────────────────
+        price_gain_candidates = []
+        for symbol, quote in quotes.items():
+            price = quote.last or quote.ask
+            if not price or price <= 0:
+                continue
+            if not (mcfg.min_price <= price <= mcfg.max_price):
+                continue
+            prior_close = self._prior_close.get(symbol)
+            if not prior_close or prior_close <= 0:
+                continue
+            gain_pct = (price / prior_close - 1.0) * 100.0
+            if gain_pct < mcfg.min_intraday_gain:
+                continue
+            price_gain_candidates.append((symbol, price, prior_close, gain_pct))
+
+        logger.info(
+            f"  {len(price_gain_candidates)} symbols up {mcfg.min_intraday_gain:.0f}%+"
+            f" in ${mcfg.min_price}–${mcfg.max_price}"
+        )
+
+        if not price_gain_candidates:
+            logger.info("  No intraday movers — quiet session so far")
+            logger.info(f"=== END INTRADAY SCAN ({label}) ===")
+            return
+
+        candidate_symbols = [s for s, *_ in price_gain_candidates]
+
+        # ── Step 3: today's bars for candidates (volume + HOD) ───────────────
+        logger.info(f"  Fetching bars since 4am for {len(candidate_symbols)} candidates...")
+        try:
+            bar_results = self._data_feed.get_bars_since_4am(
+                candidate_symbols, until_utc=now_utc
+            )
+            bars_today = {
+                sym: [b.to_bar_dict() for b in sym_bars]
+                for sym, sym_bars in bar_results.items()
+            }
+        except Exception as e:
+            logger.warning(f"  get_bars_since_4am failed: {e} — using quote price as HOD")
+            bars_today = {}
+
+        # ── Step 4: historical avg vol denominator ───────────────────────────
+        try:
+            avg_vols = self._db.get_avg_volume_at_time_batch(
+                symbols=candidate_symbols,
+                as_of_date=today,
+                current_hour=now_et.hour,
+                current_minute=now_et.minute,
+                lookback_days=30,
+            )
+        except Exception as e:
+            logger.warning(f"  Avg volume query failed: {e} — rel_vol will be 0")
+            avg_vols = {}
+
+        # ── Step 5: qualifies_momentum gate + rank ───────────────────────────
+        qualified = []
+        for symbol, price, prior_close, gain_pct in price_gain_candidates:
+            bars = bars_today.get(symbol, [])
+            total_vol = sum(b['volume'] for b in bars)
+
+            # HOD from bars; fall back to current price (proxy for mover at new high)
+            if bars:
+                high_of_day = max(float(b.get('high', b['close'])) for b in bars)
+            else:
+                high_of_day = price
+
+            avg_vol = avg_vols.get(symbol, 0.0)
+            rel_vol = (total_vol / avg_vol) if avg_vol > 0 else 0.0
+
+            fund = self._fundamentals.get(symbol, {})
+            float_shares = fund.get('float_shares')
+
+            if not qualifies_momentum(
+                price=price,
+                prior_close=prior_close,
+                high_of_day=high_of_day,
+                rel_vol=rel_vol,
+                float_shares=float_shares,
+                et_time=now_et,
+                cfg=mcfg,
+            ):
+                continue
+
+            # Momentum score for ranking: rel_vol * gain (high vol + high move = best)
+            momentum_score = rel_vol * gain_pct
+            qualified.append((symbol, price, gain_pct, rel_vol, float_shares,
+                               momentum_score, bars, total_vol))
+
+        # ── Step 6: cap to top-N; add to watchlist; seed state ───────────────
+        qualified.sort(key=lambda x: x[5], reverse=True)  # sort by momentum_score desc
+
+        slots_remaining = max(0, INTRADAY_WATCHLIST_CAP - len(self._gaprun_qualified))
+        new_count = 0
+
+        for symbol, price, gain_pct, rel_vol, flt, score, bars, total_vol in qualified:
+            if symbol in self._gaprun_qualified:
+                continue  # already on watchlist
+            if new_count >= slots_remaining:
+                break
+
+            self._gaprun_qualified.add(symbol)
+            new_count += 1
+
+            # Seed volume and bar history (same as premarket scan)
+            if total_vol > 0:
+                self._today_volume[symbol] = total_vol
+            if bars:
+                self._bar_history[symbol].clear()
+                for bar in bars:
+                    self._bar_history[symbol].append(bar)
+
+            flt_str = f"{flt/1e6:.1f}M" if flt else "no float data"
+            logger.info(
+                f"  [INTRADAY ADD] {symbol:<8}  +{gain_pct:.1f}%  "
+                f"rvol={rel_vol:.1f}x  ${price:.2f}  float={flt_str}  score={score:.0f}"
+            )
+
+        logger.info(
+            f"  Added {new_count} new symbols "
+            f"(watchlist now {len(self._gaprun_qualified)}, cap={INTRADAY_WATCHLIST_CAP})"
+        )
+        if qualified and new_count == 0 and slots_remaining == 0:
+            logger.info(
+                f"  Watchlist at cap ({INTRADAY_WATCHLIST_CAP}) — "
+                f"top intraday mover not added: {qualified[0][0]} score={qualified[0][5]:.0f}"
+            )
+
+        logger.info(f"=== END INTRADAY SCAN ({label}) ===")
+        self.status_write_requested = True  # run_trading.py: syncs bar_poller.set_watchlist()
 
     # ── Orchestrator wiring (de-logic: live runs the SAME engine as the sim) ─────
     # Additive for now: built lazily, used by the (pending) on_minute path in process_bar.
