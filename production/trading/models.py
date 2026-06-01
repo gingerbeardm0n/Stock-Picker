@@ -228,6 +228,36 @@ class AddOnConfig:
     stop_buffer: float = 0.076            # $ below breakout/pullback-low for updated stop
 
 
+# ── Intraday Momentum Scanner config ─────────────────────────────────────────
+
+@dataclass
+class MomentumScanConfig:
+    """
+    Configuration for the intraday high-day-momo scanner.
+
+    Used by qualifies_momentum() — called identically from both the sim
+    (Orchestrator._scan_for_entry, scanner mode) and the live runner
+    (_run_intraday_momentum_scan), ensuring sim/live discovery parity.
+
+    All fields are Optuna-tunable (Category A).
+
+    Gates:
+      G1  min_relative_volume  — rel-vol minimum (corpus: 5x)
+      G2  hod_tol              — tolerance below high-of-day to still qualify (0 = strict)
+      G3  scan_end_hour        — ET hour after which scanner goes quiet (corpus: 11 AM)
+      G4  max_float            — maximum float shares (corpus: 20M)
+      G5  min_price/max_price  — price range (corpus: $1-$20)
+      G6  min_intraday_gain    — % gain vs prior close (intraday default 5% < premarket 10%)
+    """
+    min_price: float = 1.0
+    max_price: float = 20.0
+    min_relative_volume: float = 5.0
+    max_float: int = 20_000_000
+    min_intraday_gain: float = 5.0   # % gain from prior close (vs ScannerConfig.min_premarket_gain=10%)
+    hod_tol: float = 0.0             # fraction below HOD that still qualifies (0.02 = within 2%)
+    scan_end_hour: int = 11          # ET hour; window is [9:30, scan_end_hour) exclusive
+
+
 # ── Category D: Market Temperature thresholds ────────────────────────────────
 
 @dataclass
