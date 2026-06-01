@@ -1,0 +1,144 @@
+{
+  "days": [
+    "2025-01-06",
+    "2025-01-23",
+    "2025-02-12",
+    "2025-03-05",
+    "2025-03-20"
+  ],
+  "metrics": {
+    "total_trades": 11,
+    "winners": 2,
+    "losers": 9,
+    "win_rate": 18.181818181818183,
+    "profit_factor": 0.5139246619446233,
+    "total_pnl": -120.78,
+    "avg_daily_pnl": -24.157080000000132,
+    "max_drawdown": 193.87,
+    "days_traded": 5,
+    "objective": -79.82883333333334
+  },
+  "trades": [
+    {
+      "date": "2025-01-06",
+      "symbol": "VNCE",
+      "pattern": "DIP_BUY",
+      "entry_price": 4.79,
+      "exit_price": 4.6499,
+      "shares": 204,
+      "pnl": -30.5,
+      "exit_reason": "STOP_HIT",
+      "hold_minutes": 5
+    },
+    {
+      "date": "2025-01-06",
+      "symbol": "MTVA",
+      "pattern": "DIP_BUY",
+      "entry_price": 2.37,
+      "exit_price": 2.42,
+      "shares": 150,
+      "pnl": 34.98,
+      "exit_reason": "TRAILING_STOP",
+      "hold_minutes": 41
+    },
+    {
+      "date": "2025-01-06",
+      "symbol": "FGL",
+      "pattern": "VWAP_RECLAIM",
+      "entry_price": 2.3663,
+      "exit_price": 2.15,
+      "shares": 189,
+      "pnl": -40.88,
+      "exit_reason": "STOP_HIT",
+      "hold_minutes": 17
+    },
+    {
+      "date": "2025-01-23",
+      "symbol": "SPCB",
+      "pattern": "VWAP_RECLAIM",
+      "entry_price": 18.14,
+      "exit_price": 15.89,
+      "shares": 49,
+      "pnl": -110.25,
+      "exit_reason": "STOP_HIT",
+      "hold_minutes": 1
+    },
+    {
+      "date": "2025-01-23",
+      "symbol": "VNCE",
+      "pattern": "GAP_AND_GO",
+      "entry_price": 4.67,
+      "exit_price": 4.29,
+      "shares": 67,
+      "pnl": -25.46,
+      "exit_reason": "STOP_HIT",
+      "hold_minutes": 2
+    },
+    {
+      "date": "2025-01-23",
+      "symbol": "SPCB",
+      "pattern": "VWAP_RECLAIM",
+      "entry_price": 18.0313,
+      "exit_price": 16.66,
+      "shares": 7,
+      "pnl": -9.6,
+      "exit_reason": "STOP_HIT",
+      "hold_minutes": 4
+    },
+    {
+      "date": "2025-01-23",
+      "symbol": "VNCE",
+      "pattern": "VWAP_RECLAIM",
+      "entry_price": 4.4491,
+      "exit_price": 4.2296,
+      "shares": 35,
+      "pnl": -7.68,
+      "exit_reason": "STOP_HIT",
+      "hold_minutes": 1
+    },
+    {
+      "date": "2025-03-05",
+      "symbol": "GV",
+      "pattern": "VWAP_RECLAIM",
+      "entry_price": 2.29,
+      "exit_price": 2.5197,
+      "shares": 783,
+      "pnl": 92.72,
+      "exit_reason": "STOP_HIT",
+      "hold_minutes": 12
+    },
+    {
+      "date": "2025-03-05",
+      "symbol": "SCOR",
+      "pattern": "GAP_AND_GO",
+      "entry_price": 7.0,
+      "exit_price": 6.8238,
+      "shares": 192,
+      "pnl": -8.41,
+      "exit_reason": "STOP_HIT",
+      "hold_minutes": 25
+    },
+    {
+      "date": "2025-03-05",
+      "symbol": "GV",
+      "pattern": "VWAP_RECLAIM",
+      "entry_price": 2.47,
+      "exit_price": 2.415,
+      "shares": 161,
+      "pnl": -11.07,
+      "exit_reason": "STOP_HIT",
+      "hold_minutes": 12
+    },
+    {
+      "date": "2025-03-20",
+      "symbol": "APVO",
+      "pattern": "VWAP_RECLAIM",
+      "entry_price": 2.9377,
+      "exit_price": 2.9001,
+      "shares": 178,
+      "pnl": -4.63,
+      "exit_reason": "STOP_HIT",
+      "hold_minutes": 27
+    }
+  ]
+}
