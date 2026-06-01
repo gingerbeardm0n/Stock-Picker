@@ -25,7 +25,8 @@ from trading.entry_engine import evaluate_entry
 from trading.exit_engine import evaluate_exit
 from trading.add_on_engine import evaluate_add_on
 from trading.indicators import get_current_ema, calculate_macd, estimate_buy_sell_volume
-from trading.models import ScannerConfig, ScoringConfig
+from trading.models import ScannerConfig, ScoringConfig, MomentumScanConfig
+from trading.momentum_scanner import qualifies_momentum
 from trading.market_temperature import (
     TemperatureState, classify_premarket, update_from_trade_result, is_session_over,
 )
@@ -65,6 +66,7 @@ class Orchestrator:
         symbol_universe=None,
         news_cache=None,
         rel_vol_resolver=None,
+        momentum_config=None,
         max_position_pct: float = 20.0,
         verbose: bool = False,
         debug: bool = False,
@@ -79,6 +81,7 @@ class Orchestrator:
         self.add_on_config = add_on_config
         from trading.models import MarketTemperatureConfig
         self.temp_config = temp_config or MarketTemperatureConfig()
+        self.momentum_config = momentum_config or MomentumScanConfig()
 
         self.hot_symbols = hot_symbols or set()
         self.prior_close = prior_close or {}
@@ -96,6 +99,7 @@ class Orchestrator:
         self.temp_state = TemperatureState()
         self.bar_history = defaultdict(list)
         self._cumulative_volume = defaultdict(float)
+        self._high_of_day = defaultdict(float)   # running per-symbol HOD (time-forward, no lookahead)
         self._last_macd_histogram = defaultdict(lambda: None)
         self.time_decay_exits = set()
         self.stop_hit_counts = {}
@@ -125,13 +129,16 @@ class Orchestrator:
                     f"  symbols={self.temp_state.qualifying_symbols_count}"
                 )
 
-        # Step 1: Update bar history and cumulative volume
+        # Step 1: Update bar history, cumulative volume, and high-of-day
         for bar in bars:
             sym = bar['symbol']
             self.bar_history[sym].append(bar)
             if len(self.bar_history[sym]) > BAR_HISTORY_SIZE:
                 self.bar_history[sym].pop(0)
             self._cumulative_volume[sym] += float(bar['volume'])
+            bar_high = float(bar.get('high', bar['close']))
+            if bar_high > self._high_of_day[sym]:
+                self._high_of_day[sym] = bar_high
 
         # Step 2: Exit check
         if self.broker.position:
@@ -253,13 +260,16 @@ class Orchestrator:
     def _scan_for_entry(self, current_time, bars):
         et_time = current_time.astimezone(ET)
         scfg = self.scanner_config if self.scanner_config is not None else ScannerConfig()
-        min_price = scfg.min_price
-        max_price = scfg.max_price
-        min_gain = scfg.min_premarket_gain
+        mcfg = self.momentum_config
 
         universe_mode = self.symbol_universe is not None
 
         # ── Step 1: cheap candidate pre-filter ────────────────────────────────────
+        # Scanner mode: qualifies_momentum() is the authoritative gate.
+        #   rel_vol uses bar['rel_vol_30d'] (precomputed by sim/live upstream) as a
+        #   fast estimate; 0.0 if absent means G1 rejects — acceptable fallback since
+        #   the sim always attaches this column and live injects it via the resolver.
+        # Universe mode: upstream already screened; only structural guards applied.
         candidates = []
         for bar in bars:
             symbol = bar['symbol']
@@ -278,12 +288,18 @@ class Orchestrator:
                 prior = self.prior_close.get(symbol)
                 if prior is None or prior <= 0:
                     continue
-                if scfg.enable_price_range:
-                    if price < min_price or price > max_price:
-                        continue
-                if scfg.enable_premarket_gain:
-                    if (price - prior) / prior * 100 < min_gain:
-                        continue
+                fund = self.fundamentals.get(symbol, {})
+                quick_rel_vol = float(bar.get('rel_vol_30d') or 0)
+                if not qualifies_momentum(
+                    price=price,
+                    prior_close=prior,
+                    high_of_day=self._high_of_day[symbol],
+                    rel_vol=quick_rel_vol,
+                    float_shares=fund.get('float_shares'),
+                    et_time=et_time,
+                    cfg=mcfg,
+                ):
+                    continue
             candidates.append((symbol, bar, history))
 
         if not candidates:
