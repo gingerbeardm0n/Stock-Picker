@@ -93,6 +93,7 @@ class SimulationRunner:
                  exit_config=None, scanner_config=None, entry_config=None,
                  add_on_config=None,
                  scoring_config=None,
+                 momentum_config=None,
                  debug=False, cache_data=False, cache_dir: str | None = None,
                  symbol_universe: list | None = None,
                  temp_config=None,
@@ -123,6 +124,7 @@ class SimulationRunner:
         self.entry_config = entry_config      # EntryConfig | None; None = all defaults
         self.add_on_config = add_on_config    # AddOnConfig | None; None = all defaults
         self.scoring_config = scoring_config  # ScoringConfig | None; None = all defaults
+        self.momentum_config = momentum_config  # MomentumScanConfig | None; None = all defaults
         self.debug = debug
         self.cache_data = cache_data
         self.cache_dir = Path(cache_dir) if cache_dir else None
@@ -518,6 +520,7 @@ class SimulationRunner:
             exit_config=self.exit_config,
             scoring_config=self.scoring_config,
             add_on_config=self.add_on_config,
+            momentum_config=self.momentum_config,
             temp_config=self.temp_config,
             portfolio_manager=self.portfolio_manager,
             hot_symbols=self.hot_symbols,

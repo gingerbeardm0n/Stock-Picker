@@ -46,7 +46,7 @@ except ImportError:
 from optimizer.run_config import RunConfig
 from optimizer.results_db import init_db, write_run
 from optimizer.simulate_one import run_date_range
-from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig
+from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig, MomentumScanConfig
 
 
 # ── Heartbeat monitor ─────────────────────────────────────────────────────────
@@ -532,7 +532,20 @@ def _build_config_from_trial(
             hot_market_multiplier  = _float('e_hot_market_multiplier', 1.00, 1.75),
         )
 
-    return RunConfig(scanner=scanner, entry=entry, exit_=exit_, add_on=add_on, scoring=scoring)
+    # ── Momentum / Intraday Discovery (Category M) ───────────────────────────
+    # Tune the key intraday-discovery parameters. Price range, rel-vol floor,
+    # and float cap reuse the same corpus-derived defaults as ScannerConfig
+    # (not separately tuned to avoid blowing up the search space).
+    if mode == 'gates-only':
+        momentum = MomentumScanConfig()
+    else:
+        momentum = MomentumScanConfig(
+            min_intraday_gain = _float('m_min_intraday_gain', 2.0, 15.0),
+            scan_end_hour     = _int(  'm_scan_end_hour',     10,  11),
+            hod_tol           = _float('m_hod_tol',           0.0,  0.05),
+        )
+
+    return RunConfig(scanner=scanner, entry=entry, exit_=exit_, add_on=add_on, scoring=scoring, momentum=momentum)
 
 
 # ── Seed helper ───────────────────────────────────────────────────────────────
