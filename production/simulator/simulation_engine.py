@@ -383,6 +383,16 @@ class SimulationRunner:
         qualifies_momentum() is the authoritative gate — this is only a coarse
         pre-filter to avoid scanning all 4000 symbols every minute.
         """
+        # TODO (SIM/LIVE DIVERGENCE — low priority):
+        # This scans the WHOLE day's bars to build the superset (look-ahead).
+        # A stock that surges at 2 PM is in hot_symbols from 9:30 AM. In live
+        # trading, symbols are discovered in real-time via the per-minute
+        # intraday scan (_run_intraday_momentum_scan). qualifies_momentum()'s
+        # time-forward gates (G2 HOD, G3 time, G6 gain) prevent acting on
+        # future data, so no incorrect trades result — but the sim evaluates
+        # some candidates earlier than live would discover them, which can
+        # cause slightly more entries than live. True time-forward sim discovery
+        # would require running a streaming intraday scan during simulation.
         MIN_PRICE = 2.0
         MAX_PRICE = 20.0
         MIN_GAIN  = 5.0   # safe superset floor — Optuna rarely benefits below 5% intraday gain

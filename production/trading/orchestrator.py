@@ -289,7 +289,24 @@ class Orchestrator:
                 if prior is None or prior <= 0:
                     continue
                 fund = self.fundamentals.get(symbol, {})
-                quick_rel_vol = float(bar.get('rel_vol_30d') or 0)
+
+                # G1 (rel_vol) pre-filter: use precomputed rel_vol_30d when
+                # available (sim bars always carry it). For live bars that don't
+                # carry rel_vol_30d, pass exactly the threshold so G1 passes here
+                # and the real rel_vol is computed by the injected resolver in
+                # Step 2, then verified by evaluate_entry's own rel-vol gate.
+                #
+                # TODO (BEFORE PAPER TRADING): attach intraday rel_vol to live
+                # bars at the bar_poller layer so this pre-filter also gates live
+                # candidates correctly (avoids unnecessary evaluate_entry calls
+                # for stocks that don't meet the volume threshold).
+                rel_vol_30d = bar.get('rel_vol_30d')
+                quick_rel_vol = (
+                    float(rel_vol_30d)
+                    if rel_vol_30d is not None
+                    else mcfg.min_relative_volume  # live bars: bypass G1, defer to Step 2
+                )
+
                 if not qualifies_momentum(
                     price=price,
                     prior_close=prior,

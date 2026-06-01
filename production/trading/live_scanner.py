@@ -246,8 +246,17 @@ class LiveScanner:
         # ── Orchestrator path (de-logic flip), flag-gated — default OFF (old path runs) ──
         # When True, process_bar batches the minute's bars and runs the shared Orchestrator
         # (full strategy: temperature/scoring/add-ons/portfolio) instead of the per-bar
-        # collect/execute/exit code. Flip to True from run_trading only after a dry-run
-        # session has been verified against a sim of the same day.
+        # collect/execute/exit code.
+        #
+        # TODO (BEFORE PAPER TRADING) — checklist to flip this True:
+        # 1. Fix rel_vol on live bars: attach intraday cumulative rel_vol to each bar
+        #    at the bar_poller layer so orchestrator._scan_for_entry G1 gate works
+        #    correctly (currently bypassed for live bars — see orchestrator.py TODO).
+        # 2. Re-run parity_check.py after any live_scanner changes to confirm PASS.
+        # 3. Run one full dry_run=True session; compare entries/exits against a sim
+        #    of the same day (same date, same config) — should be near-identical.
+        # 4. Confirm golden_baseline.py --check still PASS after any edits.
+        # 5. Only then: set _use_orchestrator = True in run_trading.py (not here).
         self._use_orchestrator: bool = False
         self._minute_bars: list[dict] = []
         self._minute_bars_ts = None
