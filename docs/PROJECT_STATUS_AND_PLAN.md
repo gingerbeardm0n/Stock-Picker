@@ -1,5 +1,8 @@
 # jTrader — Status Ledger & Work Plan (2026-05-29)
 
+> **SUPERSEDED (2026-05-31)** by `docs/PROJECT_HISTORY.md` (timeline + component ledger) and
+> `docs/AUTONOMOUS_QUEUE.md` (live work log). Kept for history; many items below are now DONE.
+
 Reconstructed from the working session. Each item tagged:
 **[DONE]** executed + verified · **[PARTIAL]** started, not finished · **[TODO]** proposed only, not begun.
 

@@ -1,6 +1,8 @@
 # Sim De-Logic-ing Plan (a.k.a. Live/Sim Parity)
 
-**Status:** plan. Rewritten 2026-05-29 to match the standing architecture rule.
+**Status:** ✅ DONE (2026-05-31) — migration steps 0-6 complete, sim==live parity GREEN, live flip
+flag-gated (default OFF). Kept as design record; current state in docs/PROJECT_HISTORY.md.
+**Status (original):** plan. Rewritten 2026-05-29 to match the standing architecture rule.
 **Supersedes** the earlier "make live match sim" framing — that was backwards.
 
 ## The rule (non-negotiable)
