@@ -689,8 +689,15 @@ def _make_objective(
     symbol_universe: list | dict | None = None,
     locked_params: dict | None = None,
     adaptive_trend_controller: AdaptiveTrendController | None = None,
+    date_sampler=None,
+    days_per_week: int = 2,
 ):
-    """Return a closure that Optuna calls for each trial."""
+    """Return a closure that Optuna calls for each trial.
+
+    date_sampler: if provided, each trial samples a different random subset
+    of trading days (stratified by ISO week). This prevents overfitting to
+    specific day ordering and covers all market regimes in every trial.
+    """
 
     def objective(trial: optuna.Trial) -> float:
         # Build per-trial locked params (don't mutate the shared dict)
@@ -711,6 +718,13 @@ def _make_objective(
 
         t_start = time.time()
         is_first_trial = (trial.number == 0)
+
+        # Stratified random day sampling: each trial gets different days.
+        # Trial 0 runs ALL pool days (no sampling) to warm the memory cache.
+        trial_dates = None
+        if date_sampler is not None and not is_first_trial:
+            trial_dates = date_sampler.sample(seed=trial.number, days_per_week=days_per_week)
+
         try:
             # Trial 0: disable early_abort so ALL days are loaded into memory cache.
             # This ensures save_memory_cache (below) persists all 187 days, not just
@@ -731,6 +745,7 @@ def _make_objective(
                 # Abort dead configs fast: if 0 trades after 20 data-days, skip rest.
                 # Cuts ~80% of dead-trial time from ~130s → ~14s per pruned trial.
                 early_abort_days=_abort,
+                dates=trial_dates,
             )
         except Exception as e:
             elapsed = time.time() - t_start
@@ -783,6 +798,9 @@ def run_optuna(
     adaptive_trend: bool = False,
     trend_burnin: int = 50,
     trend_recheck: int = 25,
+    stratified_sample: bool = False,
+    days_per_week: int = 2,
+    min_symbols: int = 500,
 ) -> None:
     if log_file:
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
@@ -831,6 +849,21 @@ def run_optuna(
         AdaptiveTrendController(burn_in=trend_burnin, recheck_interval=trend_recheck)
         if adaptive_trend else None
     )
+
+    # ── Stratified random day sampler ────────────────────────────────────────
+    _date_sampler = None
+    if stratified_sample:
+        from date_sampler import DateSampler
+        _date_sampler = DateSampler.from_db(
+            pool_start=start_date,
+            pool_end=end_date,
+            holdout_start=None,  # holdout managed separately via run_holdout.py
+            min_symbols=min_symbols,
+            min_days_per_week=days_per_week,
+        )
+        stats = _date_sampler.stats(days_per_week)
+        print(f"[SAMPLER] Stratified {days_per_week}/week: {stats['days_per_trial']} days/trial "
+              f"({stats['sample_pct']}% of {stats['total_pool_days']} pool days across {stats['total_weeks']} weeks)")
 
     # ── Pre-load memory cache from disk (skips ~2hr trial-0 warm-up) ────────
     if cache_data and cache_dir:
@@ -887,7 +920,7 @@ def run_optuna(
         obj_fn = _make_objective(
             start_date, end_date, results_conn, mode, debug, cache_data,
             disable_relative_volume, cache_dir, symbol_universe, locked_params,
-            adaptive_trend_controller,
+            adaptive_trend_controller, _date_sampler, days_per_week,
         )
         obj_fn._heartbeat = heartbeat  # type: ignore[attr-defined]
         heartbeat.start()
@@ -947,6 +980,14 @@ if __name__ == '__main__':
                         help='JSON file of locked params (keys starting with _ are ignored as comments). '
                              'Merged with --lock-params (CLI wins on conflict). '
                              'Example: --lock-file optimizer/locked_params_v1.json')
+    parser.add_argument('--stratified-sample', action='store_true',
+                        help='Enable stratified random day sampling: each trial sees a different '
+                             'random subset of days (N per week). Covers full date range with '
+                             '~40%% of days per trial. Re-randomizes each trial.')
+    parser.add_argument('--days-per-week', type=int, default=2,
+                        help='Days to sample per ISO week when --stratified-sample is on (default: 2)')
+    parser.add_argument('--min-symbols', type=int, default=500,
+                        help='Minimum symbols/day to include in sampling pool (default: 500)')
     parser.add_argument('--adaptive-trend', action='store_true',
                         help='Explore b_enable_trend freely for --trend-burnin trials, '
                              'then lock to the winner (top-20%% analysis). Rechecks every '
@@ -1009,4 +1050,7 @@ if __name__ == '__main__':
         adaptive_trend=args.adaptive_trend,
         trend_burnin=args.trend_burnin,
         trend_recheck=args.trend_recheck,
+        stratified_sample=args.stratified_sample,
+        days_per_week=args.days_per_week,
+        min_symbols=args.min_symbols,
     )
