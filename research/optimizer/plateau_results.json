@@ -1,0 +1,4503 @@
+{
+  "study": "mega_120params_v3",
+  "trials_analyzed": 2594,
+  "params_analyzed": 94,
+  "already_locked": 45,
+  "boolean": {
+    "a_enable_buying_volume": {
+      "true_median": 225.0,
+      "false_median": 8265.2,
+      "true_count": 112,
+      "false_count": 2482,
+      "diff_pct": 0.9728,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "a_enable_float_filter": {
+      "true_median": 8545.7,
+      "false_median": 5860.0,
+      "true_count": 2265,
+      "false_count": 329,
+      "diff_pct": 0.3143,
+      "verdict": "STRONG_PREFERENCE",
+      "better": true
+    },
+    "a_enable_last_1min_volume": {
+      "true_median": 1509.1,
+      "false_median": 8271.3,
+      "true_count": 119,
+      "false_count": 2475,
+      "diff_pct": 0.8176,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "a_enable_last_5min_volume": {
+      "true_median": 351.0,
+      "false_median": 8266.5,
+      "true_count": 113,
+      "false_count": 2481,
+      "diff_pct": 0.9575,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "a_enable_market_cap_filter": {
+      "true_median": 8485.9,
+      "false_median": 6845.2,
+      "true_count": 2093,
+      "false_count": 501,
+      "diff_pct": 0.1933,
+      "verdict": "STRONG_PREFERENCE",
+      "better": true
+    },
+    "a_enable_premarket_gain": {
+      "true_median": 3004.7,
+      "false_median": 8276.8,
+      "true_count": 139,
+      "false_count": 2455,
+      "diff_pct": 0.637,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "a_enable_price_range": {
+      "true_median": 4490.8,
+      "false_median": 8263.2,
+      "true_count": 144,
+      "false_count": 2450,
+      "diff_pct": 0.4565,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "a_enable_relative_volume": {
+      "true_median": null,
+      "false_median": 8100.2,
+      "true_count": 0,
+      "false_count": 2594,
+      "diff_pct": null,
+      "verdict": "ONE_SIDED",
+      "better": false
+    },
+    "a_enable_spread_filter": {
+      "true_median": null,
+      "false_median": 8100.2,
+      "true_count": 0,
+      "false_count": 2594,
+      "diff_pct": null,
+      "verdict": "ONE_SIDED",
+      "better": false
+    },
+    "b_enable_abcd": {
+      "true_median": 8475.6,
+      "false_median": 6432.1,
+      "true_count": 2260,
+      "false_count": 334,
+      "diff_pct": 0.2411,
+      "verdict": "STRONG_PREFERENCE",
+      "better": true
+    },
+    "b_enable_dip_buy": {
+      "true_median": 8200.6,
+      "false_median": 7080.2,
+      "true_count": 2462,
+      "false_count": 132,
+      "diff_pct": 0.1366,
+      "verdict": "STRONG_PREFERENCE",
+      "better": true
+    },
+    "b_enable_flat_top": {
+      "true_median": 5867.5,
+      "false_median": 8301.7,
+      "true_count": 236,
+      "false_count": 2358,
+      "diff_pct": 0.2932,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "b_enable_gap_and_go": {
+      "true_median": 8271.9,
+      "false_median": 1620.6,
+      "true_count": 2462,
+      "false_count": 132,
+      "diff_pct": 0.8041,
+      "verdict": "STRONG_PREFERENCE",
+      "better": true
+    },
+    "b_enable_macd": {
+      "true_median": 8326.6,
+      "false_median": 7782.5,
+      "true_count": 1651,
+      "false_count": 943,
+      "diff_pct": 0.0653,
+      "verdict": "MILD_PREFERENCE",
+      "better": true
+    },
+    "b_enable_orb": {
+      "true_median": 8390.8,
+      "false_median": 7714.5,
+      "true_count": 1688,
+      "false_count": 906,
+      "diff_pct": 0.0806,
+      "verdict": "MILD_PREFERENCE",
+      "better": true
+    },
+    "b_enable_red_to_green": {
+      "true_median": 8528.0,
+      "false_median": 7266.4,
+      "true_count": 1771,
+      "false_count": 823,
+      "diff_pct": 0.1479,
+      "verdict": "STRONG_PREFERENCE",
+      "better": true
+    },
+    "b_enable_trend": {
+      "true_median": 2365.1,
+      "false_median": 8265.2,
+      "true_count": 116,
+      "false_count": 2478,
+      "diff_pct": 0.7138,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "b_enable_vwap_break_curl": {
+      "true_median": 7376.3,
+      "false_median": 8456.6,
+      "true_count": 738,
+      "false_count": 1856,
+      "diff_pct": 0.1277,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "b_enable_vwap_reclaim": {
+      "true_median": 8424.5,
+      "false_median": 6550.4,
+      "true_count": 2055,
+      "false_count": 539,
+      "diff_pct": 0.2225,
+      "verdict": "STRONG_PREFERENCE",
+      "better": true
+    },
+    "c_enable_selling_pressure": {
+      "true_median": 6039.6,
+      "false_median": 8650.7,
+      "true_count": 420,
+      "false_count": 2174,
+      "diff_pct": 0.3018,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "c_enable_volume_dry_up_exit": {
+      "true_median": 5853.3,
+      "false_median": 8280.0,
+      "true_count": 125,
+      "false_count": 2469,
+      "diff_pct": 0.2931,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "e_enable_micro_pb_add": {
+      "true_median": 8255.2,
+      "false_median": 6395.8,
+      "true_count": 2474,
+      "false_count": 120,
+      "diff_pct": 0.2252,
+      "verdict": "STRONG_PREFERENCE",
+      "better": true
+    },
+    "e_enable_new_high": {
+      "true_median": 6857.5,
+      "false_median": 8488.1,
+      "true_count": 386,
+      "false_count": 2208,
+      "diff_pct": 0.1921,
+      "verdict": "STRONG_PREFERENCE",
+      "better": false
+    },
+    "e_enable_vwap_retest": {
+      "true_median": 8493.6,
+      "false_median": 6845.1,
+      "true_count": 2181,
+      "false_count": 413,
+      "diff_pct": 0.1941,
+      "verdict": "STRONG_PREFERENCE",
+      "better": true
+    },
+    "e_enable_whole_dollar_add": {
+      "true_median": 8449.1,
+      "false_median": 6438.6,
+      "true_count": 2261,
+      "false_count": 333,
+      "diff_pct": 0.238,
+      "verdict": "STRONG_PREFERENCE",
+      "better": true
+    }
+  },
+  "numeric": {
+    "a_max_market_cap": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9612.0,
+      "worst_bin_median": 7326.0,
+      "range_pct": 0.2378,
+      "best_bin_center": 250000000.0,
+      "bin_medians": [
+        [
+          125000000.0,
+          9127.6,
+          182
+        ],
+        [
+          175000000.0,
+          9220.4,
+          191
+        ],
+        [
+          250000000.0,
+          9612.0,
+          204
+        ],
+        [
+          325000000.0,
+          8310.9,
+          83
+        ],
+        [
+          375000000.0,
+          8967.0,
+          217
+        ],
+        [
+          425000000.0,
+          8424.1,
+          222
+        ],
+        [
+          500000000.0,
+          7955.6,
+          354
+        ],
+        [
+          575000000.0,
+          8182.8,
+          167
+        ],
+        [
+          700000000.0,
+          7326.0,
+          209
+        ],
+        [
+          900000000.0,
+          8610.2,
+          264
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "a_max_price": {
+      "plateau_width": 0.2,
+      "best_bin_median": 6375.4,
+      "worst_bin_median": 2183.0,
+      "range_pct": 0.6576,
+      "best_bin_center": 19.4606,
+      "bin_medians": [
+        [
+          15.5212,
+          4210.6,
+          15
+        ],
+        [
+          16.5051,
+          6065.6,
+          14
+        ],
+        [
+          17.4608,
+          5034.1,
+          14
+        ],
+        [
+          18.4648,
+          2183.0,
+          15
+        ],
+        [
+          19.4606,
+          6375.4,
+          14
+        ],
+        [
+          20.4265,
+          4560.0,
+          14
+        ],
+        [
+          21.3695,
+          3597.3,
+          15
+        ],
+        [
+          22.3533,
+          4566.3,
+          14
+        ],
+        [
+          23.3801,
+          4169.7,
+          14
+        ],
+        [
+          24.4357,
+          5630.7,
+          15
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "a_min_buying_volume": {
+      "plateau_width": 0.1,
+      "best_bin_median": 1243.6,
+      "worst_bin_median": -192.2,
+      "range_pct": 1.1545,
+      "best_bin_center": 20000.0,
+      "bin_medians": [
+        [
+          20000.0,
+          1243.6,
+          10
+        ],
+        [
+          40000.0,
+          674.3,
+          11
+        ],
+        [
+          58250.0,
+          216.1,
+          13
+        ],
+        [
+          79250.0,
+          507.3,
+          11
+        ],
+        [
+          102250.0,
+          1.6,
+          11
+        ],
+        [
+          120250.0,
+          274.5,
+          11
+        ],
+        [
+          136500.0,
+          48.7,
+          10
+        ],
+        [
+          155000.0,
+          -124.8,
+          11
+        ],
+        [
+          172500.0,
+          146.7,
+          10
+        ],
+        [
+          190000.0,
+          -192.2,
+          14
+        ]
+      ],
+      "verdict": "SPIKE"
+    },
+    "a_min_last_1min_volume": {
+      "plateau_width": 0.1,
+      "best_bin_median": 3770.8,
+      "worst_bin_median": 575.4,
+      "range_pct": 0.8474,
+      "best_bin_center": 5000.0,
+      "bin_medians": [
+        [
+          5000.0,
+          3770.8,
+          10
+        ],
+        [
+          10300.0,
+          2365.8,
+          14
+        ],
+        [
+          14800.0,
+          2932.8,
+          10
+        ],
+        [
+          19000.0,
+          2450.8,
+          13
+        ],
+        [
+          23500.0,
+          658.4,
+          11
+        ],
+        [
+          28000.0,
+          2240.9,
+          12
+        ],
+        [
+          31800.0,
+          1213.0,
+          13
+        ],
+        [
+          36800.0,
+          896.5,
+          11
+        ],
+        [
+          42000.0,
+          803.5,
+          12
+        ],
+        [
+          47000.0,
+          575.4,
+          13
+        ]
+      ],
+      "verdict": "SPIKE"
+    },
+    "a_min_last_5min_volume": {
+      "plateau_width": 0.1,
+      "best_bin_median": 3241.5,
+      "worst_bin_median": 41.6,
+      "range_pct": 0.9872,
+      "best_bin_center": 40000.0,
+      "bin_medians": [
+        [
+          40000.0,
+          3241.5,
+          10
+        ],
+        [
+          85000.0,
+          910.4,
+          12
+        ],
+        [
+          130000.0,
+          838.6,
+          11
+        ],
+        [
+          175000.0,
+          507.3,
+          11
+        ],
+        [
+          225000.0,
+          555.8,
+          12
+        ],
+        [
+          271000.0,
+          354.4,
+          12
+        ],
+        [
+          318000.0,
+          267.4,
+          11
+        ],
+        [
+          372000.0,
+          198.7,
+          10
+        ],
+        [
+          429000.0,
+          173.7,
+          12
+        ],
+        [
+          479000.0,
+          41.6,
+          12
+        ]
+      ],
+      "verdict": "SPIKE"
+    },
+    "a_min_premarket_gain": {
+      "plateau_width": 0.2,
+      "best_bin_median": 7708.8,
+      "worst_bin_median": 1121.1,
+      "range_pct": 0.8546,
+      "best_bin_center": 5.9189,
+      "bin_medians": [
+        [
+          5.9189,
+          7708.8,
+          14
+        ],
+        [
+          7.7228,
+          7128.2,
+          14
+        ],
+        [
+          9.4425,
+          5317.9,
+          14
+        ],
+        [
+          11.3013,
+          3546.6,
+          14
+        ],
+        [
+          13.4307,
+          2988.6,
+          13
+        ],
+        [
+          15.4456,
+          2518.8,
+          14
+        ],
+        [
+          17.4248,
+          2629.3,
+          14
+        ],
+        [
+          19.6333,
+          2607.4,
+          14
+        ],
+        [
+          21.8765,
+          2014.5,
+          14
+        ],
+        [
+          23.9854,
+          1121.1,
+          14
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "a_min_price": {
+      "plateau_width": 0.2,
+      "best_bin_median": 7721.1,
+      "worst_bin_median": 3129.3,
+      "range_pct": 0.5947,
+      "best_bin_center": 1.2,
+      "bin_medians": [
+        [
+          1.2,
+          7721.1,
+          15
+        ],
+        [
+          1.6004,
+          7709.9,
+          14
+        ],
+        [
+          2.0118,
+          6037.7,
+          14
+        ],
+        [
+          2.4516,
+          6122.5,
+          15
+        ],
+        [
+          2.8654,
+          4781.5,
+          14
+        ],
+        [
+          3.2456,
+          4549.6,
+          14
+        ],
+        [
+          3.6387,
+          3129.3,
+          15
+        ],
+        [
+          4.0391,
+          3824.7,
+          14
+        ],
+        [
+          4.4248,
+          3711.5,
+          14
+        ],
+        [
+          4.798,
+          3203.1,
+          15
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "b_abcd_d_light_vol": {
+      "plateau_width": 0.7,
+      "best_bin_median": 9289.0,
+      "worst_bin_median": 7435.0,
+      "range_pct": 0.1996,
+      "best_bin_center": 0.7022,
+      "bin_medians": [
+        [
+          0.5782,
+          7878.3,
+          226
+        ],
+        [
+          0.6661,
+          8919.3,
+          226
+        ],
+        [
+          0.6847,
+          8779.5,
+          226
+        ],
+        [
+          0.7022,
+          9289.0,
+          226
+        ],
+        [
+          0.7221,
+          8931.5,
+          226
+        ],
+        [
+          0.7476,
+          9005.3,
+          226
+        ],
+        [
+          0.7771,
+          8881.2,
+          226
+        ],
+        [
+          0.816,
+          8627.8,
+          226
+        ],
+        [
+          0.8732,
+          7435.0,
+          226
+        ],
+        [
+          0.9533,
+          7954.2,
+          226
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "b_bull_flag_breakout_vol_min": {
+      "plateau_width": 0.7,
+      "best_bin_median": 9569.6,
+      "worst_bin_median": 6660.7,
+      "range_pct": 0.304,
+      "best_bin_center": 0.6595,
+      "bin_medians": [
+        [
+          0.5636,
+          7243.1,
+          156
+        ],
+        [
+          0.6393,
+          9124.3,
+          156
+        ],
+        [
+          0.6595,
+          9569.6,
+          156
+        ],
+        [
+          0.68,
+          9376.4,
+          156
+        ],
+        [
+          0.7488,
+          8342.6,
+          156
+        ],
+        [
+          0.829,
+          9216.0,
+          156
+        ],
+        [
+          0.8636,
+          9506.2,
+          156
+        ],
+        [
+          0.8832,
+          9015.4,
+          156
+        ],
+        [
+          0.9176,
+          8753.4,
+          156
+        ],
+        [
+          0.9715,
+          6660.7,
+          157
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "b_bull_flag_light_vol": {
+      "plateau_width": 0.6,
+      "best_bin_median": 9593.1,
+      "worst_bin_median": 6348.6,
+      "range_pct": 0.3382,
+      "best_bin_center": 0.4872,
+      "bin_medians": [
+        [
+          0.4159,
+          9338.8,
+          156
+        ],
+        [
+          0.4409,
+          9396.1,
+          156
+        ],
+        [
+          0.4594,
+          9194.5,
+          156
+        ],
+        [
+          0.4872,
+          9593.1,
+          156
+        ],
+        [
+          0.5911,
+          7132.7,
+          156
+        ],
+        [
+          0.7297,
+          6348.6,
+          156
+        ],
+        [
+          0.7962,
+          8684.7,
+          156
+        ],
+        [
+          0.8205,
+          8505.0,
+          156
+        ],
+        [
+          0.8465,
+          9274.0,
+          156
+        ],
+        [
+          0.8807,
+          8547.6,
+          157
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "b_bull_flag_pole_vol_min": {
+      "plateau_width": 0.7,
+      "best_bin_median": 9557.0,
+      "worst_bin_median": 6669.8,
+      "range_pct": 0.3021,
+      "best_bin_center": 0.9474,
+      "bin_medians": [
+        [
+          0.5622,
+          7979.9,
+          156
+        ],
+        [
+          0.6491,
+          8900.7,
+          156
+        ],
+        [
+          0.691,
+          8682.8,
+          156
+        ],
+        [
+          0.7164,
+          9196.4,
+          156
+        ],
+        [
+          0.748,
+          8989.2,
+          156
+        ],
+        [
+          0.8211,
+          6669.8,
+          157
+        ],
+        [
+          0.8942,
+          8012.5,
+          155
+        ],
+        [
+          0.9246,
+          9025.6,
+          156
+        ],
+        [
+          0.9474,
+          9557.0,
+          156
+        ],
+        [
+          0.9803,
+          9003.6,
+          157
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "b_dip_buy_support_tolerance": {
+      "plateau_width": 0.7,
+      "best_bin_median": 8930.0,
+      "worst_bin_median": 6839.7,
+      "range_pct": 0.2341,
+      "best_bin_center": 0.149,
+      "bin_medians": [
+        [
+          0.0721,
+          7146.2,
+          247
+        ],
+        [
+          0.1195,
+          6839.7,
+          246
+        ],
+        [
+          0.1283,
+          7878.3,
+          246
+        ],
+        [
+          0.1336,
+          8868.4,
+          246
+        ],
+        [
+          0.1375,
+          8480.4,
+          246
+        ],
+        [
+          0.141,
+          8759.5,
+          246
+        ],
+        [
+          0.1436,
+          8689.5,
+          246
+        ],
+        [
+          0.1454,
+          8334.7,
+          246
+        ],
+        [
+          0.1471,
+          8714.3,
+          246
+        ],
+        [
+          0.149,
+          8930.0,
+          247
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "b_flat_top_resistance_tol": {
+      "plateau_width": 0.4,
+      "best_bin_median": 7413.7,
+      "worst_bin_median": 2083.5,
+      "range_pct": 0.719,
+      "best_bin_center": 0.0938,
+      "bin_medians": [
+        [
+          0.0163,
+          7182.5,
+          24
+        ],
+        [
+          0.0283,
+          7156.4,
+          23
+        ],
+        [
+          0.0407,
+          7357.5,
+          24
+        ],
+        [
+          0.0522,
+          6331.5,
+          23
+        ],
+        [
+          0.0607,
+          5510.6,
+          24
+        ],
+        [
+          0.0668,
+          2083.5,
+          23
+        ],
+        [
+          0.0709,
+          5830.1,
+          24
+        ],
+        [
+          0.0755,
+          2701.3,
+          23
+        ],
+        [
+          0.0831,
+          3499.8,
+          24
+        ],
+        [
+          0.0938,
+          7413.7,
+          24
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "b_flat_top_vol_increase_tol": {
+      "plateau_width": 0.1,
+      "best_bin_median": 8404.2,
+      "worst_bin_median": 2492.4,
+      "range_pct": 0.7034,
+      "best_bin_center": 1.9115,
+      "bin_medians": [
+        [
+          1.0098,
+          4922.7,
+          24
+        ],
+        [
+          1.0337,
+          3166.7,
+          23
+        ],
+        [
+          1.0647,
+          5203.2,
+          24
+        ],
+        [
+          1.1146,
+          2492.4,
+          23
+        ],
+        [
+          1.209,
+          2642.7,
+          24
+        ],
+        [
+          1.3348,
+          7485.9,
+          24
+        ],
+        [
+          1.4644,
+          7339.5,
+          23
+        ],
+        [
+          1.6019,
+          6347.1,
+          23
+        ],
+        [
+          1.7498,
+          7420.5,
+          24
+        ],
+        [
+          1.9115,
+          8404.2,
+          24
+        ]
+      ],
+      "verdict": "SPIKE"
+    },
+    "b_gap_and_go_breakout_vol_min": {
+      "plateau_width": 0.3,
+      "best_bin_median": 9546.9,
+      "worst_bin_median": 7431.4,
+      "range_pct": 0.2216,
+      "best_bin_center": 1.7909,
+      "bin_medians": [
+        [
+          1.0473,
+          8263.2,
+          247
+        ],
+        [
+          1.1357,
+          7963.4,
+          246
+        ],
+        [
+          1.2179,
+          7431.4,
+          246
+        ],
+        [
+          1.2956,
+          7574.2,
+          246
+        ],
+        [
+          1.377,
+          7886.5,
+          246
+        ],
+        [
+          1.5649,
+          8389.8,
+          246
+        ],
+        [
+          1.7909,
+          9546.9,
+          246
+        ],
+        [
+          1.9622,
+          8530.7,
+          246
+        ],
+        [
+          2.1173,
+          9360.9,
+          246
+        ],
+        [
+          2.5885,
+          8704.2,
+          247
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "b_gap_and_go_max_bars_since_open": {
+      "plateau_width": 0.5,
+      "best_bin_median": 9337.3,
+      "worst_bin_median": 6539.1,
+      "range_pct": 0.2997,
+      "best_bin_center": 25.5,
+      "bin_medians": [
+        [
+          12.0,
+          6539.1,
+          230
+        ],
+        [
+          20.5,
+          6813.1,
+          160
+        ],
+        [
+          23.0,
+          7435.3,
+          270
+        ],
+        [
+          24.5,
+          8236.5,
+          217
+        ],
+        [
+          25.5,
+          9337.3,
+          353
+        ],
+        [
+          26.5,
+          8921.3,
+          325
+        ],
+        [
+          28.0,
+          8734.5,
+          394
+        ],
+        [
+          29.5,
+          9027.2,
+          513
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "b_micro_pb_green_pct": {
+      "plateau_width": 0.2,
+      "best_bin_median": 9278.1,
+      "worst_bin_median": 6820.0,
+      "range_pct": 0.2649,
+      "best_bin_center": 0.7761,
+      "bin_medians": [
+        [
+          0.4235,
+          7356.9,
+          123
+        ],
+        [
+          0.4648,
+          8033.3,
+          122
+        ],
+        [
+          0.5016,
+          7807.5,
+          123
+        ],
+        [
+          0.5701,
+          7327.1,
+          122
+        ],
+        [
+          0.6339,
+          7841.8,
+          123
+        ],
+        [
+          0.6674,
+          6820.0,
+          123
+        ],
+        [
+          0.725,
+          8288.4,
+          122
+        ],
+        [
+          0.7761,
+          9278.1,
+          122
+        ],
+        [
+          0.8038,
+          8836.7,
+          123
+        ],
+        [
+          0.8593,
+          7766.3,
+          123
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "b_micro_pb_light_vol": {
+      "plateau_width": 0.4,
+      "best_bin_median": 8978.1,
+      "worst_bin_median": 7204.5,
+      "range_pct": 0.1975,
+      "best_bin_center": 0.7048,
+      "bin_medians": [
+        [
+          0.4252,
+          7231.5,
+          123
+        ],
+        [
+          0.4628,
+          7204.5,
+          122
+        ],
+        [
+          0.4865,
+          7777.8,
+          123
+        ],
+        [
+          0.5067,
+          7458.9,
+          122
+        ],
+        [
+          0.5271,
+          8151.9,
+          123
+        ],
+        [
+          0.5655,
+          7988.8,
+          123
+        ],
+        [
+          0.6288,
+          8037.7,
+          122
+        ],
+        [
+          0.6791,
+          8524.0,
+          122
+        ],
+        [
+          0.7048,
+          8978.1,
+          123
+        ],
+        [
+          0.8056,
+          8852.6,
+          123
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "b_micro_pb_swing_tol": {
+      "plateau_width": 0.3,
+      "best_bin_median": 9147.5,
+      "worst_bin_median": 6537.1,
+      "range_pct": 0.2854,
+      "best_bin_center": 0.9052,
+      "bin_medians": [
+        [
+          0.9052,
+          9147.5,
+          123
+        ],
+        [
+          0.9123,
+          8643.1,
+          122
+        ],
+        [
+          0.9159,
+          8449.1,
+          123
+        ],
+        [
+          0.919,
+          7720.9,
+          122
+        ],
+        [
+          0.9228,
+          7988.8,
+          123
+        ],
+        [
+          0.9275,
+          7743.7,
+          122
+        ],
+        [
+          0.9336,
+          8092.8,
+          123
+        ],
+        [
+          0.94,
+          7406.0,
+          122
+        ],
+        [
+          0.9451,
+          7620.7,
+          123
+        ],
+        [
+          0.9733,
+          6537.1,
+          123
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "b_stop_buffer": {
+      "plateau_width": 0.5,
+      "best_bin_median": 9335.6,
+      "worst_bin_median": 6714.2,
+      "range_pct": 0.2808,
+      "best_bin_center": 0.0915,
+      "bin_medians": [
+        [
+          0.0167,
+          6714.2,
+          260
+        ],
+        [
+          0.0274,
+          7171.0,
+          259
+        ],
+        [
+          0.0334,
+          7521.8,
+          259
+        ],
+        [
+          0.0372,
+          8275.7,
+          260
+        ],
+        [
+          0.0421,
+          8115.2,
+          259
+        ],
+        [
+          0.0522,
+          8458.1,
+          259
+        ],
+        [
+          0.0699,
+          9318.9,
+          260
+        ],
+        [
+          0.085,
+          9055.5,
+          259
+        ],
+        [
+          0.0915,
+          9335.6,
+          259
+        ],
+        [
+          0.0967,
+          9205.3,
+          260
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "b_vwap_break_curl_lookback": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9352.1,
+      "worst_bin_median": 6348.6,
+      "range_pct": 0.3212,
+      "best_bin_center": 4.5,
+      "bin_medians": [
+        [
+          3.5,
+          9023.4,
+          219
+        ],
+        [
+          4.5,
+          9352.1,
+          129
+        ],
+        [
+          5.5,
+          7495.3,
+          51
+        ],
+        [
+          6.5,
+          7275.0,
+          127
+        ],
+        [
+          7.5,
+          6348.6,
+          212
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "b_vwap_break_vol_min": {
+      "plateau_width": 0.1,
+      "best_bin_median": 9758.1,
+      "worst_bin_median": 5983.4,
+      "range_pct": 0.3868,
+      "best_bin_center": 1.377,
+      "bin_medians": [
+        [
+          0.8155,
+          6775.0,
+          74
+        ],
+        [
+          0.8454,
+          5983.4,
+          74
+        ],
+        [
+          0.8764,
+          6568.1,
+          74
+        ],
+        [
+          0.9081,
+          6747.6,
+          73
+        ],
+        [
+          1.0285,
+          6711.0,
+          74
+        ],
+        [
+          1.1808,
+          8080.9,
+          74
+        ],
+        [
+          1.2619,
+          8437.2,
+          73
+        ],
+        [
+          1.3221,
+          8541.4,
+          74
+        ],
+        [
+          1.377,
+          9758.1,
+          74
+        ],
+        [
+          1.4524,
+          7836.6,
+          74
+        ]
+      ],
+      "verdict": "SPIKE"
+    },
+    "b_vwap_curl_tolerance": {
+      "plateau_width": 0.3,
+      "best_bin_median": 9182.0,
+      "worst_bin_median": 5651.0,
+      "range_pct": 0.3846,
+      "best_bin_center": 0.0144,
+      "bin_medians": [
+        [
+          0.007,
+          7829.2,
+          74
+        ],
+        [
+          0.0098,
+          8800.2,
+          74
+        ],
+        [
+          0.0114,
+          8130.3,
+          74
+        ],
+        [
+          0.0129,
+          8868.0,
+          73
+        ],
+        [
+          0.0144,
+          9182.0,
+          74
+        ],
+        [
+          0.0161,
+          7846.5,
+          74
+        ],
+        [
+          0.0177,
+          7478.4,
+          73
+        ],
+        [
+          0.0197,
+          6786.2,
+          74
+        ],
+        [
+          0.0225,
+          6881.3,
+          74
+        ],
+        [
+          0.0271,
+          5651.0,
+          74
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "b_vwap_reclaim_lookback": {
+      "plateau_width": 0.6,
+      "best_bin_median": 9411.0,
+      "worst_bin_median": 7317.8,
+      "range_pct": 0.2224,
+      "best_bin_center": 8.0,
+      "bin_medians": [
+        [
+          3.5,
+          8064.6,
+          305
+        ],
+        [
+          4.5,
+          8783.6,
+          519
+        ],
+        [
+          6.0,
+          7317.8,
+          339
+        ],
+        [
+          8.0,
+          9411.0,
+          215
+        ],
+        [
+          9.5,
+          9298.7,
+          677
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "c_early_time_decay_min_gain_pct": {
+      "plateau_width": 0.7,
+      "best_bin_median": 8258.6,
+      "worst_bin_median": 2590.5,
+      "range_pct": 0.6863,
+      "best_bin_center": 7.1888,
+      "bin_medians": [
+        [
+          3.8351,
+          2590.5,
+          112
+        ],
+        [
+          5.8876,
+          7060.5,
+          111
+        ],
+        [
+          6.2407,
+          8057.7,
+          112
+        ],
+        [
+          6.448,
+          7777.8,
+          111
+        ],
+        [
+          6.621,
+          7721.2,
+          111
+        ],
+        [
+          6.7935,
+          7615.4,
+          112
+        ],
+        [
+          6.9766,
+          7348.7,
+          111
+        ],
+        [
+          7.1888,
+          8258.6,
+          112
+        ],
+        [
+          7.5305,
+          7539.3,
+          111
+        ],
+        [
+          8.8752,
+          7831.0,
+          112
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "c_early_time_decay_minute": {
+      "plateau_width": 0.875,
+      "best_bin_median": 7947.6,
+      "worst_bin_median": 5529.7,
+      "range_pct": 0.3042,
+      "best_bin_center": 40.5,
+      "bin_medians": [
+        [
+          22.0,
+          5529.7,
+          107
+        ],
+        [
+          30.0,
+          7484.4,
+          112
+        ],
+        [
+          31.5,
+          7705.2,
+          152
+        ],
+        [
+          32.5,
+          7683.0,
+          196
+        ],
+        [
+          33.5,
+          7655.7,
+          175
+        ],
+        [
+          34.5,
+          7615.1,
+          137
+        ],
+        [
+          35.5,
+          7348.7,
+          85
+        ],
+        [
+          40.5,
+          7947.6,
+          151
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "c_ema_cross_qty_pct": {
+      "plateau_width": 0.5,
+      "best_bin_median": 9363.9,
+      "worst_bin_median": 6243.5,
+      "range_pct": 0.3332,
+      "best_bin_center": 0.268,
+      "bin_medians": [
+        [
+          0.1323,
+          6243.5,
+          260
+        ],
+        [
+          0.1838,
+          9021.5,
+          259
+        ],
+        [
+          0.226,
+          8866.8,
+          259
+        ],
+        [
+          0.268,
+          9363.9,
+          260
+        ],
+        [
+          0.295,
+          9199.7,
+          259
+        ],
+        [
+          0.3135,
+          9242.4,
+          259
+        ],
+        [
+          0.3402,
+          7954.2,
+          260
+        ],
+        [
+          0.3682,
+          8159.6,
+          259
+        ],
+        [
+          0.3946,
+          7959.8,
+          259
+        ],
+        [
+          0.4547,
+          7484.4,
+          260
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "c_macd_flip_qty_pct": {
+      "plateau_width": 0.7,
+      "best_bin_median": 9570.5,
+      "worst_bin_median": 6280.6,
+      "range_pct": 0.3438,
+      "best_bin_center": 0.622,
+      "bin_medians": [
+        [
+          0.4412,
+          6280.6,
+          126
+        ],
+        [
+          0.5206,
+          6754.9,
+          125
+        ],
+        [
+          0.584,
+          9064.8,
+          126
+        ],
+        [
+          0.622,
+          9570.5,
+          125
+        ],
+        [
+          0.6483,
+          9458.8,
+          125
+        ],
+        [
+          0.6704,
+          8761.2,
+          126
+        ],
+        [
+          0.6906,
+          9193.0,
+          125
+        ],
+        [
+          0.7143,
+          9233.0,
+          126
+        ],
+        [
+          0.7503,
+          9220.4,
+          125
+        ],
+        [
+          0.886,
+          7157.5,
+          126
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "c_selling_pressure_qty_pct": {
+      "plateau_width": 0.2,
+      "best_bin_median": 7715.9,
+      "worst_bin_median": 4561.7,
+      "range_pct": 0.4088,
+      "best_bin_center": 0.4043,
+      "bin_medians": [
+        [
+          0.2744,
+          5882.2,
+          42
+        ],
+        [
+          0.3697,
+          6821.0,
+          42
+        ],
+        [
+          0.4043,
+          7715.9,
+          42
+        ],
+        [
+          0.4417,
+          7441.0,
+          42
+        ],
+        [
+          0.4949,
+          4561.7,
+          42
+        ],
+        [
+          0.5404,
+          6857.5,
+          42
+        ],
+        [
+          0.5689,
+          6411.5,
+          42
+        ],
+        [
+          0.602,
+          5810.2,
+          42
+        ],
+        [
+          0.6899,
+          4800.3,
+          42
+        ],
+        [
+          0.8782,
+          5203.2,
+          42
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "c_selling_pressure_ratio": {
+      "plateau_width": 0.3,
+      "best_bin_median": 7241.6,
+      "worst_bin_median": 2858.5,
+      "range_pct": 0.6053,
+      "best_bin_center": 2.0749,
+      "bin_medians": [
+        [
+          1.5648,
+          5179.2,
+          42
+        ],
+        [
+          2.0749,
+          7241.6,
+          42
+        ],
+        [
+          2.3219,
+          5482.4,
+          42
+        ],
+        [
+          2.545,
+          6471.3,
+          42
+        ],
+        [
+          2.9871,
+          2858.5,
+          42
+        ],
+        [
+          3.4109,
+          7168.5,
+          42
+        ],
+        [
+          3.5931,
+          6698.5,
+          42
+        ],
+        [
+          3.7428,
+          5509.2,
+          42
+        ],
+        [
+          3.8699,
+          5566.1,
+          42
+        ],
+        [
+          3.9606,
+          6023.7,
+          42
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "c_target1_qty_pct": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9152.1,
+      "worst_bin_median": 6756.2,
+      "range_pct": 0.2618,
+      "best_bin_center": 0.2104,
+      "bin_medians": [
+        [
+          0.2104,
+          9152.1,
+          260
+        ],
+        [
+          0.2293,
+          9008.6,
+          259
+        ],
+        [
+          0.2479,
+          8419.4,
+          259
+        ],
+        [
+          0.2743,
+          7800.1,
+          260
+        ],
+        [
+          0.3122,
+          8319.5,
+          259
+        ],
+        [
+          0.3514,
+          8089.8,
+          259
+        ],
+        [
+          0.3892,
+          7947.4,
+          260
+        ],
+        [
+          0.4284,
+          7684.6,
+          259
+        ],
+        [
+          0.4645,
+          7808.2,
+          259
+        ],
+        [
+          0.6404,
+          6756.2,
+          260
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "c_target2_ratio": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9220.4,
+      "worst_bin_median": 6806.1,
+      "range_pct": 0.2618,
+      "best_bin_center": 3.972,
+      "bin_medians": [
+        [
+          2.7258,
+          6806.1,
+          260
+        ],
+        [
+          3.5246,
+          7551.4,
+          259
+        ],
+        [
+          3.6507,
+          8239.5,
+          259
+        ],
+        [
+          3.775,
+          8740.6,
+          260
+        ],
+        [
+          3.972,
+          9220.4,
+          259
+        ],
+        [
+          4.2334,
+          8852.6,
+          259
+        ],
+        [
+          4.4785,
+          8407.7,
+          260
+        ],
+        [
+          4.6837,
+          7655.7,
+          259
+        ],
+        [
+          4.8329,
+          8117.1,
+          259
+        ],
+        [
+          4.9427,
+          7941.4,
+          260
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "c_time_decay_hour": {
+      "plateau_width": 0.333,
+      "best_bin_median": 8954.9,
+      "worst_bin_median": 5391.9,
+      "range_pct": 0.3979,
+      "best_bin_center": 13.5,
+      "bin_medians": [
+        [
+          10.5,
+          5391.9,
+          40
+        ],
+        [
+          12.0,
+          8012.5,
+          1917
+        ],
+        [
+          13.5,
+          8954.9,
+          637
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "c_volume_dry_up_qty_pct": {
+      "plateau_width": 0.5,
+      "best_bin_median": 6611.0,
+      "worst_bin_median": 3355.8,
+      "range_pct": 0.4924,
+      "best_bin_center": 0.7373,
+      "bin_medians": [
+        [
+          0.3179,
+          5812.2,
+          13
+        ],
+        [
+          0.4301,
+          3355.8,
+          12
+        ],
+        [
+          0.5101,
+          5116.1,
+          13
+        ],
+        [
+          0.5724,
+          5404.0,
+          12
+        ],
+        [
+          0.6275,
+          6598.4,
+          12
+        ],
+        [
+          0.6799,
+          6479.5,
+          13
+        ],
+        [
+          0.7373,
+          6611.0,
+          12
+        ],
+        [
+          0.7958,
+          6364.4,
+          13
+        ],
+        [
+          0.8524,
+          6417.0,
+          12
+        ],
+        [
+          0.9322,
+          5499.0,
+          13
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "c_volume_dry_up_threshold": {
+      "plateau_width": 0.4,
+      "best_bin_median": 7187.3,
+      "worst_bin_median": 3722.6,
+      "range_pct": 0.4821,
+      "best_bin_center": 0.3779,
+      "bin_medians": [
+        [
+          0.3209,
+          6730.1,
+          13
+        ],
+        [
+          0.3541,
+          6479.0,
+          12
+        ],
+        [
+          0.3779,
+          7187.3,
+          13
+        ],
+        [
+          0.4006,
+          7008.1,
+          12
+        ],
+        [
+          0.4298,
+          6415.4,
+          12
+        ],
+        [
+          0.4747,
+          5628.0,
+          13
+        ],
+        [
+          0.5368,
+          5045.0,
+          12
+        ],
+        [
+          0.6166,
+          3722.6,
+          13
+        ],
+        [
+          0.6858,
+          4422.9,
+          12
+        ],
+        [
+          0.75,
+          3753.5,
+          13
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "d_chop_max_position_pct": {
+      "plateau_width": 0.7,
+      "best_bin_median": 8900.2,
+      "worst_bin_median": 7318.7,
+      "range_pct": 0.1777,
+      "best_bin_center": 7.6568,
+      "bin_medians": [
+        [
+          3.1782,
+          7318.7,
+          260
+        ],
+        [
+          4.6114,
+          7548.6,
+          259
+        ],
+        [
+          5.0358,
+          8245.6,
+          259
+        ],
+        [
+          5.3648,
+          8237.2,
+          260
+        ],
+        [
+          5.7151,
+          8403.6,
+          259
+        ],
+        [
+          6.6536,
+          8224.2,
+          259
+        ],
+        [
+          7.6568,
+          8900.2,
+          260
+        ],
+        [
+          8.1397,
+          8310.9,
+          259
+        ],
+        [
+          8.6275,
+          8196.3,
+          259
+        ],
+        [
+          9.4413,
+          7549.4,
+          260
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "d_hot_symbols_min": {
+      "plateau_width": 0.667,
+      "best_bin_median": 8725.5,
+      "worst_bin_median": 6271.9,
+      "range_pct": 0.2812,
+      "best_bin_center": 5.5,
+      "bin_medians": [
+        [
+          3.0,
+          6271.9,
+          484
+        ],
+        [
+          4.5,
+          8130.3,
+          136
+        ],
+        [
+          5.5,
+          8725.5,
+          1974
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "e_add_pct_tier1": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9457.1,
+      "worst_bin_median": 6985.1,
+      "range_pct": 0.2614,
+      "best_bin_center": 0.2656,
+      "bin_medians": [
+        [
+          0.1731,
+          7272.2,
+          260
+        ],
+        [
+          0.2525,
+          9364.3,
+          259
+        ],
+        [
+          0.2656,
+          9457.1,
+          259
+        ],
+        [
+          0.2806,
+          9008.9,
+          260
+        ],
+        [
+          0.3066,
+          8117.1,
+          259
+        ],
+        [
+          0.3313,
+          8490.3,
+          259
+        ],
+        [
+          0.3452,
+          8619.8,
+          260
+        ],
+        [
+          0.3584,
+          7629.6,
+          259
+        ],
+        [
+          0.3767,
+          7620.7,
+          259
+        ],
+        [
+          0.443,
+          6985.1,
+          260
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "e_add_pct_tier4": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9661.3,
+      "worst_bin_median": 5228.3,
+      "range_pct": 0.4588,
+      "best_bin_center": 0.0656,
+      "bin_medians": [
+        [
+          0.0543,
+          9210.0,
+          260
+        ],
+        [
+          0.0608,
+          9526.0,
+          259
+        ],
+        [
+          0.0656,
+          9661.3,
+          259
+        ],
+        [
+          0.0752,
+          9016.3,
+          260
+        ],
+        [
+          0.088,
+          7915.4,
+          259
+        ],
+        [
+          0.0998,
+          7705.4,
+          259
+        ],
+        [
+          0.1109,
+          7449.8,
+          260
+        ],
+        [
+          0.1196,
+          7963.6,
+          259
+        ],
+        [
+          0.1281,
+          7469.4,
+          259
+        ],
+        [
+          0.1665,
+          5228.3,
+          260
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "e_hot_market_multiplier": {
+      "plateau_width": 0.5,
+      "best_bin_median": 9360.9,
+      "worst_bin_median": 5483.9,
+      "range_pct": 0.4142,
+      "best_bin_center": 1.7362,
+      "bin_medians": [
+        [
+          1.1615,
+          5483.9,
+          260
+        ],
+        [
+          1.3456,
+          8066.7,
+          259
+        ],
+        [
+          1.3838,
+          7348.7,
+          259
+        ],
+        [
+          1.4205,
+          7883.6,
+          260
+        ],
+        [
+          1.4685,
+          8445.4,
+          259
+        ],
+        [
+          1.5374,
+          8852.6,
+          259
+        ],
+        [
+          1.6224,
+          8352.4,
+          260
+        ],
+        [
+          1.6809,
+          9008.6,
+          259
+        ],
+        [
+          1.7094,
+          8499.8,
+          259
+        ],
+        [
+          1.7362,
+          9360.9,
+          260
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "e_stop_buffer": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9820.3,
+      "worst_bin_median": 6598.9,
+      "range_pct": 0.328,
+      "best_bin_center": 0.0494,
+      "bin_medians": [
+        [
+          0.0309,
+          8127.1,
+          260
+        ],
+        [
+          0.044,
+          9163.3,
+          259
+        ],
+        [
+          0.0494,
+          9820.3,
+          259
+        ],
+        [
+          0.0571,
+          9407.4,
+          260
+        ],
+        [
+          0.0674,
+          8880.6,
+          259
+        ],
+        [
+          0.0766,
+          8365.6,
+          259
+        ],
+        [
+          0.0836,
+          8037.6,
+          260
+        ],
+        [
+          0.0907,
+          7780.6,
+          259
+        ],
+        [
+          0.0983,
+          7440.2,
+          259
+        ],
+        [
+          0.126,
+          6598.9,
+          260
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "e_time_cutoff_minute": {
+      "plateau_width": 0.3,
+      "best_bin_median": 9657.4,
+      "worst_bin_median": 5762.0,
+      "range_pct": 0.4034,
+      "best_bin_center": 28.5,
+      "bin_medians": [
+        [
+          19.5,
+          5762.0,
+          222
+        ],
+        [
+          24.5,
+          9163.7,
+          144
+        ],
+        [
+          26.0,
+          9339.5,
+          382
+        ],
+        [
+          28.5,
+          9657.4,
+          260
+        ],
+        [
+          32.5,
+          7187.3,
+          201
+        ],
+        [
+          36.0,
+          6929.1,
+          269
+        ],
+        [
+          38.0,
+          8064.6,
+          299
+        ],
+        [
+          40.5,
+          7521.8,
+          261
+        ],
+        [
+          43.0,
+          8227.9,
+          251
+        ],
+        [
+          44.5,
+          8491.1,
+          305
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "f_float_1m_5m_pts": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9002.7,
+      "worst_bin_median": 7780.6,
+      "range_pct": 0.1357,
+      "best_bin_center": 8.5,
+      "bin_medians": [
+        [
+          6.5,
+          7800.1,
+          630
+        ],
+        [
+          7.5,
+          7810.5,
+          401
+        ],
+        [
+          8.5,
+          9002.7,
+          504
+        ],
+        [
+          10.0,
+          8232.2,
+          484
+        ],
+        [
+          13.5,
+          7780.6,
+          575
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_float_unknown_pts": {
+      "plateau_width": 0.286,
+      "best_bin_median": 9237.1,
+      "worst_bin_median": 6382.6,
+      "range_pct": 0.309,
+      "best_bin_center": 8.5,
+      "bin_medians": [
+        [
+          2.5,
+          7471.7,
+          209
+        ],
+        [
+          4.0,
+          8050.8,
+          279
+        ],
+        [
+          5.5,
+          6382.6,
+          91
+        ],
+        [
+          6.5,
+          7539.3,
+          331
+        ],
+        [
+          7.5,
+          8537.8,
+          359
+        ],
+        [
+          8.5,
+          9237.1,
+          337
+        ],
+        [
+          9.5,
+          7958.0,
+          988
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "f_gap_10pct_pts": {
+      "plateau_width": 0.2,
+      "best_bin_median": 9157.2,
+      "worst_bin_median": 6980.8,
+      "range_pct": 0.2377,
+      "best_bin_center": 4.5,
+      "bin_medians": [
+        [
+          1.5,
+          7366.8,
+          181
+        ],
+        [
+          2.5,
+          7388.5,
+          303
+        ],
+        [
+          3.5,
+          6980.8,
+          232
+        ],
+        [
+          4.5,
+          9157.2,
+          1058
+        ],
+        [
+          6.0,
+          8094.1,
+          820
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "f_macd_unknown_pts": {
+      "plateau_width": 0.25,
+      "best_bin_median": 8729.7,
+      "worst_bin_median": 2688.5,
+      "range_pct": 0.692,
+      "best_bin_center": 4.5,
+      "bin_medians": [
+        [
+          1.0,
+          2688.5,
+          122
+        ],
+        [
+          2.5,
+          7117.1,
+          238
+        ],
+        [
+          3.5,
+          7423.6,
+          566
+        ],
+        [
+          4.5,
+          8729.7,
+          1668
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "f_news_tier1_pts": {
+      "plateau_width": 0.571,
+      "best_bin_median": 8647.9,
+      "worst_bin_median": 3623.9,
+      "range_pct": 0.5809,
+      "best_bin_center": 14.5,
+      "bin_medians": [
+        [
+          12.5,
+          3623.9,
+          30
+        ],
+        [
+          13.5,
+          7757.7,
+          253
+        ],
+        [
+          14.5,
+          8647.9,
+          334
+        ],
+        [
+          15.5,
+          8182.0,
+          405
+        ],
+        [
+          16.5,
+          8145.5,
+          223
+        ],
+        [
+          17.5,
+          7731.5,
+          375
+        ],
+        [
+          19.0,
+          8167.1,
+          974
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_news_tier2_pts": {
+      "plateau_width": 0.5,
+      "best_bin_median": 8667.4,
+      "worst_bin_median": 6591.7,
+      "range_pct": 0.2395,
+      "best_bin_center": 8.5,
+      "bin_medians": [
+        [
+          8.5,
+          8667.4,
+          1016
+        ],
+        [
+          9.5,
+          8361.9,
+          724
+        ],
+        [
+          11.0,
+          7363.6,
+          525
+        ],
+        [
+          14.0,
+          6591.7,
+          329
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_pattern_abcd": {
+      "plateau_width": 0.4,
+      "best_bin_median": 8897.8,
+      "worst_bin_median": 5810.2,
+      "range_pct": 0.347,
+      "best_bin_center": 19.5,
+      "bin_medians": [
+        [
+          11.0,
+          5810.2,
+          226
+        ],
+        [
+          15.0,
+          6444.8,
+          248
+        ],
+        [
+          17.0,
+          8092.8,
+          239
+        ],
+        [
+          18.5,
+          7963.0,
+          258
+        ],
+        [
+          19.5,
+          8897.8,
+          1623
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_pattern_bull_flag": {
+      "plateau_width": 0.75,
+      "best_bin_median": 8668.8,
+      "worst_bin_median": 7642.7,
+      "range_pct": 0.1184,
+      "best_bin_center": 22.5,
+      "bin_medians": [
+        [
+          13.5,
+          7642.7,
+          142
+        ],
+        [
+          17.5,
+          7756.3,
+          303
+        ],
+        [
+          18.5,
+          8387.8,
+          418
+        ],
+        [
+          19.5,
+          8040.4,
+          359
+        ],
+        [
+          21.0,
+          8115.4,
+          298
+        ],
+        [
+          22.5,
+          8668.8,
+          310
+        ],
+        [
+          23.5,
+          8086.3,
+          481
+        ],
+        [
+          24.5,
+          7821.8,
+          283
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "f_pattern_dip_buy": {
+      "plateau_width": 0.5,
+      "best_bin_median": 9226.7,
+      "worst_bin_median": 6929.1,
+      "range_pct": 0.249,
+      "best_bin_center": 9.5,
+      "bin_medians": [
+        [
+          8.5,
+          9116.5,
+          104
+        ],
+        [
+          9.5,
+          9226.7,
+          256
+        ],
+        [
+          10.5,
+          9006.7,
+          353
+        ],
+        [
+          12.5,
+          9038.6,
+          258
+        ],
+        [
+          14.5,
+          7988.8,
+          115
+        ],
+        [
+          15.5,
+          8315.2,
+          226
+        ],
+        [
+          16.5,
+          7975.0,
+          356
+        ],
+        [
+          17.5,
+          7789.4,
+          364
+        ],
+        [
+          18.5,
+          8050.8,
+          257
+        ],
+        [
+          20.5,
+          6929.1,
+          305
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_pattern_flat_top": {
+      "plateau_width": 0.5,
+      "best_bin_median": 9655.3,
+      "worst_bin_median": 7049.2,
+      "range_pct": 0.2699,
+      "best_bin_center": 10.5,
+      "bin_medians": [
+        [
+          10.5,
+          9655.3,
+          209
+        ],
+        [
+          12.0,
+          9015.3,
+          206
+        ],
+        [
+          14.0,
+          9106.2,
+          341
+        ],
+        [
+          15.5,
+          8922.4,
+          143
+        ],
+        [
+          17.5,
+          7515.2,
+          339
+        ],
+        [
+          19.5,
+          7049.2,
+          112
+        ],
+        [
+          21.0,
+          7386.1,
+          445
+        ],
+        [
+          22.5,
+          7388.5,
+          203
+        ],
+        [
+          23.5,
+          8736.2,
+          293
+        ],
+        [
+          24.5,
+          7360.3,
+          303
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_pattern_gap_and_go": {
+      "plateau_width": 0.429,
+      "best_bin_median": 9332.7,
+      "worst_bin_median": 6449.2,
+      "range_pct": 0.309,
+      "best_bin_center": 17.5,
+      "bin_medians": [
+        [
+          15.5,
+          7859.3,
+          242
+        ],
+        [
+          16.5,
+          8926.2,
+          664
+        ],
+        [
+          17.5,
+          9332.7,
+          382
+        ],
+        [
+          18.5,
+          7964.9,
+          151
+        ],
+        [
+          19.5,
+          8492.3,
+          482
+        ],
+        [
+          21.0,
+          6947.6,
+          377
+        ],
+        [
+          23.5,
+          6449.2,
+          296
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_pattern_orb": {
+      "plateau_width": 0.556,
+      "best_bin_median": 8935.0,
+      "worst_bin_median": 7193.1,
+      "range_pct": 0.1949,
+      "best_bin_center": 15.25,
+      "bin_medians": [
+        [
+          10.5,
+          7843.7,
+          476
+        ],
+        [
+          11.5,
+          7998.8,
+          272
+        ],
+        [
+          12.5,
+          8490.3,
+          249
+        ],
+        [
+          13.75,
+          8827.9,
+          300
+        ],
+        [
+          15.25,
+          8935.0,
+          138
+        ],
+        [
+          16.5,
+          7988.8,
+          149
+        ],
+        [
+          17.5,
+          8276.8,
+          243
+        ],
+        [
+          18.5,
+          8521.3,
+          360
+        ],
+        [
+          22.0,
+          7193.1,
+          407
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_pattern_red_to_green": {
+      "plateau_width": 0.125,
+      "best_bin_median": 9425.0,
+      "worst_bin_median": 7600.9,
+      "range_pct": 0.1935,
+      "best_bin_center": 17.5,
+      "bin_medians": [
+        [
+          8.5,
+          8055.5,
+          160
+        ],
+        [
+          9.5,
+          7682.0,
+          232
+        ],
+        [
+          10.5,
+          8310.9,
+          501
+        ],
+        [
+          11.5,
+          8228.6,
+          417
+        ],
+        [
+          13.0,
+          7600.9,
+          455
+        ],
+        [
+          15.5,
+          8086.3,
+          293
+        ],
+        [
+          17.5,
+          9425.0,
+          262
+        ],
+        [
+          20.0,
+          7833.2,
+          274
+        ]
+      ],
+      "verdict": "SPIKE"
+    },
+    "f_pattern_whole_dollar": {
+      "plateau_width": 0.571,
+      "best_bin_median": 8836.7,
+      "worst_bin_median": 7339.0,
+      "range_pct": 0.1695,
+      "best_bin_center": 17.0,
+      "bin_medians": [
+        [
+          10.0,
+          7339.0,
+          189
+        ],
+        [
+          12.5,
+          7791.7,
+          326
+        ],
+        [
+          13.5,
+          7756.3,
+          321
+        ],
+        [
+          14.5,
+          8117.6,
+          512
+        ],
+        [
+          15.5,
+          8409.5,
+          540
+        ],
+        [
+          17.0,
+          8836.7,
+          295
+        ],
+        [
+          20.0,
+          8310.9,
+          411
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_relvol_pts_100x": {
+      "plateau_width": 0.25,
+      "best_bin_median": 8998.7,
+      "worst_bin_median": 6145.5,
+      "range_pct": 0.3171,
+      "best_bin_center": 14.5,
+      "bin_medians": [
+        [
+          14.5,
+          8998.7,
+          1539
+        ],
+        [
+          15.5,
+          7740.5,
+          488
+        ],
+        [
+          17.5,
+          7331.7,
+          260
+        ],
+        [
+          19.5,
+          6145.5,
+          307
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "f_relvol_pts_10x": {
+      "plateau_width": 0.667,
+      "best_bin_median": 8431.0,
+      "worst_bin_median": 7030.8,
+      "range_pct": 0.1661,
+      "best_bin_center": 11.5,
+      "bin_medians": [
+        [
+          7.0,
+          7030.8,
+          148
+        ],
+        [
+          9.0,
+          7479.9,
+          244
+        ],
+        [
+          10.5,
+          7832.0,
+          382
+        ],
+        [
+          11.5,
+          8431.0,
+          448
+        ],
+        [
+          12.5,
+          8196.3,
+          157
+        ],
+        [
+          13.5,
+          8239.5,
+          1215
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_relvol_pts_25x": {
+      "plateau_width": 0.143,
+      "best_bin_median": 9009.1,
+      "worst_bin_median": 6661.2,
+      "range_pct": 0.2606,
+      "best_bin_center": 15.5,
+      "bin_medians": [
+        [
+          11.0,
+          7931.2,
+          197
+        ],
+        [
+          12.5,
+          7360.3,
+          89
+        ],
+        [
+          13.5,
+          7740.6,
+          457
+        ],
+        [
+          14.5,
+          7982.1,
+          392
+        ],
+        [
+          15.5,
+          9009.1,
+          515
+        ],
+        [
+          16.5,
+          7971.7,
+          678
+        ],
+        [
+          17.5,
+          6661.2,
+          266
+        ]
+      ],
+      "verdict": "SPIKE"
+    },
+    "f_size_chop": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9526.2,
+      "worst_bin_median": 6730.1,
+      "range_pct": 0.2935,
+      "best_bin_center": 0.1163,
+      "bin_medians": [
+        [
+          0.1163,
+          9526.2,
+          260
+        ],
+        [
+          0.2142,
+          8245.6,
+          259
+        ],
+        [
+          0.3422,
+          6730.1,
+          259
+        ],
+        [
+          0.3976,
+          7475.6,
+          260
+        ],
+        [
+          0.4142,
+          7093.5,
+          259
+        ],
+        [
+          0.4309,
+          7407.4,
+          259
+        ],
+        [
+          0.4526,
+          8180.0,
+          260
+        ],
+        [
+          0.4731,
+          9136.9,
+          259
+        ],
+        [
+          0.4864,
+          9521.3,
+          259
+        ],
+        [
+          0.4959,
+          8942.6,
+          260
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_size_cold": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9432.6,
+      "worst_bin_median": 7379.2,
+      "range_pct": 0.2177,
+      "best_bin_center": 0.2226,
+      "bin_medians": [
+        [
+          0.2226,
+          9432.6,
+          260
+        ],
+        [
+          0.2575,
+          9111.1,
+          259
+        ],
+        [
+          0.2865,
+          8874.6,
+          259
+        ],
+        [
+          0.3229,
+          8505.1,
+          260
+        ],
+        [
+          0.3656,
+          7645.4,
+          259
+        ],
+        [
+          0.4039,
+          7968.8,
+          259
+        ],
+        [
+          0.4358,
+          7581.8,
+          260
+        ],
+        [
+          0.4794,
+          7757.7,
+          259
+        ],
+        [
+          0.5651,
+          7879.8,
+          259
+        ],
+        [
+          0.7116,
+          7379.2,
+          260
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_size_neutral": {
+      "plateau_width": 0.3,
+      "best_bin_median": 9864.3,
+      "worst_bin_median": 7101.7,
+      "range_pct": 0.2801,
+      "best_bin_center": 0.4114,
+      "bin_medians": [
+        [
+          0.4114,
+          9864.3,
+          260
+        ],
+        [
+          0.4322,
+          9596.6,
+          259
+        ],
+        [
+          0.4548,
+          9208.1,
+          259
+        ],
+        [
+          0.5796,
+          7806.4,
+          260
+        ],
+        [
+          0.8149,
+          7101.7,
+          259
+        ],
+        [
+          0.9626,
+          7208.9,
+          259
+        ],
+        [
+          1.0079,
+          7755.1,
+          260
+        ],
+        [
+          1.0754,
+          7103.0,
+          259
+        ],
+        [
+          1.1441,
+          7964.9,
+          259
+        ],
+        [
+          1.1832,
+          8446.0,
+          260
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "f_threshold_chop": {
+      "plateau_width": 0.6,
+      "best_bin_median": 9176.3,
+      "worst_bin_median": 5907.3,
+      "range_pct": 0.3562,
+      "best_bin_center": 81.5,
+      "bin_medians": [
+        [
+          69.0,
+          5907.3,
+          241
+        ],
+        [
+          74.5,
+          7962.1,
+          239
+        ],
+        [
+          76.5,
+          8294.6,
+          165
+        ],
+        [
+          77.5,
+          8905.7,
+          213
+        ],
+        [
+          79.0,
+          8976.3,
+          392
+        ],
+        [
+          81.5,
+          9176.3,
+          260
+        ],
+        [
+          83.5,
+          8859.7,
+          164
+        ],
+        [
+          86.0,
+          8266.5,
+          345
+        ],
+        [
+          88.5,
+          7419.9,
+          157
+        ],
+        [
+          89.5,
+          8055.5,
+          418
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_threshold_cold": {
+      "plateau_width": 0.3,
+      "best_bin_median": 9055.5,
+      "worst_bin_median": 7391.6,
+      "range_pct": 0.1837,
+      "best_bin_center": 58.5,
+      "bin_medians": [
+        [
+          56.5,
+          7813.5,
+          256
+        ],
+        [
+          58.5,
+          9055.5,
+          207
+        ],
+        [
+          59.5,
+          7802.0,
+          251
+        ],
+        [
+          60.5,
+          7935.7,
+          209
+        ],
+        [
+          62.5,
+          8054.1,
+          353
+        ],
+        [
+          65.0,
+          8111.0,
+          180
+        ],
+        [
+          67.0,
+          8704.1,
+          259
+        ],
+        [
+          69.0,
+          8421.2,
+          252
+        ],
+        [
+          71.0,
+          8106.3,
+          325
+        ],
+        [
+          76.0,
+          7391.6,
+          302
+        ]
+      ],
+      "verdict": "NARROW"
+    },
+    "f_threshold_hot": {
+      "plateau_width": 0.778,
+      "best_bin_median": 8786.0,
+      "worst_bin_median": 6744.8,
+      "range_pct": 0.2323,
+      "best_bin_center": 28.5,
+      "bin_medians": [
+        [
+          20.5,
+          8454.3,
+          277
+        ],
+        [
+          21.5,
+          8149.9,
+          318
+        ],
+        [
+          22.5,
+          7903.0,
+          274
+        ],
+        [
+          24.0,
+          8263.1,
+          399
+        ],
+        [
+          25.5,
+          8179.5,
+          175
+        ],
+        [
+          27.0,
+          8430.5,
+          333
+        ],
+        [
+          28.5,
+          8786.0,
+          214
+        ],
+        [
+          30.0,
+          7982.3,
+          285
+        ],
+        [
+          43.0,
+          6744.8,
+          319
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "f_threshold_neutral": {
+      "plateau_width": 0.429,
+      "best_bin_median": 9196.4,
+      "worst_bin_median": 5401.1,
+      "range_pct": 0.4127,
+      "best_bin_center": 41.5,
+      "bin_medians": [
+        [
+          40.5,
+          9006.7,
+          507
+        ],
+        [
+          41.5,
+          9196.4,
+          518
+        ],
+        [
+          43.0,
+          8870.7,
+          494
+        ],
+        [
+          44.5,
+          7360.3,
+          151
+        ],
+        [
+          46.5,
+          7425.5,
+          404
+        ],
+        [
+          51.5,
+          6581.5,
+          229
+        ],
+        [
+          60.0,
+          5401.1,
+          291
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "f_time_1000_1030_pts": {
+      "plateau_width": 0.4,
+      "best_bin_median": 9196.4,
+      "worst_bin_median": 6426.8,
+      "range_pct": 0.3012,
+      "best_bin_center": 3.5,
+      "bin_medians": [
+        [
+          0.5,
+          8089.1,
+          970
+        ],
+        [
+          1.5,
+          7133.6,
+          218
+        ],
+        [
+          2.5,
+          6426.8,
+          222
+        ],
+        [
+          3.5,
+          9196.4,
+          874
+        ],
+        [
+          4.5,
+          8448.3,
+          310
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    },
+    "m_hod_tol": {
+      "plateau_width": 0.8,
+      "best_bin_median": 8803.7,
+      "worst_bin_median": 6677.4,
+      "range_pct": 0.2415,
+      "best_bin_center": 0.0227,
+      "bin_medians": [
+        [
+          0.0105,
+          6677.4,
+          260
+        ],
+        [
+          0.0216,
+          8207.8,
+          259
+        ],
+        [
+          0.0227,
+          8803.7,
+          259
+        ],
+        [
+          0.0237,
+          8334.5,
+          260
+        ],
+        [
+          0.0247,
+          8236.5,
+          259
+        ],
+        [
+          0.0256,
+          8276.8,
+          259
+        ],
+        [
+          0.0265,
+          8452.7,
+          260
+        ],
+        [
+          0.0275,
+          8460.3,
+          259
+        ],
+        [
+          0.029,
+          7238.0,
+          259
+        ],
+        [
+          0.0399,
+          7963.0,
+          260
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "m_scan_end_hour": {
+      "plateau_width": 0.5,
+      "best_bin_median": 8122.6,
+      "worst_bin_median": 6735.5,
+      "range_pct": 0.1708,
+      "best_bin_center": 11.5,
+      "bin_medians": [
+        [
+          10.5,
+          6735.5,
+          27
+        ],
+        [
+          11.5,
+          8122.6,
+          2567
+        ]
+      ],
+      "verdict": "MODERATE_PLATEAU"
+    }
+  },
+  "lockable_boolean": {},
+  "lockable_numeric": {
+    "c_early_time_decay_minute": {
+      "plateau_width": 0.875,
+      "best_bin_median": 7947.6,
+      "worst_bin_median": 5529.7,
+      "range_pct": 0.3042,
+      "best_bin_center": 40.5,
+      "bin_medians": [
+        [
+          22.0,
+          5529.7,
+          107
+        ],
+        [
+          30.0,
+          7484.4,
+          112
+        ],
+        [
+          31.5,
+          7705.2,
+          152
+        ],
+        [
+          32.5,
+          7683.0,
+          196
+        ],
+        [
+          33.5,
+          7655.7,
+          175
+        ],
+        [
+          34.5,
+          7615.1,
+          137
+        ],
+        [
+          35.5,
+          7348.7,
+          85
+        ],
+        [
+          40.5,
+          7947.6,
+          151
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "m_hod_tol": {
+      "plateau_width": 0.8,
+      "best_bin_median": 8803.7,
+      "worst_bin_median": 6677.4,
+      "range_pct": 0.2415,
+      "best_bin_center": 0.0227,
+      "bin_medians": [
+        [
+          0.0105,
+          6677.4,
+          260
+        ],
+        [
+          0.0216,
+          8207.8,
+          259
+        ],
+        [
+          0.0227,
+          8803.7,
+          259
+        ],
+        [
+          0.0237,
+          8334.5,
+          260
+        ],
+        [
+          0.0247,
+          8236.5,
+          259
+        ],
+        [
+          0.0256,
+          8276.8,
+          259
+        ],
+        [
+          0.0265,
+          8452.7,
+          260
+        ],
+        [
+          0.0275,
+          8460.3,
+          259
+        ],
+        [
+          0.029,
+          7238.0,
+          259
+        ],
+        [
+          0.0399,
+          7963.0,
+          260
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "f_threshold_hot": {
+      "plateau_width": 0.778,
+      "best_bin_median": 8786.0,
+      "worst_bin_median": 6744.8,
+      "range_pct": 0.2323,
+      "best_bin_center": 28.5,
+      "bin_medians": [
+        [
+          20.5,
+          8454.3,
+          277
+        ],
+        [
+          21.5,
+          8149.9,
+          318
+        ],
+        [
+          22.5,
+          7903.0,
+          274
+        ],
+        [
+          24.0,
+          8263.1,
+          399
+        ],
+        [
+          25.5,
+          8179.5,
+          175
+        ],
+        [
+          27.0,
+          8430.5,
+          333
+        ],
+        [
+          28.5,
+          8786.0,
+          214
+        ],
+        [
+          30.0,
+          7982.3,
+          285
+        ],
+        [
+          43.0,
+          6744.8,
+          319
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "f_pattern_bull_flag": {
+      "plateau_width": 0.75,
+      "best_bin_median": 8668.8,
+      "worst_bin_median": 7642.7,
+      "range_pct": 0.1184,
+      "best_bin_center": 22.5,
+      "bin_medians": [
+        [
+          13.5,
+          7642.7,
+          142
+        ],
+        [
+          17.5,
+          7756.3,
+          303
+        ],
+        [
+          18.5,
+          8387.8,
+          418
+        ],
+        [
+          19.5,
+          8040.4,
+          359
+        ],
+        [
+          21.0,
+          8115.4,
+          298
+        ],
+        [
+          22.5,
+          8668.8,
+          310
+        ],
+        [
+          23.5,
+          8086.3,
+          481
+        ],
+        [
+          24.5,
+          7821.8,
+          283
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "b_abcd_d_light_vol": {
+      "plateau_width": 0.7,
+      "best_bin_median": 9289.0,
+      "worst_bin_median": 7435.0,
+      "range_pct": 0.1996,
+      "best_bin_center": 0.7022,
+      "bin_medians": [
+        [
+          0.5782,
+          7878.3,
+          226
+        ],
+        [
+          0.6661,
+          8919.3,
+          226
+        ],
+        [
+          0.6847,
+          8779.5,
+          226
+        ],
+        [
+          0.7022,
+          9289.0,
+          226
+        ],
+        [
+          0.7221,
+          8931.5,
+          226
+        ],
+        [
+          0.7476,
+          9005.3,
+          226
+        ],
+        [
+          0.7771,
+          8881.2,
+          226
+        ],
+        [
+          0.816,
+          8627.8,
+          226
+        ],
+        [
+          0.8732,
+          7435.0,
+          226
+        ],
+        [
+          0.9533,
+          7954.2,
+          226
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "b_bull_flag_breakout_vol_min": {
+      "plateau_width": 0.7,
+      "best_bin_median": 9569.6,
+      "worst_bin_median": 6660.7,
+      "range_pct": 0.304,
+      "best_bin_center": 0.6595,
+      "bin_medians": [
+        [
+          0.5636,
+          7243.1,
+          156
+        ],
+        [
+          0.6393,
+          9124.3,
+          156
+        ],
+        [
+          0.6595,
+          9569.6,
+          156
+        ],
+        [
+          0.68,
+          9376.4,
+          156
+        ],
+        [
+          0.7488,
+          8342.6,
+          156
+        ],
+        [
+          0.829,
+          9216.0,
+          156
+        ],
+        [
+          0.8636,
+          9506.2,
+          156
+        ],
+        [
+          0.8832,
+          9015.4,
+          156
+        ],
+        [
+          0.9176,
+          8753.4,
+          156
+        ],
+        [
+          0.9715,
+          6660.7,
+          157
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "b_bull_flag_pole_vol_min": {
+      "plateau_width": 0.7,
+      "best_bin_median": 9557.0,
+      "worst_bin_median": 6669.8,
+      "range_pct": 0.3021,
+      "best_bin_center": 0.9474,
+      "bin_medians": [
+        [
+          0.5622,
+          7979.9,
+          156
+        ],
+        [
+          0.6491,
+          8900.7,
+          156
+        ],
+        [
+          0.691,
+          8682.8,
+          156
+        ],
+        [
+          0.7164,
+          9196.4,
+          156
+        ],
+        [
+          0.748,
+          8989.2,
+          156
+        ],
+        [
+          0.8211,
+          6669.8,
+          157
+        ],
+        [
+          0.8942,
+          8012.5,
+          155
+        ],
+        [
+          0.9246,
+          9025.6,
+          156
+        ],
+        [
+          0.9474,
+          9557.0,
+          156
+        ],
+        [
+          0.9803,
+          9003.6,
+          157
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "b_dip_buy_support_tolerance": {
+      "plateau_width": 0.7,
+      "best_bin_median": 8930.0,
+      "worst_bin_median": 6839.7,
+      "range_pct": 0.2341,
+      "best_bin_center": 0.149,
+      "bin_medians": [
+        [
+          0.0721,
+          7146.2,
+          247
+        ],
+        [
+          0.1195,
+          6839.7,
+          246
+        ],
+        [
+          0.1283,
+          7878.3,
+          246
+        ],
+        [
+          0.1336,
+          8868.4,
+          246
+        ],
+        [
+          0.1375,
+          8480.4,
+          246
+        ],
+        [
+          0.141,
+          8759.5,
+          246
+        ],
+        [
+          0.1436,
+          8689.5,
+          246
+        ],
+        [
+          0.1454,
+          8334.7,
+          246
+        ],
+        [
+          0.1471,
+          8714.3,
+          246
+        ],
+        [
+          0.149,
+          8930.0,
+          247
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "c_early_time_decay_min_gain_pct": {
+      "plateau_width": 0.7,
+      "best_bin_median": 8258.6,
+      "worst_bin_median": 2590.5,
+      "range_pct": 0.6863,
+      "best_bin_center": 7.1888,
+      "bin_medians": [
+        [
+          3.8351,
+          2590.5,
+          112
+        ],
+        [
+          5.8876,
+          7060.5,
+          111
+        ],
+        [
+          6.2407,
+          8057.7,
+          112
+        ],
+        [
+          6.448,
+          7777.8,
+          111
+        ],
+        [
+          6.621,
+          7721.2,
+          111
+        ],
+        [
+          6.7935,
+          7615.4,
+          112
+        ],
+        [
+          6.9766,
+          7348.7,
+          111
+        ],
+        [
+          7.1888,
+          8258.6,
+          112
+        ],
+        [
+          7.5305,
+          7539.3,
+          111
+        ],
+        [
+          8.8752,
+          7831.0,
+          112
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "c_macd_flip_qty_pct": {
+      "plateau_width": 0.7,
+      "best_bin_median": 9570.5,
+      "worst_bin_median": 6280.6,
+      "range_pct": 0.3438,
+      "best_bin_center": 0.622,
+      "bin_medians": [
+        [
+          0.4412,
+          6280.6,
+          126
+        ],
+        [
+          0.5206,
+          6754.9,
+          125
+        ],
+        [
+          0.584,
+          9064.8,
+          126
+        ],
+        [
+          0.622,
+          9570.5,
+          125
+        ],
+        [
+          0.6483,
+          9458.8,
+          125
+        ],
+        [
+          0.6704,
+          8761.2,
+          126
+        ],
+        [
+          0.6906,
+          9193.0,
+          125
+        ],
+        [
+          0.7143,
+          9233.0,
+          126
+        ],
+        [
+          0.7503,
+          9220.4,
+          125
+        ],
+        [
+          0.886,
+          7157.5,
+          126
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    },
+    "d_chop_max_position_pct": {
+      "plateau_width": 0.7,
+      "best_bin_median": 8900.2,
+      "worst_bin_median": 7318.7,
+      "range_pct": 0.1777,
+      "best_bin_center": 7.6568,
+      "bin_medians": [
+        [
+          3.1782,
+          7318.7,
+          260
+        ],
+        [
+          4.6114,
+          7548.6,
+          259
+        ],
+        [
+          5.0358,
+          8245.6,
+          259
+        ],
+        [
+          5.3648,
+          8237.2,
+          260
+        ],
+        [
+          5.7151,
+          8403.6,
+          259
+        ],
+        [
+          6.6536,
+          8224.2,
+          259
+        ],
+        [
+          7.6568,
+          8900.2,
+          260
+        ],
+        [
+          8.1397,
+          8310.9,
+          259
+        ],
+        [
+          8.6275,
+          8196.3,
+          259
+        ],
+        [
+          9.4413,
+          7549.4,
+          260
+        ]
+      ],
+      "verdict": "WIDE_PLATEAU"
+    }
+  }
+}
