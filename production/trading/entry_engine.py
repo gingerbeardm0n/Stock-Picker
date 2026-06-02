@@ -374,11 +374,7 @@ def _check_5_pillars(
     current_price = float(bar['close'])
     data['price'] = current_price
 
-    # Pillar 1: Price range
-    if cfg.enable_price_range:
-        if current_price < cfg.min_price or current_price > cfg.max_price:
-            data['fail_reason'] = f"Price ${current_price:.2f} outside ${cfg.min_price}-${cfg.max_price}"
-            return False, data
+    # Pillar 1: Price range — pre-screened by qualifies_momentum(); no re-check needed
 
     # Pillar 2: Up X%+ from prior close
     if prior_close is None or prior_close <= 0:
@@ -388,17 +384,11 @@ def _check_5_pillars(
     pct_change = ((current_price - prior_close) / prior_close) * 100
     data['pct_change'] = round(pct_change, 2)
 
-    if cfg.enable_premarket_gain:
-        if pct_change < cfg.min_premarket_gain:
-            data['fail_reason'] = f"Gain {pct_change:.1f}% < {cfg.min_premarket_gain}% min"
-            return False, data
+    # Pillar 2: Gain % — pre-screened by qualifies_momentum(); pct_change kept for logging
 
     # Pillar 3: Relative volume
     data['rel_vol'] = round(relative_volume, 2)
-    if cfg.enable_relative_volume:
-        if relative_volume < cfg.min_relative_volume:
-            data['fail_reason'] = f"Rel vol {relative_volume:.1f}x < {cfg.min_relative_volume}x min"
-            return False, data
+    # Pillar 3: Rel vol — pre-screened by qualifies_momentum(); rel_vol kept for logging
 
     # Time/volume checks (entry liquidity)
     recent_bars = (bar_history + [bar])[-5:]
@@ -449,13 +439,10 @@ def _check_5_pillars(
             data['fail_reason'] = f"Selling pressure: buying {buying_vol:,.0f} vs selling {selling_vol:,.0f}"
             return False, data
 
-    # Pillar 4: Float (skip if no data — graceful degradation)
+    # Pillar 4: Float — pre-screened by qualifies_momentum(); kept for logging only
     float_shares = fundamentals.get('float_shares')
-    if cfg.enable_float_filter and float_shares:
+    if float_shares:
         data['float_shares'] = float_shares
-        if float_shares > cfg.max_float:
-            data['fail_reason'] = f"Float {float_shares/1e6:.1f}M > {cfg.max_float/1e6:.0f}M max"
-            return False, data
 
     # Market cap
     market_cap = fundamentals.get('market_cap')

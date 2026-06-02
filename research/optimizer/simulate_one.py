@@ -115,6 +115,7 @@ def run_date_range(
             add_on_config=getattr(config, 'add_on', None),
             scoring_config=getattr(config, 'scoring', None),
             momentum_config=getattr(config, 'momentum', None),
+            temp_config=getattr(config, 'temperature', None),
             debug=debug,
             cache_data=cache_data,
             cache_dir=cache_dir,

@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../production')))  # production/
 
 from dataclasses import dataclass, field, asdict
-from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig, MomentumScanConfig
+from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig, MomentumScanConfig, MarketTemperatureConfig
 
 
 @dataclass
@@ -49,6 +49,7 @@ class RunConfig:
     add_on: AddOnConfig        = field(default_factory=AddOnConfig)
     scoring: ScoringConfig     = field(default_factory=ScoringConfig)
     momentum: MomentumScanConfig = field(default_factory=MomentumScanConfig)  # intraday discovery
+    temperature: MarketTemperatureConfig = field(default_factory=MarketTemperatureConfig)  # Category D
 
     # Simulation meta (not tuned)
     account_size: float    = 5000.0
@@ -79,6 +80,8 @@ class RunConfig:
             d[f'f_{k}'] = v
         for k, v in asdict(self.momentum).items():
             d[f'm_{k}'] = v
+        for k, v in asdict(self.temperature).items():
+            d[f'd_{k}'] = v
         d['account_size']     = self.account_size
         d['risk_pct']         = self.risk_pct
         d['max_position_pct'] = self.max_position_pct
@@ -93,6 +96,7 @@ class RunConfig:
         add_on_fields  = {k[2:]: v for k, v in d.items() if k.startswith('e_')}
         scoring_fields = {k[2:]: v for k, v in d.items() if k.startswith('f_')}
         momentum_fields = {k[2:]: v for k, v in d.items() if k.startswith('m_')}
+        temp_fields     = {k[2:]: v for k, v in d.items() if k.startswith('d_')}
         return cls(
             scanner=ScannerConfig(**scanner_fields),
             entry=EntryConfig(**entry_fields),
@@ -100,6 +104,7 @@ class RunConfig:
             add_on=AddOnConfig(**add_on_fields) if add_on_fields else AddOnConfig(),
             scoring=ScoringConfig(**scoring_fields) if scoring_fields else ScoringConfig(),
             momentum=MomentumScanConfig(**momentum_fields) if momentum_fields else MomentumScanConfig(),
+            temperature=MarketTemperatureConfig(**temp_fields) if temp_fields else MarketTemperatureConfig(),
             account_size=d.get('account_size', 5000.0),
             risk_pct=d.get('risk_pct', 2.0),
             max_position_pct=d.get('max_position_pct', 20.0),

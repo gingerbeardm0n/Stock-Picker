@@ -46,7 +46,8 @@ except ImportError:
 from optimizer.run_config import RunConfig
 from optimizer.results_db import init_db, write_run
 from optimizer.simulate_one import run_date_range
-from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig, MomentumScanConfig
+from simulator.simulation_engine import save_memory_cache, load_memory_cache
+from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig, MomentumScanConfig, MarketTemperatureConfig
 
 
 # ── Heartbeat monitor ─────────────────────────────────────────────────────────
@@ -199,39 +200,37 @@ def _build_config_from_trial(
 
     # ── Scanner (Category A) with feature toggles ─────────────────────────
     if mode == 'single-indicator':
+        # price_range/premarket_gain/relative_volume/float_filter removed —
+        # enforced by qualifies_momentum(), always on, not tunable.
         a_choices = [
-            'price_range',
-            'premarket_gain',
-            'relative_volume',
             'buying_volume',
-            'float_filter',
             'market_cap_filter',
             'spread_filter',
             'last_5min_volume',
             'last_1min_volume',
         ]
-        if disable_relative_volume:
-            a_choices = [c for c in a_choices if c != 'relative_volume']
         a_indicator = trial.suggest_categorical('a_indicator', a_choices)
-        enable_price_range = a_indicator == 'price_range'
-        enable_premarket_gain = a_indicator == 'premarket_gain'
-        enable_relative_volume = a_indicator == 'relative_volume'
+        enable_price_range = True
+        enable_premarket_gain = True
+        enable_relative_volume = not disable_relative_volume
         enable_buying_volume = a_indicator == 'buying_volume'
-        enable_float_filter = a_indicator == 'float_filter'
+        enable_float_filter = True
         enable_market_cap_filter = a_indicator == 'market_cap_filter'
         enable_spread_filter = a_indicator == 'spread_filter'
         enable_last_5min_volume = a_indicator == 'last_5min_volume'
         enable_last_1min_volume = a_indicator == 'last_1min_volume'
     else:
-        enable_price_range = base_scanner.enable_price_range
-        enable_premarket_gain = _bool('a_enable_premarket_gain')
-        enable_relative_volume = False if disable_relative_volume else _bool('a_enable_relative_volume')
+        # Price/gain/relvol/float gates are now enforced by qualifies_momentum()
+        # in the shared pipeline — no longer tunable (always on).
+        enable_price_range = True
+        enable_premarket_gain = True
+        enable_relative_volume = not disable_relative_volume
         enable_buying_volume = _bool('a_enable_buying_volume')
-        enable_float_filter = _bool('a_enable_float_filter')
+        enable_float_filter = True
         enable_market_cap_filter = _bool('a_enable_market_cap_filter')
-        enable_spread_filter = base_scanner.enable_spread_filter
-        enable_last_5min_volume = base_scanner.enable_last_5min_volume
-        enable_last_1min_volume = base_scanner.enable_last_1min_volume
+        enable_spread_filter = _bool('a_enable_spread_filter')
+        enable_last_5min_volume = _bool('a_enable_last_5min_volume')
+        enable_last_1min_volume = _bool('a_enable_last_1min_volume')
 
     if mode == 'gates-only':
         min_price = base_scanner.min_price
@@ -241,6 +240,9 @@ def _build_config_from_trial(
         min_buying_volume = base_scanner.min_buying_volume
         max_float = base_scanner.max_float
         max_market_cap = base_scanner.max_market_cap
+        max_spread = base_scanner.max_spread
+        min_last_5min_volume = base_scanner.min_last_5min_volume
+        min_last_1min_volume = base_scanner.min_last_1min_volume
     elif mode == 'single-indicator':
         min_price = trial.suggest_float('a_min_price', 1.0, 5.0) if enable_price_range else base_scanner.min_price
         max_price = trial.suggest_float('a_max_price', 15.0, 25.0) if enable_price_range else base_scanner.max_price
@@ -250,13 +252,16 @@ def _build_config_from_trial(
         max_float = trial.suggest_int('a_max_float', 5_000_000, 50_000_000, step=1_000_000) if enable_float_filter else base_scanner.max_float
         max_market_cap = trial.suggest_int('a_max_market_cap', 100_000_000, 1_000_000_000, step=50_000_000) if enable_market_cap_filter else base_scanner.max_market_cap
     else:
-        min_price = _float('a_min_price', 1.0, 5.0)
-        max_price = _float('a_max_price', 15.0, 25.0)
+        min_price = _float('a_min_price', 1.0, 5.0) if enable_price_range else base_scanner.min_price
+        max_price = _float('a_max_price', 15.0, 25.0) if enable_price_range else base_scanner.max_price
         min_premarket_gain = _float('a_min_premarket_gain', 5.0, 25.0) if enable_premarket_gain else base_scanner.min_premarket_gain
         min_relative_volume = _float('a_min_relative_volume', 2.0, 15.0) if enable_relative_volume else base_scanner.min_relative_volume
         min_buying_volume = _int('a_min_buying_volume', 10_000, 200_000, step=5_000) if enable_buying_volume else base_scanner.min_buying_volume
         max_float = _int('a_max_float', 5_000_000, 50_000_000, step=1_000_000) if enable_float_filter else base_scanner.max_float
         max_market_cap = _int('a_max_market_cap', 100_000_000, 1_000_000_000, step=50_000_000) if enable_market_cap_filter else base_scanner.max_market_cap
+        max_spread = _float('a_max_spread', 0.02, 0.30) if enable_spread_filter else base_scanner.max_spread
+        min_last_5min_volume = _int('a_min_last_5min_volume', 20_000, 500_000, step=10_000) if enable_last_5min_volume else base_scanner.min_last_5min_volume
+        min_last_1min_volume = _int('a_min_last_1min_volume', 2_000, 50_000, step=1_000) if enable_last_1min_volume else base_scanner.min_last_1min_volume
 
     scanner = ScannerConfig(
         min_price=min_price,
@@ -266,6 +271,9 @@ def _build_config_from_trial(
         min_buying_volume=min_buying_volume,
         max_float=max_float,
         max_market_cap=max_market_cap,
+        max_spread=max_spread,
+        min_last_5min_volume=min_last_5min_volume,
+        min_last_1min_volume=min_last_1min_volume,
         enable_price_range=enable_price_range,
         enable_premarket_gain=enable_premarket_gain,
         enable_relative_volume=enable_relative_volume,
@@ -304,7 +312,7 @@ def _build_config_from_trial(
         enable_ema9 = _bool('b_enable_ema9')
         enable_macd = _bool('b_enable_macd')
         enable_trend = _bool('b_enable_trend')
-        enable_rr = base_entry.enable_rr
+        enable_rr = _bool('b_enable_rr')
 
         enable_bull_flag       = _bool('b_enable_bull_flag')
         enable_micro_pullback  = _bool('b_enable_micro_pullback')
@@ -312,6 +320,12 @@ def _build_config_from_trial(
         enable_dip_buy         = _bool('b_enable_dip_buy')
         enable_flat_top        = _bool('b_enable_flat_top')
         enable_vwap_break_curl = _bool('b_enable_vwap_break_curl')
+        # NEW pattern toggles — previously hardcoded True, now tunable
+        enable_gap_and_go      = _bool('b_enable_gap_and_go')
+        enable_vwap_reclaim    = _bool('b_enable_vwap_reclaim')
+        enable_red_to_green    = _bool('b_enable_red_to_green')
+        enable_orb             = _bool('b_enable_orb')
+        enable_whole_dollar    = _bool('b_enable_whole_dollar')
 
     if mode == 'gates-only':
         min_rr_ratio              = base_entry.min_rr_ratio
@@ -324,13 +338,17 @@ def _build_config_from_trial(
         micro_pb_swing_tol        = base_entry.micro_pb_swing_tol
         abcd_min_pullback_pct     = base_entry.abcd_min_pullback_pct
         abcd_d_light_vol          = base_entry.abcd_d_light_vol
-        # dip_buy_support_tolerance replaces legacy dip_buy_light_vol (GAP-A rewrite)
         dip_buy_support_tolerance = base_entry.dip_buy_support_tolerance
         flat_top_resistance_tol   = base_entry.flat_top_resistance_tol
         flat_top_vol_increase_tol = base_entry.flat_top_vol_increase_tol
         vwap_break_curl_lookback  = base_entry.vwap_break_curl_lookback
         vwap_curl_tolerance       = base_entry.vwap_curl_tolerance
         vwap_break_vol_min        = base_entry.vwap_break_vol_min
+        gap_and_go_breakout_vol_min  = base_entry.gap_and_go_breakout_vol_min
+        gap_and_go_max_bars_since_open = base_entry.gap_and_go_max_bars_since_open
+        vwap_reclaim_lookback     = base_entry.vwap_reclaim_lookback
+        vwap_reclaim_min_below    = base_entry.vwap_reclaim_min_below
+        vwap_reclaim_breakout_vol_min = base_entry.vwap_reclaim_breakout_vol_min
     else:
         min_rr_ratio   = _float('b_min_rr_ratio', 1.5, 4.0)
         stop_buffer    = _float('b_stop_buffer', 0.01, 0.10)
@@ -342,15 +360,19 @@ def _build_config_from_trial(
         micro_pb_swing_tol         = _float('b_micro_pb_swing_tol',  0.90, 1.00) if enable_micro_pullback else base_entry.micro_pb_swing_tol
         abcd_min_pullback_pct      = _float('b_abcd_min_pullback_pct', 0.05, 0.30) if enable_abcd else base_entry.abcd_min_pullback_pct
         abcd_d_light_vol           = _float('b_abcd_d_light_vol',    0.50, 1.00) if enable_abcd else base_entry.abcd_d_light_vol
-        # GAP-A: dip_buy_light_vol is no longer used by detect_dip_buy (rewritten to use support levels).
-        # Tune dip_buy_support_tolerance (8% tolerance for named support level match) instead.
         dip_buy_support_tolerance  = _float('b_dip_buy_support_tolerance', 0.03, 0.15) if enable_dip_buy else base_entry.dip_buy_support_tolerance
         flat_top_resistance_tol    = _float('b_flat_top_resistance_tol',   0.01, 0.10) if enable_flat_top else base_entry.flat_top_resistance_tol
         flat_top_vol_increase_tol  = _float('b_flat_top_vol_increase_tol', 1.00, 2.00) if enable_flat_top else base_entry.flat_top_vol_increase_tol
-        # GAP-K: VWAP break/curl pattern — 78.1% win rate, highest dollar EV.
         vwap_break_curl_lookback   = _int(  'b_vwap_break_curl_lookback', 3, 8)          if enable_vwap_break_curl else base_entry.vwap_break_curl_lookback
         vwap_curl_tolerance        = _float('b_vwap_curl_tolerance',       0.005, 0.030) if enable_vwap_break_curl else base_entry.vwap_curl_tolerance
         vwap_break_vol_min         = _float('b_vwap_break_vol_min',        0.80, 1.50)   if enable_vwap_break_curl else base_entry.vwap_break_vol_min
+        # NEW: Gap-and-go params (conditional on enable_gap_and_go)
+        gap_and_go_breakout_vol_min   = _float('b_gap_and_go_breakout_vol_min', 1.0, 3.0)   if enable_gap_and_go else base_entry.gap_and_go_breakout_vol_min
+        gap_and_go_max_bars_since_open = _int('b_gap_and_go_max_bars_since_open', 5, 30)     if enable_gap_and_go else base_entry.gap_and_go_max_bars_since_open
+        # NEW: VWAP reclaim params (conditional on enable_vwap_reclaim)
+        vwap_reclaim_lookback         = _int(  'b_vwap_reclaim_lookback',         3, 10)     if enable_vwap_reclaim else base_entry.vwap_reclaim_lookback
+        vwap_reclaim_min_below        = _int(  'b_vwap_reclaim_min_below',        1, 5)      if enable_vwap_reclaim else base_entry.vwap_reclaim_min_below
+        vwap_reclaim_breakout_vol_min = _float('b_vwap_reclaim_breakout_vol_min', 0.80, 2.00) if enable_vwap_reclaim else base_entry.vwap_reclaim_breakout_vol_min
 
     entry = EntryConfig(
         min_rr_ratio=min_rr_ratio,
@@ -379,34 +401,42 @@ def _build_config_from_trial(
         vwap_break_curl_lookback=vwap_break_curl_lookback,
         vwap_curl_tolerance=vwap_curl_tolerance,
         vwap_break_vol_min=vwap_break_vol_min,
+        # NEW pattern toggles + params
+        enable_gap_and_go=enable_gap_and_go,
+        enable_vwap_reclaim=enable_vwap_reclaim,
+        enable_red_to_green=enable_red_to_green,
+        enable_whole_dollar=enable_whole_dollar,
+        enable_orb=enable_orb,
+        gap_and_go_breakout_vol_min=gap_and_go_breakout_vol_min,
+        gap_and_go_max_bars_since_open=gap_and_go_max_bars_since_open,
+        vwap_reclaim_lookback=vwap_reclaim_lookback,
+        vwap_reclaim_min_below=vwap_reclaim_min_below,
+        vwap_reclaim_breakout_vol_min=vwap_reclaim_breakout_vol_min,
     )
 
-    # In full/gates-only mode these are explored (not locked to False).
-    # GAP-L fixed MACD flip to actually sell 75% — now worth exploring.
+    # In full/gates-only mode all exit gates are explored.
     exit_macd        = _bool('c_enable_macd_flip_exit') if mode != 'single-indicator' else base_exit.enable_macd_flip_exit
-    exit_resistance  = base_exit.enable_resistance_exit
-    exit_volume_dry  = base_exit.enable_volume_dry_up_exit
+    exit_selling     = _bool('c_enable_selling_pressure') if mode != 'single-indicator' else base_exit.enable_selling_pressure
+    exit_resistance  = _bool('c_enable_resistance_exit') if mode != 'single-indicator' else base_exit.enable_resistance_exit
+    exit_volume_dry  = _bool('c_enable_volume_dry_up_exit') if mode != 'single-indicator' else base_exit.enable_volume_dry_up_exit
 
     if mode == 'single-indicator':
         # Category C: choose exactly ONE profit-exit strategy.
-        # Hard stop (STOP_HIT) is always active — not a tunable choice.
-        # Selling pressure acts as a soft early-exit and is always tuned.
         c_profit = trial.suggest_categorical(
             'c_profit',
             ['fixed_target', 'trailing_stop', 'ema_cross', 'macd_flip', 'time_decay'],
         )
         exit_macd     = c_profit == 'macd_flip'
-        exit_resistance = False   # excluded — only tunable in full mode
-        exit_volume_dry = False   # excluded — only tunable in full mode
+        exit_selling  = True       # always tuned in single-indicator
+        exit_resistance = False
+        exit_volume_dry = False
 
-        # Profit-exit numeric params (conditional on c_profit)
         trailing_stop_distance = (
             trial.suggest_float('c_trailing_stop_distance', 0.05, 0.50)
             if c_profit == 'trailing_stop' else 0.0
         )
         target1_ratio   = trial.suggest_float('c_target1_ratio',   1.0, 3.0)
         target1_qty_pct = trial.suggest_float('c_target1_qty_pct', 0.20, 0.80)
-        # T2 only meaningful for fixed_target or trailing_stop
         target2_ratio   = (
             trial.suggest_float('c_target2_ratio',   2.0, 5.0)
             if c_profit in ('fixed_target', 'trailing_stop') else base_exit.target2_ratio
@@ -419,7 +449,7 @@ def _build_config_from_trial(
             trial.suggest_float('c_macd_flip_qty_pct', 0.25, 0.75)
             if c_profit == 'macd_flip' else base_exit.macd_flip_qty_pct
         )
-        time_decay_hour = trial.suggest_int('c_time_decay_hour', 10, 13)
+        time_decay_hour = trial.suggest_int('c_time_decay_hour', 10, 14)
         selling_pressure_ratio   = trial.suggest_float('c_selling_pressure_ratio',   1.20, 4.00)
         selling_pressure_qty_pct = trial.suggest_float('c_selling_pressure_qty_pct', 0.20, 1.00)
 
@@ -433,28 +463,46 @@ def _build_config_from_trial(
             early_time_decay_hour    = 0,
             selling_pressure_ratio   = selling_pressure_ratio,
             selling_pressure_qty_pct = selling_pressure_qty_pct,
+            enable_selling_pressure  = exit_selling,
             enable_macd_flip_exit    = exit_macd,
             macd_flip_qty_pct        = macd_flip_qty_pct,
             enable_resistance_exit   = False,
             enable_volume_dry_up_exit= False,
         )
     else:
+        # NEW: early time decay — explore enabling it (hour 0 = disabled)
+        early_time_decay_hour = _int('c_early_time_decay_hour', 0, 11)
+        # Conditional params only when early_time_decay is enabled (hour > 0)
+        early_time_decay_minute = _int('c_early_time_decay_minute', 15, 45) if early_time_decay_hour > 0 else base_exit.early_time_decay_minute
+        early_time_decay_min_gain_pct = _float('c_early_time_decay_min_gain_pct', 2.0, 10.0) if early_time_decay_hour > 0 else base_exit.early_time_decay_min_gain_pct
+
         exit_ = ExitConfig(
             target1_ratio            = _float('c_target1_ratio',            1.0, 3.0),
             target2_ratio            = _float('c_target2_ratio',            2.0, 5.0),
             target1_qty_pct          = _float('c_target1_qty_pct',          0.20, 0.80),
             target2_qty_pct          = _float('c_target2_qty_pct',          0.10, 0.50),
+            ema_cross_qty_pct        = _float('c_ema_cross_qty_pct',        0.10, 0.50),
             trailing_stop_distance   = _float('c_trailing_stop_distance',   0.00, 0.50),
-            time_decay_hour          = _int(  'c_time_decay_hour',          10,   13),
-            early_time_decay_hour    = 0,    # Phase 4 — disabled for now
-            selling_pressure_ratio   = _float('c_selling_pressure_ratio',   1.20, 4.00),
-            selling_pressure_qty_pct = _float('c_selling_pressure_qty_pct', 0.20, 1.00),
+            time_decay_hour          = _int(  'c_time_decay_hour',          10,   14),
+            early_time_decay_hour    = early_time_decay_hour,
+            early_time_decay_minute  = early_time_decay_minute,
+            early_time_decay_min_gain_pct = early_time_decay_min_gain_pct,
+            # Selling pressure — now toggle-gated
+            enable_selling_pressure  = exit_selling,
+            selling_pressure_ratio   = _float('c_selling_pressure_ratio',   1.20, 4.00) if exit_selling else base_exit.selling_pressure_ratio,
+            selling_pressure_qty_pct = _float('c_selling_pressure_qty_pct', 0.20, 1.00) if exit_selling else base_exit.selling_pressure_qty_pct,
+            # MACD flip
             enable_macd_flip_exit    = exit_macd,
-            # GAP-L: MACD flip now sells macd_flip_qty_pct (default 75%) immediately.
-            # Tune when enabled; use corpus-derived default (0.75) when disabled.
             macd_flip_qty_pct        = _float('c_macd_flip_qty_pct', 0.40, 1.00) if exit_macd else base_exit.macd_flip_qty_pct,
+            # Resistance exit — NEW
             enable_resistance_exit   = exit_resistance,
+            resistance_touch_threshold = _int('c_resistance_touch_threshold', 2, 4) if exit_resistance else base_exit.resistance_touch_threshold,
+            resistance_exit_qty_pct  = _float('c_resistance_exit_qty_pct', 0.25, 1.00) if exit_resistance else base_exit.resistance_exit_qty_pct,
+            resistance_tolerance     = _float('c_resistance_tolerance', 0.01, 0.10) if exit_resistance else base_exit.resistance_tolerance,
+            # Volume dry-up exit — NEW
             enable_volume_dry_up_exit= exit_volume_dry,
+            volume_dry_up_threshold  = _float('c_volume_dry_up_threshold', 0.30, 0.80) if exit_volume_dry else base_exit.volume_dry_up_threshold,
+            volume_dry_up_qty_pct    = _float('c_volume_dry_up_qty_pct', 0.25, 1.00) if exit_volume_dry else base_exit.volume_dry_up_qty_pct,
         )
 
     # ── Scoring (Category F) — composite entry score weights ─────────────────
@@ -467,7 +515,6 @@ def _build_config_from_trial(
     base_scoring = ScoringConfig()
 
     if mode == 'gates-only':
-        # Gates-only mode: keep scoring at defaults — only gate toggles matter.
         scoring = base_scoring
     else:
         scoring = ScoringConfig(
@@ -496,10 +543,39 @@ def _build_config_from_trial(
             news_none_pts    = _int('f_news_none_pts',     0,  4),
             news_unknown_pts = _int('f_news_unknown_pts',  2,  8),
 
-            # ── Fixed at corpus-derived defaults (not yet tuned) ─────────────
-            # Pattern weights, float pts, gap pts, MACD pts, time-of-day pts
-            # are left at ScoringConfig defaults. Add to search space after
-            # the threshold/size/relvol/news tuning converges.
+            # ── Pattern base points (NEW — previously fixed at corpus defaults) ─
+            pattern_gap_and_go      = _int('f_pattern_gap_and_go',      15, 25),
+            pattern_vwap_break_curl = _int('f_pattern_vwap_break_curl', 15, 25),
+            pattern_micro_pullback  = _int('f_pattern_micro_pullback',  12, 25),
+            pattern_vwap_reclaim    = _int('f_pattern_vwap_reclaim',    12, 25),
+            pattern_orb             = _int('f_pattern_orb',             10, 25),
+            pattern_bull_flag       = _int('f_pattern_bull_flag',       10, 25),
+            pattern_flat_top        = _int('f_pattern_flat_top',        10, 25),
+            pattern_red_to_green    = _int('f_pattern_red_to_green',     8, 22),
+            pattern_dip_buy         = _int('f_pattern_dip_buy',          8, 22),
+            pattern_whole_dollar    = _int('f_pattern_whole_dollar',      8, 22),
+            pattern_abcd            = _int('f_pattern_abcd',             8, 20),
+
+            # ── Float quality points (NEW) ────────────────────────────────────
+            float_sub1m_pts  = _int('f_float_sub1m_pts',  8, 20),
+            float_1m_5m_pts  = _int('f_float_1m_5m_pts',  6, 16),
+            float_5m_20m_pts = _int('f_float_5m_20m_pts', 2, 10),
+            float_unknown_pts = _int('f_float_unknown_pts', 2, 10),
+
+            # ── Gap magnitude points (NEW) ────────────────────────────────────
+            gap_40pct_pts = _int('f_gap_40pct_pts', 6, 15),
+            gap_20pct_pts = _int('f_gap_20pct_pts', 3, 10),
+            gap_10pct_pts = _int('f_gap_10pct_pts', 1,  7),
+
+            # ── MACD state points (NEW) ───────────────────────────────────────
+            macd_positive_pts = _int('f_macd_positive_pts', 2, 8),
+            macd_unknown_pts  = _int('f_macd_unknown_pts',  0, 5),
+
+            # ── Time-of-day points (NEW) ──────────────────────────────────────
+            time_930_945_pts    = _int('f_time_930_945_pts',    2, 8),
+            time_945_1000_pts   = _int('f_time_945_1000_pts',   1, 7),
+            time_1000_1030_pts  = _int('f_time_1000_1030_pts',  0, 5),
+            time_after_1030_pts = _int('f_time_after_1030_pts', 0, 3),
         )
 
     # ── Add-on / Pyramid (Category E) ────────────────────────────────────────
@@ -522,30 +598,52 @@ def _build_config_from_trial(
             max_add_ons            = _int('e_max_add_ons', 1, 4),
 
             # Morning window cutoff (corpus: <1% of adds after 10:30 ET)
-            time_cutoff_minute     = _int('e_time_cutoff_minute', 15, 30),
+            time_cutoff_minute     = _int('e_time_cutoff_minute', 15, 45),
 
             # Add sizing tiers (fraction of initial_shares per add)
             add_pct_tier1          = _float('e_add_pct_tier1', 0.10, 0.50),
             add_pct_tier2          = _float('e_add_pct_tier2', 0.10, 0.40),
+            add_pct_tier3          = _float('e_add_pct_tier3', 0.05, 0.30),
+            add_pct_tier4          = _float('e_add_pct_tier4', 0.05, 0.20),
 
             # HOT market add size multiplier (concept: 25-50% more in hot market)
             hot_market_multiplier  = _float('e_hot_market_multiplier', 1.00, 1.75),
+
+            # Stop buffer for add-on stop adjustment
+            stop_buffer            = _float('e_stop_buffer', 0.02, 0.15),
         )
 
     # ── Momentum / Intraday Discovery (Category M) ───────────────────────────
-    # Tune the key intraday-discovery parameters. Price range, rel-vol floor,
-    # and float cap reuse the same corpus-derived defaults as ScannerConfig
-    # (not separately tuned to avoid blowing up the search space).
     if mode == 'gates-only':
         momentum = MomentumScanConfig()
     else:
         momentum = MomentumScanConfig(
-            min_intraday_gain = _float('m_min_intraday_gain', 2.0, 15.0),
-            scan_end_hour     = _int(  'm_scan_end_hour',     10,  11),
-            hod_tol           = _float('m_hod_tol',           0.0,  0.05),
+            min_intraday_gain  = _float('m_min_intraday_gain',  5.0, 20.0),
+            scan_end_hour      = _int(  'm_scan_end_hour',      10,  12),
+            hod_tol            = _float('m_hod_tol',            0.0,  0.05),
         )
 
-    return RunConfig(scanner=scanner, entry=entry, exit_=exit_, add_on=add_on, scoring=scoring, momentum=momentum)
+    # ── Market Temperature (Category D — NEW, previously never tuned) ────────
+    from trading.models import MarketTemperatureConfig
+    base_temp = MarketTemperatureConfig()
+    if mode == 'gates-only':
+        temperature = base_temp
+    else:
+        temperature = MarketTemperatureConfig(
+            hot_gapper_threshold       = _float('d_hot_gapper_threshold',       30.0, 80.0),
+            warm_gapper_threshold      = _float('d_warm_gapper_threshold',      10.0, 40.0),
+            hot_symbols_min            = _int(  'd_hot_symbols_min',             2,    6),
+            cold_symbols_max           = _int(  'd_cold_symbols_max',            1,    4),
+            hot_max_position_pct       = _float('d_hot_max_position_pct',       15.0, 30.0),
+            neutral_max_position_pct   = _float('d_neutral_max_position_pct',   10.0, 20.0),
+            cold_max_position_pct      = _float('d_cold_max_position_pct',       5.0, 15.0),
+            chop_max_position_pct      = _float('d_chop_max_position_pct',       2.0, 10.0),
+        )
+
+    return RunConfig(
+        scanner=scanner, entry=entry, exit_=exit_, add_on=add_on,
+        scoring=scoring, momentum=momentum, temperature=temperature,
+    )
 
 
 # ── Seed helper ───────────────────────────────────────────────────────────────
@@ -614,6 +712,11 @@ def _make_objective(
         t_start = time.time()
         is_first_trial = (trial.number == 0)
         try:
+            # Trial 0: disable early_abort so ALL days are loaded into memory cache.
+            # This ensures save_memory_cache (below) persists all 187 days, not just
+            # the first 20 before early-abort fires. One-time cost; subsequent trials
+            # benefit from the full warm cache.
+            _abort = 0 if is_first_trial else 20
             result = run_date_range(
                 cfg,
                 start_date,
@@ -627,13 +730,22 @@ def _make_objective(
                 print_dates=is_first_trial,  # only trial 0: full per-day progress
                 # Abort dead configs fast: if 0 trades after 20 data-days, skip rest.
                 # Cuts ~80% of dead-trial time from ~130s → ~14s per pruned trial.
-                early_abort_days=20,
+                early_abort_days=_abort,
             )
         except Exception as e:
             elapsed = time.time() - t_start
             print(f"\n  Trial {trial.number} ERROR after {elapsed:.1f}s: {e}", flush=True)
             _traceback.print_exc()
             return -999.0
+
+        # After trial 0 builds the full memory cache (all 187 days loaded from
+        # parquet + DB avg_vol queries done), persist to disk so future process
+        # restarts skip the ~2hr warm-up entirely.
+        if is_first_trial and cache_data and cache_dir:
+            from pathlib import Path as _P
+            _mc_path = str(_P(cache_dir) / 'memory_cache.pkl')
+            n_saved = save_memory_cache(_mc_path)
+            print(f"  [CACHE] Saved memory cache ({n_saved} days) → {_mc_path}", flush=True)
 
         if result['total_trades'] == 0:
             raise optuna.TrialPruned()
@@ -708,9 +820,10 @@ def run_optuna(
     date_specific_mode = isinstance(symbol_universe, dict)
     if date_specific_mode:
         locked_params = dict(locked_params or {})
-        for gate in ('a_enable_premarket_gain', 'a_enable_relative_volume',
-                     'a_enable_buying_volume', 'a_enable_float_filter',
-                     'a_enable_market_cap_filter'):
+        # a_enable_price_range/premarket_gain/relative_volume/float_filter
+        # no longer tunable (always True via qualifies_momentum). Only lock
+        # the remaining tunable gates in date-specific mode.
+        for gate in ('a_enable_buying_volume', 'a_enable_market_cap_filter'):
             locked_params.setdefault(gate, False)
         print("Date-specific mode: category A scanner gates auto-locked off (pre-screen trusted)")
 
@@ -718,6 +831,16 @@ def run_optuna(
         AdaptiveTrendController(burn_in=trend_burnin, recheck_interval=trend_recheck)
         if adaptive_trend else None
     )
+
+    # ── Pre-load memory cache from disk (skips ~2hr trial-0 warm-up) ────────
+    if cache_data and cache_dir:
+        from pathlib import Path
+        _mc_path = str(Path(cache_dir) / 'memory_cache.pkl')
+        n_loaded = load_memory_cache(_mc_path)
+        if n_loaded:
+            print(f"[CACHE] Loaded memory cache from disk ({n_loaded} days) — trial 0 will be instant")
+        else:
+            print(f"[CACHE] No memory cache found at {_mc_path} — trial 0 will build it")
 
     storage = optuna_db_url or 'sqlite:///optimizer/optuna.db'
     sname   = study_name or f'trading_{start_date}_{end_date}'
@@ -777,13 +900,16 @@ def run_optuna(
         finally:
             heartbeat.stop()
 
-    best = study.best_trial
-    print(f"\n{'='*60}")
-    print(f"Best trial : #{best.number}  objective = ${best.value:,.0f}")
-    print(f"Best params:")
-    for k, v in sorted(best.params.items()):
-        print(f"  {k:<40} {v}")
-    print(f"{'='*60}\n")
+    try:
+        best = study.best_trial
+        print(f"\n{'='*60}")
+        print(f"Best trial : #{best.number}  objective = {best.value:,.2f}")
+        print(f"Best params:")
+        for k, v in sorted(best.params.items()):
+            print(f"  {k:<40} {v}")
+        print(f"{'='*60}\n")
+    except ValueError:
+        print("\nNo completed trials with trades found (all pruned).")
 
     results_conn.close()
 

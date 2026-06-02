@@ -33,7 +33,7 @@ from trading.portfolio_manager import PortfolioManager
 from trading.models import ExitConfig, ScannerConfig, EntryConfig, MarketTemperatureConfig, AddOnConfig, ScoringConfig, ExitSignal
 from trading.trading_engine import Trade, PositionManager
 from simulator.sim_broker import SimBroker
-from trading.orchestrator import Orchestrator
+from trading.orchestrator import Orchestrator, _noop_rel_vol_resolver
 from trading.market_temperature import (
     TemperatureState, classify_premarket, update_from_trade_result, is_session_over
 )
@@ -75,6 +75,41 @@ def _intern_symbol(sym: str) -> int:
         _SYM_TO_IDX[sym] = idx
         _IDX_TO_SYM.append(sym)
     return idx
+
+
+def save_memory_cache(path: str) -> int:
+    """Persist the full in-memory _DATA_CACHE + symbol table to a pickle file.
+    Returns number of days saved. Call after trial 0 completes so subsequent
+    process restarts skip the ~2hr warm-up."""
+    import pickle
+    global _DATA_CACHE, _SYM_TO_IDX, _IDX_TO_SYM
+    blob = {
+        'version': _PERSIST_CACHE_VERSION,
+        'data_cache': _DATA_CACHE,
+        'sym_to_idx': _SYM_TO_IDX,
+        'idx_to_sym': _IDX_TO_SYM,
+    }
+    with open(path, 'wb') as f:
+        pickle.dump(blob, f, protocol=pickle.HIGHEST_PROTOCOL)
+    return len(_DATA_CACHE)
+
+
+def load_memory_cache(path: str) -> int:
+    """Load a previously saved memory cache. Returns number of days loaded,
+    or 0 if file doesn't exist or version mismatch."""
+    import pickle
+    global _DATA_CACHE, _SYM_TO_IDX, _IDX_TO_SYM
+    try:
+        with open(path, 'rb') as f:
+            blob = pickle.load(f)
+        if blob.get('version') != _PERSIST_CACHE_VERSION:
+            return 0
+        _DATA_CACHE = blob['data_cache']
+        _SYM_TO_IDX = blob['sym_to_idx']
+        _IDX_TO_SYM = blob['idx_to_sym']
+        return len(_DATA_CACHE)
+    except (FileNotFoundError, EOFError, pickle.UnpicklingError, KeyError):
+        return 0
 
 
 
@@ -393,9 +428,9 @@ class SimulationRunner:
         # some candidates earlier than live would discover them, which can
         # cause slightly more entries than live. True time-forward sim discovery
         # would require running a streaming intraday scan during simulation.
-        MIN_PRICE = 2.0
-        MAX_PRICE = 20.0
-        MIN_GAIN  = 5.0   # safe superset floor — Optuna rarely benefits below 5% intraday gain
+        MIN_PRICE = 1.0   # match lowest possible a_min_price in Optuna search space
+        MAX_PRICE = 25.0  # match highest possible a_max_price in Optuna search space
+        MIN_GAIN  = 5.0   # must match Optuna search space floor for m_min_intraday_gain
 
         hot = set()
         for idx in range(len(self.minute_array)):
@@ -546,53 +581,84 @@ class SimulationRunner:
             prior_day_high=self.prior_day_high,
             symbol_universe=self.symbol_universe,
             news_cache=self.news_cache,
-            rel_vol_resolver=self._resolve_rel_vol,
+            # When cache_data=True (optimizer), skip DB rel_vol resolver. Bars already
+            # carry precomputed rel_vol_30d; NaN bars get rel_vol=0 (rejected). This
+            # eliminates 26s/day of DB queries in the sim loop. Live trading and
+            # non-cached sim runs still use the full DB resolver.
+            rel_vol_resolver=(
+                _noop_rel_vol_resolver if self.cache_data
+                else self._resolve_rel_vol
+            ),
             max_position_pct=self.max_position_pct,
             verbose=self.verbose,
             debug=self.debug,
         )
 
         # Keep one DB connection open for the whole simulation loop
-        # (rel-vol batch queries use this instead of opening per symbol)
+        # (rel-vol batch queries use this instead of opening per symbol).
+        # When cache_data=True, the noop resolver is used, so no DB needed.
         t0 = time.perf_counter()
-        with StockDataDB() as db:
-            self._db = db
+        _db_ctx = StockDataDB() if not self.cache_data else None
+        _db_obj = _db_ctx.__enter__() if _db_ctx else None
+        self._db = _db_obj
+        try:
             # Pre-compute relevant symbol set for this day: hot_symbols + any
             # open position symbol (needed for exit evaluation even if not hot).
-            # Pre-filtering bars before on_minute eliminates bar_history updates
-            # for the ~4000 irrelevant symbols (360,000 no-op dict writes/day).
             relevant_syms = set(self.hot_symbols)
 
-            for minute_time in sorted(bars_by_time.keys()):
+            # ── Pre-filter: build per-symbol-id index, then assemble only hot bars ─
+            # Without this, the inner loop iterates all ~3000+ symbols per minute
+            # just to find the ~7-50 hot ones (770K+ wasted Python iterations/day).
+            # One-time O(N) scan builds sym_id → {minute → [indices]}, then the
+            # per-minute loop does O(|hot|) dict lookups instead of O(|all|) scans.
+            _sym_to_id = {sname: sid for sid, sname in enumerate(_IDX_TO_SYM)}
+            if self.minute_array is not None:
+                hot_sym_ids = {_sym_to_id[s] for s in relevant_syms if s in _sym_to_id}
+
+                # sym_id → {minute_time → [row indices]}
+                _sym_minute_idx: dict[int, dict] = defaultdict(lambda: defaultdict(list))
+                for minute_time, indices in bars_by_time.items():
+                    for idx in indices:
+                        _sym_minute_idx[self.minute_syms[idx]][minute_time].append(idx)
+            else:
+                hot_sym_ids = None
+                _sym_minute_idx = None
+
+            sorted_minutes = sorted(bars_by_time.keys())
+            for minute_time in sorted_minutes:
                 # Include open position symbol so exit logic always sees its bars.
                 pos = self.orch.broker.position
-                if pos is not None:
-                    relevant_syms.add(pos.symbol)
+                if pos is not None and hot_sym_ids is not None:
+                    pos_id = _sym_to_id.get(pos.symbol)
+                    if pos_id is not None and pos_id not in hot_sym_ids:
+                        hot_sym_ids.add(pos_id)
 
                 bars = []
                 if self.minute_array is not None:
-                    for idx in bars_by_time[minute_time]:
-                        sym = _IDX_TO_SYM[self.minute_syms[idx]]
-                        if sym not in relevant_syms:
-                            continue  # skip non-hot symbols — saves ~360k dict ops/day
-                        r = self.minute_array[idx]   # float64: [unix_ts,open,high,low,close,vol,rel_vol,vwap]
-                        rv = r[6]
-                        bars.append({
-                            'time': minute_time,
-                            'symbol': sym,
-                            'open': r[1],
-                            'high': r[2],
-                            'low': r[3],
-                            'close': r[4],
-                            'volume': r[5],
-                            'rel_vol_30d': None if (rv != rv) else rv,  # NaN → None
-                            'vwap': r[7],
-                        })
+                    for sym_id in hot_sym_ids:
+                        for idx in _sym_minute_idx.get(sym_id, {}).get(minute_time, []):
+                            r = self.minute_array[idx]
+                            sym = _IDX_TO_SYM[self.minute_syms[idx]]
+                            rv = r[6]
+                            bars.append({
+                                'time': minute_time,
+                                'symbol': sym,
+                                'open': r[1],
+                                'high': r[2],
+                                'low': r[3],
+                                'close': r[4],
+                                'volume': r[5],
+                                'rel_vol_30d': None if (rv != rv) else rv,  # NaN → None
+                                'vwap': r[7],
+                            })
                 else:
                     bars = [b for b in bars_by_time[minute_time]
                             if b['symbol'] in relevant_syms]
                 self.orch.on_minute(minute_time, bars)
             self._db = None
+        finally:
+            if _db_ctx is not None:
+                _db_ctx.__exit__(None, None, None)
         if self.debug:
             self._stats['simulation_seconds'] = time.perf_counter() - t0
 

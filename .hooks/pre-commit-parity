@@ -1,0 +1,32 @@
+#!/bin/bash
+# Pre-commit hook: Parity Audit (Tier 1 — structural checks)
+# Warns on new regressions but NEVER blocks the commit.
+#
+# Install: copy to .git/hooks/pre-commit or add to existing hook chain.
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT" || exit 0
+
+# Only run if trading code was modified
+CHANGED=$(git diff --cached --name-only -- production/ research/optimizer/ 2>/dev/null)
+if [ -z "$CHANGED" ]; then
+    exit 0  # No trading code changed, skip audit
+fi
+
+echo ""
+echo "Running parity audit..."
+PYTHONIOENCODING=utf-8 python research/maintenance/parity_audit.py 2>/dev/null
+RESULT=$?
+
+if [ $RESULT -ne 0 ]; then
+    echo ""
+    echo "=========================================="
+    echo "  PARITY WARNING: New regressions found!"
+    echo "  Commit proceeding — review above."
+    echo "  To accept: python research/maintenance/parity_audit.py --update-baseline"
+    echo "=========================================="
+    echo ""
+fi
+
+# Always allow commit (exit 0)
+exit 0
