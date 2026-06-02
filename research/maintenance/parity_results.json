@@ -1,14 +1,6 @@
 {
-  "total_checks": 25,
-  "passed": 18,
-  "failed": 7,
-  "failure_ids": [
-    "gain_threshold_unified",
-    "live_no_enable_gain",
-    "live_no_enable_price",
-    "live_no_enable_relvol",
-    "live_no_scfg_gain",
-    "live_no_scfg_price",
-    "no_hardcoded_trading_end"
-  ]
+  "total_checks": 26,
+  "passed": 26,
+  "failed": 0,
+  "failure_ids": []
 }

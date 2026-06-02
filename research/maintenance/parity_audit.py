@@ -114,8 +114,11 @@ def audit_config_consistency():
     check("min_relvol_consistent", "min_relative_volume consistent",
           scfg.min_relative_volume == mcfg.min_relative_volume,
           f"Scanner={scfg.min_relative_volume} vs Momentum={mcfg.min_relative_volume}", cat)
+    check("scan_end_hour_consistent", "scan_end_hour consistent",
+          scfg.scan_end_hour == mcfg.scan_end_hour,
+          f"Scanner={scfg.scan_end_hour} vs Momentum={mcfg.scan_end_hour}", cat)
     check("gain_threshold_unified", "Gain threshold unified",
-          False,  # Known divergence — always flag until fixed
+          scfg.min_premarket_gain == mcfg.min_intraday_gain,
           f"Scanner.min_premarket_gain={scfg.min_premarket_gain}% vs Momentum.min_intraday_gain={mcfg.min_intraday_gain}%", cat)
 
 
@@ -147,11 +150,10 @@ def audit_hardcoded_constants():
 
     with open('production/trading/entry_engine.py') as f:
         ee_code = f.read()
-    match = re.search(r'TRADING_END_HOUR\s*=\s*(\d+)', ee_code)
-    if match:
-        check("no_hardcoded_trading_end", "No hardcoded TRADING_END_HOUR",
-              False,
-              f"TRADING_END_HOUR={match.group(1)} hardcoded — should read from config", cat)
+    has_hardcoded_end = re.search(r'^TRADING_END_HOUR\s*=\s*\d+', ee_code, re.MULTILINE)
+    check("no_hardcoded_trading_end", "No hardcoded TRADING_END_HOUR",
+          has_hardcoded_end is None,
+          "TRADING_END_HOUR still hardcoded — should read from ScannerConfig.scan_end_hour", cat)
 
 
 def audit_optuna_search_space():

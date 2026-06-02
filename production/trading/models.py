@@ -27,11 +27,12 @@ class ScannerConfig:
     """
     min_price: float = 1.0              # Pillar 1: minimum price
     max_price: float = 20.0             # Pillar 1: maximum price
-    min_premarket_gain: float = 10.0    # Pillar 2: % gain vs prior close
+    min_premarket_gain: float = 5.0     # Pillar 2: % gain vs prior close (matches MomentumScanConfig)
     min_relative_volume: float = 5.0    # Pillar 3: rel-vol multiplier minimum
     min_buying_volume: float = 50_000   # Pillar 3: absolute buying-volume floor
     max_float: int = 20_000_000         # Pillar 4: max float shares
     max_market_cap: int = 500_000_000   # Pillar 4 (extended): max market cap
+    scan_end_hour: int = 11             # ET hour; no new entries after this (matches MomentumScanConfig)
     max_spread: float = 0.15            # Time check: max bid-ask spread
     min_last_5min_volume: int = 100_000 # Time check: min volume in last 5 minutes
     min_last_1min_volume: int = 10_000  # Time check: min volume in last 1 minute

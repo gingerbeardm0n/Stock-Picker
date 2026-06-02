@@ -531,14 +531,14 @@ class LiveScanner:
             return
         self._diag_last_minute[symbol] = minute_key
 
-        scfg = self._scanner_config or ScannerConfig()
+        mcfg = self._momentum_config
         ecfg = self._entry_config   or EntryConfig()
         bar  = bars[-1]
         price = float(bar['close'])
 
-        # Gate 2: 5 Pillars
-        if scfg.enable_price_range and not (scfg.min_price <= price <= scfg.max_price):
-            reason = f"Gate2 PRICE ${price:.2f} outside ${scfg.min_price}-${scfg.max_price}"
+        # Gate 2: 5 Pillars — use MomentumScanConfig (same gates as qualifies_momentum)
+        if not (mcfg.min_price <= price <= mcfg.max_price):
+            reason = f"Gate2 PRICE ${price:.2f} outside ${mcfg.min_price}-${mcfg.max_price}"
             self._last_gate[symbol] = reason
             logger.info(f"  [{symbol}] {reason}")
             return
@@ -548,13 +548,13 @@ class LiveScanner:
             logger.info(f"  [{symbol}] {reason}")
             return
         pct = (price / prior_close - 1.0) * 100
-        if scfg.enable_premarket_gain and pct < scfg.min_premarket_gain:
-            reason = f"Gate2 GAIN {pct:.1f}% < {scfg.min_premarket_gain}% min"
+        if pct < mcfg.min_intraday_gain:
+            reason = f"Gate2 GAIN {pct:.1f}% < {mcfg.min_intraday_gain}% min"
             self._last_gate[symbol] = reason
             logger.info(f"  [{symbol}] {reason}")
             return
-        if scfg.enable_relative_volume and rel_vol < scfg.min_relative_volume:
-            reason = f"Gate2 REL_VOL {rel_vol:.2f}x < {scfg.min_relative_volume}x min"
+        if rel_vol < mcfg.min_relative_volume:
+            reason = f"Gate2 REL_VOL {rel_vol:.2f}x < {mcfg.min_relative_volume}x min"
             self._last_gate[symbol] = reason
             logger.info(f"  [{symbol}] {reason}")
             return
@@ -721,10 +721,8 @@ class LiveScanner:
         label = f"{now_et.hour}:{now_et.minute:02d}"
         logger.info(f"=== PREMARKET SCAN ({label} ET) ===")
 
-        # M2: use the (optimized) ScannerConfig thresholds, not module constants, so the
-        # tuned Category-A pillars actually reach live. Falls back to ScannerConfig()
-        # defaults (which equal the old constants except max_float: 20M vs 100M).
-        scfg = self._scanner_config or ScannerConfig()
+        # Use MomentumScanConfig for discovery gates (same as sim/optimizer).
+        mcfg = self._momentum_config
 
         today   = now_et.date()
         now_utc = now_et.astimezone(pytz.UTC)
@@ -749,7 +747,7 @@ class LiveScanner:
         for symbol, quote in quotes.items():
             price = quote.last or quote.ask    # last price (or ask if last unavailable)
 
-            if not (scfg.min_price <= price <= scfg.max_price):
+            if not (mcfg.min_price <= price <= mcfg.max_price):
                 continue
 
             # Use prior close from DB (already loaded in startup_preload)
@@ -757,13 +755,13 @@ class LiveScanner:
             if not prior_close or prior_close <= 0:
                 continue
             pct_gain = (price / prior_close - 1.0) * 100.0
-            if pct_gain < scfg.min_premarket_gain:
+            if pct_gain < mcfg.min_intraday_gain:
                 continue
 
             price_gain_candidates.append((symbol, price, prior_close, pct_gain))
 
-        logger.info(f"  {len(price_gain_candidates)} symbols up {scfg.min_premarket_gain}%+ "
-                    f"in ${scfg.min_price}–${scfg.max_price} range")
+        logger.info(f"  {len(price_gain_candidates)} symbols up {mcfg.min_intraday_gain}%+ "
+                    f"in ${mcfg.min_price}–${mcfg.max_price} range")
 
         if not price_gain_candidates:
             logger.info("  No premarket movers found — quiet morning")

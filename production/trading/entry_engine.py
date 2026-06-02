@@ -56,7 +56,7 @@ _ENTRY_DEFAULTS = EntryConfig()
 # Trading window (fixed by strategy, not tuned)
 TRADING_START_HOUR = 9
 TRADING_START_MINUTE = 30   # 9:30 AM ET
-TRADING_END_HOUR = 11       # 11:00 AM ET (no new entries after 11)
+# TRADING_END_HOUR removed — now read from ScannerConfig.scan_end_hour (default 11)
 
 
 # ── Gap and Go helpers ────────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ def evaluate_entry(
     in_window = (
         et_time.hour > TRADING_START_HOUR or
         (et_time.hour == TRADING_START_HOUR and et_time.minute >= TRADING_START_MINUTE)
-    ) and et_time.hour < TRADING_END_HOUR
+    ) and et_time.hour < scfg.scan_end_hour
 
     if not in_window:
         return None
