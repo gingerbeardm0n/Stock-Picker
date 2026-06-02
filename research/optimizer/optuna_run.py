@@ -943,6 +943,10 @@ if __name__ == '__main__':
     parser.add_argument('--lock-params', nargs='*', metavar='KEY=VALUE', default=[],
                         help='Fix params to exact values for all trials, bypassing suggest_*. '
                              'Example: --lock-params b_enable_trend=False c_time_decay_hour=11')
+    parser.add_argument('--lock-file', type=str, default=None,
+                        help='JSON file of locked params (keys starting with _ are ignored as comments). '
+                             'Merged with --lock-params (CLI wins on conflict). '
+                             'Example: --lock-file optimizer/locked_params_v1.json')
     parser.add_argument('--adaptive-trend', action='store_true',
                         help='Explore b_enable_trend freely for --trend-burnin trials, '
                              'then lock to the winner (top-20%% analysis). Rechecks every '
@@ -953,8 +957,19 @@ if __name__ == '__main__':
                         help='Re-test opposite trend setting every N trials after lock (default: 25)')
     args = parser.parse_args()
 
-    # Parse --lock-params KEY=VALUE pairs into a typed dict
+    # Load locked params from JSON file (keys starting with _ are metadata/comments)
     locked: dict = {}
+    if args.lock_file:
+        import json as _json
+        with open(args.lock_file) as _f:
+            raw = _json.load(_f)
+        for k, v in raw.items():
+            if k.startswith('_'):
+                continue  # skip metadata/comment keys
+            locked[k] = v
+        print(f"Loaded {len(locked)} locked params from {args.lock_file}")
+
+    # Parse --lock-params KEY=VALUE pairs (override file values on conflict)
     for kv in args.lock_params or []:
         if '=' not in kv:
             print(f'WARNING: --lock-params entry "{kv}" ignored (no = sign)')
