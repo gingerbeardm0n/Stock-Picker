@@ -41,6 +41,8 @@ def run_date_range(
     print_dates: bool = False,
     early_abort_days: int = 0,
     dates: list | None = None,
+    on_checkpoint=None,
+    checkpoint_interval: int = 50,
 ) -> dict:
     """
     Run a simulation over a date range using the given RunConfig.
@@ -133,6 +135,12 @@ def run_date_range(
         if verbose or print_dates:
             print(f"  [{day_idx}/{n_days}] {day} done ({_day_elapsed:.1f}s)", flush=True)
         if not success:
+            if verbose or debug:
+                _s = runner._stats if hasattr(runner, '_stats') else {}
+                print(f"  [{day_idx}/{n_days}] {day} SKIPPED: load_data failed "
+                      f"(prior_close={_s.get('prior_close_count', '?')}, "
+                      f"bars={_s.get('minute_bars_total', '?')}, "
+                      f"symbols={_s.get('symbols_total', '?')})", flush=True)
             continue
 
         _days_with_data += 1
@@ -163,6 +171,20 @@ def run_date_range(
                 'hold_minutes': t.get_exit_time_minutes(),
             })
 
+        # Checkpoint: fire on_checkpoint every checkpoint_interval data-days.
+        # The callback may raise optuna.TrialPruned — let it propagate up to
+        # the objective closure so Optuna records the trial as PRUNED.
+        if (
+            on_checkpoint is not None
+            and checkpoint_interval > 0
+            and _days_with_data > 0
+            and _days_with_data % checkpoint_interval == 0
+        ):
+            partial_metrics = _compute_partial_metrics(
+                all_trades, all_daily_pnls, config.account_size, _days_with_data
+            )
+            on_checkpoint(_days_with_data // checkpoint_interval, partial_metrics)
+
     # ── Aggregate ──────────────────────────────────────────────────────────────
     total_trades = total_winners + total_losers
     if total_trades == 0:
@@ -180,9 +202,11 @@ def run_date_range(
     # Objective: robustness-adjusted ('consistency'). Rewards green-day frequency
     # and payoff ratio, penalizes drawdown, shrinks on thin trade/day samples — and
     # does NOT amputate the right tail (downside-only risk via the green-rate factor).
+    # Also subtracts variance_penalty_k * stdev(daily_pnls): penalises configs that
+    # win big on a few days and chop the rest (default k=1.0 via ObjectiveParams).
     # Replaces raw total_pnl, which rewarded the tiny-win / one-lucky-day regime.
     # Raw total_pnl is still reported below for comparison.
-    # See research/optimizer/objective_functions.py + memory/optimizer_objective_fix.md.
+    # See research/optimizer/objective_functions.py.
     objective = compute_objective(
         formula='consistency',
         total_pnl=total_pnl,
@@ -238,4 +262,42 @@ def _empty_metrics() -> dict:
         'days_traded':   0,
         'objective':     -999.0,
         'trades':        [],
+    }
+
+
+def _compute_partial_metrics(
+    all_trades: list[dict],
+    all_daily_pnls: list[float],
+    account_size: float,
+    days_with_data: int,
+) -> dict:
+    """Build a partial metrics dict suitable for compute_objective() at a checkpoint.
+
+    This mirrors the final aggregation in run_date_range but uses only the trades
+    and daily P&Ls accumulated so far.  Called by the on_checkpoint mechanism every
+    checkpoint_interval data-days so the Optuna objective closure can call
+    trial.report() and trial.should_prune().
+    """
+    n_trades = len(all_trades)
+    if n_trades == 0:
+        return {
+            'total_trades': 0,
+            'total_pnl': 0.0,
+            'max_drawdown': 0.0,
+            'daily_pnls': [],
+            'trade_pnls': [],
+            'days_traded': days_with_data,
+        }
+
+    trade_pnls = [t['pnl'] for t in all_trades]
+    total_pnl = sum(trade_pnls)
+    max_drawdown = _compute_max_drawdown(trade_pnls)
+
+    return {
+        'total_trades': n_trades,
+        'total_pnl': total_pnl,
+        'max_drawdown': max_drawdown,
+        'daily_pnls': list(all_daily_pnls),
+        'trade_pnls': trade_pnls,
+        'days_traded': days_with_data,
     }

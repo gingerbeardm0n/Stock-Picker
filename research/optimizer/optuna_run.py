@@ -50,6 +50,30 @@ from simulator.simulation_engine import save_memory_cache, load_memory_cache
 from trading.models import ScannerConfig, EntryConfig, ExitConfig, ScoringConfig, AddOnConfig, MomentumScanConfig, MarketTemperatureConfig
 
 
+# ── Canary days ───────────────────────────────────────────────────────────────
+# High-activity trading days used to fast-prune dead configs before running the
+# full simulation.  Chosen as the single best day (most minute bars in the
+# parquet cache) from each of five years so the check spans multiple market
+# regimes.  If a config produces 0 trades on ALL of these days it will almost
+# certainly produce 0 trades across the full study range and can be discarded
+# immediately (~17s vs ~150s for the 20-day early-abort path).
+#
+# To refresh: python -c "
+#   from pathlib import Path; import pyarrow.parquet as pq
+#   cache = Path('research/optimizer/data/cache')
+#   days = {f.stem.split('_')[2]: pq.read_metadata(f).num_rows
+#           for f in cache.glob('simcache_v2_*.minute.parquet')}
+#   for d,n in sorted(days.items(), key=lambda x:-x[1])[:30]: print(d, n)
+# "
+CANARY_DAYS: list[str] = [
+    '2021-02-23',  # best 2021 day in cache (212,847 minute bars)
+    '2022-06-13',  # best 2022 day in cache (224,924 minute bars)
+    '2023-03-13',  # best 2023 day in cache (235,125 minute bars)
+    '2024-08-05',  # best 2024 day in cache (249,712 minute bars)
+    '2025-10-10',  # best 2025 day in cache (275,723 minute bars)
+]
+
+
 # ── Heartbeat monitor ─────────────────────────────────────────────────────────
 
 class _Heartbeat:
@@ -246,22 +270,22 @@ def _build_config_from_trial(
     elif mode == 'single-indicator':
         min_price = trial.suggest_float('a_min_price', 1.0, 5.0) if enable_price_range else base_scanner.min_price
         max_price = trial.suggest_float('a_max_price', 15.0, 25.0) if enable_price_range else base_scanner.max_price
-        min_premarket_gain = trial.suggest_float('a_min_premarket_gain', 5.0, 25.0) if enable_premarket_gain else base_scanner.min_premarket_gain
-        min_relative_volume = trial.suggest_float('a_min_relative_volume', 2.0, 15.0) if enable_relative_volume else base_scanner.min_relative_volume
+        min_premarket_gain = trial.suggest_float('a_min_premarket_gain', 5.0, 15.0) if enable_premarket_gain else base_scanner.min_premarket_gain
+        min_relative_volume = trial.suggest_float('a_min_relative_volume', 2.0, 8.0) if enable_relative_volume else base_scanner.min_relative_volume
         min_buying_volume = trial.suggest_int('a_min_buying_volume', 10_000, 200_000, step=5_000) if enable_buying_volume else base_scanner.min_buying_volume
         max_float = trial.suggest_int('a_max_float', 5_000_000, 50_000_000, step=1_000_000) if enable_float_filter else base_scanner.max_float
         max_market_cap = trial.suggest_int('a_max_market_cap', 100_000_000, 1_000_000_000, step=50_000_000) if enable_market_cap_filter else base_scanner.max_market_cap
     else:
         min_price = _float('a_min_price', 1.0, 5.0) if enable_price_range else base_scanner.min_price
         max_price = _float('a_max_price', 15.0, 25.0) if enable_price_range else base_scanner.max_price
-        min_premarket_gain = _float('a_min_premarket_gain', 5.0, 25.0) if enable_premarket_gain else base_scanner.min_premarket_gain
-        min_relative_volume = _float('a_min_relative_volume', 2.0, 15.0) if enable_relative_volume else base_scanner.min_relative_volume
-        min_buying_volume = _int('a_min_buying_volume', 10_000, 200_000, step=5_000) if enable_buying_volume else base_scanner.min_buying_volume
+        min_premarket_gain = _float('a_min_premarket_gain', 5.0, 15.0) if enable_premarket_gain else base_scanner.min_premarket_gain
+        min_relative_volume = _float('a_min_relative_volume', 2.0, 8.0) if enable_relative_volume else base_scanner.min_relative_volume
+        min_buying_volume = _int('a_min_buying_volume', 10_000, 100_000, step=5_000) if enable_buying_volume else base_scanner.min_buying_volume
         max_float = _int('a_max_float', 5_000_000, 50_000_000, step=1_000_000) if enable_float_filter else base_scanner.max_float
         max_market_cap = _int('a_max_market_cap', 100_000_000, 1_000_000_000, step=50_000_000) if enable_market_cap_filter else base_scanner.max_market_cap
         max_spread = _float('a_max_spread', 0.02, 0.30) if enable_spread_filter else base_scanner.max_spread
-        min_last_5min_volume = _int('a_min_last_5min_volume', 20_000, 500_000, step=10_000) if enable_last_5min_volume else base_scanner.min_last_5min_volume
-        min_last_1min_volume = _int('a_min_last_1min_volume', 2_000, 50_000, step=1_000) if enable_last_1min_volume else base_scanner.min_last_1min_volume
+        min_last_5min_volume = _int('a_min_last_5min_volume', 20_000, 250_000, step=10_000) if enable_last_5min_volume else base_scanner.min_last_5min_volume
+        min_last_1min_volume = _int('a_min_last_1min_volume', 2_000, 30_000, step=1_000) if enable_last_1min_volume else base_scanner.min_last_1min_volume
 
     scanner = ScannerConfig(
         min_price=min_price,
@@ -519,10 +543,10 @@ def _build_config_from_trial(
     else:
         scoring = ScoringConfig(
             # ── Temperature score thresholds (min score to enter) ─────────────
-            threshold_hot    = _int('f_threshold_hot',    20, 55),
-            threshold_neutral = _int('f_threshold_neutral', 40, 65),
-            threshold_cold   = _int('f_threshold_cold',   55, 80),
-            threshold_chop   = _int('f_threshold_chop',   65, 90),
+            threshold_hot    = _int('f_threshold_hot',    15, 45),
+            threshold_neutral = _int('f_threshold_neutral', 25, 55),
+            threshold_cold   = _int('f_threshold_cold',   35, 65),
+            threshold_chop   = _int('f_threshold_chop',   45, 75),
 
             # ── Base size multipliers per temperature ─────────────────────────
             size_hot     = _float('f_size_hot',     0.60, 1.50),
@@ -618,7 +642,7 @@ def _build_config_from_trial(
         momentum = MomentumScanConfig()
     else:
         momentum = MomentumScanConfig(
-            min_intraday_gain  = _float('m_min_intraday_gain',  5.0, 20.0),
+            min_intraday_gain  = _float('m_min_intraday_gain',  3.0, 12.0),
             scan_end_hour      = _int(  'm_scan_end_hour',      10,  12),
             hod_tol            = _float('m_hod_tol',            0.0,  0.05),
         )
@@ -681,6 +705,7 @@ def _make_objective(
     start_date: str,
     end_date: str,
     results_conn,
+    results_db_path: str | None,
     mode: str,
     debug: bool,
     cache_data: bool,
@@ -691,13 +716,30 @@ def _make_objective(
     adaptive_trend_controller: AdaptiveTrendController | None = None,
     date_sampler=None,
     days_per_week: int = 2,
+    cache_prebuilt: bool = False,
+    canary_days: list[str] | None = None,
 ):
     """Return a closure that Optuna calls for each trial.
 
     date_sampler: if provided, each trial samples a different random subset
     of trading days (stratified by ISO week). This prevents overfitting to
     specific day ordering and covers all market regimes in every trial.
+
+    cache_prebuilt: if True, the cache was built by --build-cache-only before
+    this run, so trial 0 is treated like any other trial (no all-days warm-up).
     """
+    # Thread-local storage for per-thread SQLite connections (results.db).
+    # SQLite connections can't be shared across threads, so each worker
+    # gets its own connection on first use.
+    _thread_local = threading.local()
+
+    def _get_results_conn():
+        """Return a thread-local results.db connection."""
+        conn = getattr(_thread_local, 'results_conn', None)
+        if conn is None:
+            conn = init_db(results_db_path)
+            _thread_local.results_conn = conn
+        return conn
 
     def objective(trial: optuna.Trial) -> float:
         # Build per-trial locked params (don't mutate the shared dict)
@@ -719,18 +761,82 @@ def _make_objective(
         t_start = time.time()
         is_first_trial = (trial.number == 0)
 
-        # Stratified random day sampling: each trial gets different days.
-        # Trial 0 runs ALL pool days (no sampling) to warm the memory cache.
+        # Stratified random day sampling.
+        # If cache is pre-built: trial 0 samples like any other trial (no all-days warm-up).
+        # If cache not pre-built: trial 0 runs ALL pool days to warm the cache.
         trial_dates = None
-        if date_sampler is not None and not is_first_trial:
-            trial_dates = date_sampler.sample(seed=trial.number, days_per_week=days_per_week)
+        if date_sampler is not None:
+            if not is_first_trial or cache_prebuilt:
+                trial_dates = date_sampler.sample(seed=trial.number, days_per_week=days_per_week)
+
+        # ── Canary pre-screen ──────────────────────────────────────────────────
+        # Run the full simulation on a handful of high-activity days BEFORE the
+        # main run.  If 0 trades on all canary days the config is almost
+        # certainly dead — prune immediately and save ~130s per trial.
+        # Skip on trial 0 (cache build path) and when canary_days is empty.
+        _active_canary = canary_days if canary_days is not None else CANARY_DAYS
+        if _active_canary and not (is_first_trial and not cache_prebuilt):
+            canary_result = run_date_range(
+                cfg,
+                start_date,
+                end_date,
+                verbose=False,
+                debug=False,
+                cache_data=cache_data,
+                cache_dir=cache_dir,
+                symbol_universe=symbol_universe,
+                early_abort_days=0,
+                dates=_active_canary,
+            )
+            if canary_result['total_trades'] == 0:
+                elapsed = time.time() - t_start
+                print(
+                    f"\n  Trial {trial.number} CANARY PRUNED: "
+                    f"0 trades on {len(_active_canary)} canary days ({elapsed:.0f}s)",
+                    flush=True,
+                )
+                trial.set_user_attr('pruned_reason', 'canary_zero_trades')
+                raise optuna.TrialPruned()
+
+        def _on_checkpoint(step: int, partial_metrics: dict) -> None:
+            """Report intermediate objective to Optuna for mid-trial pruning.
+
+            Called by run_date_range every checkpoint_interval data-days.
+            Raises optuna.TrialPruned if this trial is clearly underperforming
+            relative to the median of completed trials at the same step.
+            The exception propagates through run_date_range to Optuna.
+            """
+            from optimizer.objective_functions import compute_objective
+            try:
+                intermediate_obj = compute_objective(
+                    formula='consistency',
+                    total_pnl=partial_metrics.get('total_pnl', 0.0),
+                    max_drawdown=partial_metrics.get('max_drawdown', 0.0),
+                    trade_pnls=partial_metrics.get('trade_pnls', []),
+                    daily_pnls=partial_metrics.get('daily_pnls', []),
+                )
+            except Exception:
+                intermediate_obj = -9999.0
+
+            trial.report(intermediate_obj, step)
+            if trial.should_prune():
+                n_trades = partial_metrics.get('total_trades', 0)
+                n_days = partial_metrics.get('days_traded', 0)
+                print(
+                    f"\n  Trial {trial.number} MID-TRIAL PRUNED at step {step} "
+                    f"(day {n_days}, {n_trades} trades, intermediate_obj={intermediate_obj:.2f})",
+                    flush=True,
+                )
+                trial.set_user_attr('pruned_reason', f'median_pruner_step{step}')
+                raise optuna.TrialPruned()
 
         try:
-            # Trial 0: disable early_abort so ALL days are loaded into memory cache.
-            # This ensures save_memory_cache (below) persists all 187 days, not just
-            # the first 20 before early-abort fires. One-time cost; subsequent trials
-            # benefit from the full warm cache.
-            _abort = 0 if is_first_trial else 20
+            # early_abort: skip if 0 trades after N data-days (fast pruning).
+            # Disable on trial 0 only when we're ALSO building the cache (legacy path).
+            _abort = 20
+            if is_first_trial and not cache_prebuilt:
+                _abort = 0  # old path: trial 0 must run all days to populate cache
+
             result = run_date_range(
                 cfg,
                 start_date,
@@ -741,35 +847,62 @@ def _make_objective(
                 cache_dir=cache_dir,
                 symbol_universe=symbol_universe,
                 on_day_complete=_day_tick,
-                print_dates=is_first_trial,  # only trial 0: full per-day progress
-                # Abort dead configs fast: if 0 trades after 20 data-days, skip rest.
-                # Cuts ~80% of dead-trial time from ~130s → ~14s per pruned trial.
+                print_dates=(is_first_trial and not cache_prebuilt),
                 early_abort_days=_abort,
                 dates=trial_dates,
+                on_checkpoint=_on_checkpoint,
+                checkpoint_interval=50,
             )
         except Exception as e:
             elapsed = time.time() - t_start
-            print(f"\n  Trial {trial.number} ERROR after {elapsed:.1f}s: {e}", flush=True)
+            err_msg = f"{type(e).__name__}: {e}"
+            print(f"\n  Trial {trial.number} ERROR after {elapsed:.1f}s: {err_msg}", flush=True)
             _traceback.print_exc()
-            return -999.0
+            # Store error info in trial for post-mortem analysis
+            trial.set_user_attr('error', err_msg[:500])
+            trial.set_user_attr('error_days_done', _days_done[0])
+            raise  # Let Optuna record as FAIL with traceback, not silent -999
 
-        # After trial 0 builds the full memory cache (all 187 days loaded from
-        # parquet + DB avg_vol queries done), persist to disk so future process
-        # restarts skip the ~2hr warm-up entirely.
-        if is_first_trial and cache_data and cache_dir:
+        # Legacy: trial 0 cache save (only when cache was NOT pre-built).
+        if is_first_trial and not cache_prebuilt and cache_data and cache_dir:
             from pathlib import Path as _P
             _mc_path = str(_P(cache_dir) / 'memory_cache.pkl')
             n_saved = save_memory_cache(_mc_path)
-            print(f"  [CACHE] Saved memory cache ({n_saved} days) → {_mc_path}", flush=True)
+            print(f"  [CACHE] Saved memory cache ({n_saved} days) -> {_mc_path}", flush=True)
 
-        if result['total_trades'] == 0:
+        elapsed = time.time() - t_start
+        n_trades = result['total_trades']
+        n_days = _days_done[0]
+
+        if n_trades == 0:
+            # Log diagnostic info for debugging zero-trade pruning
+            key_params = {
+                'a_min_premarket_gain': cfg.scanner.min_premarket_gain,
+                'a_min_relative_volume': cfg.scanner.min_relative_volume,
+                'm_min_intraday_gain': cfg.momentum.min_intraday_gain,
+                'a_max_float': cfg.scanner.max_float,
+                'a_min_price': cfg.scanner.min_price,
+                'a_max_price': cfg.scanner.max_price,
+                'm_min_relative_volume': cfg.momentum.min_relative_volume,
+                'm_scan_end_hour': cfg.momentum.scan_end_hour,
+            }
+            print(f"\n  Trial {trial.number} PRUNED: 0 trades in {n_days} days ({elapsed:.0f}s).", flush=True)
+            print(f"    Key params: {key_params}", flush=True)
+            if result.get('days_traded', 0) == 0:
+                print(f"    WARNING: 0 days traded -> likely data issue (no prior_close or no minute bars)", flush=True)
+            trial.set_user_attr('pruned_reason', 'zero_trades')
+            trial.set_user_attr('pruned_days', n_days)
+            trial.set_user_attr('pruned_key_params', str(key_params))
             raise optuna.TrialPruned()
 
         trades = result.pop('trades')
         run_id = f"optuna_{trial.number:05d}"
-        write_run(results_conn, run_id, start_date, end_date,
+        _rconn = _get_results_conn()
+        write_run(_rconn, run_id, start_date, end_date,
                   result, cfg.to_flat_dict(), trades)
 
+        print(f"\n  Trial {trial.number} COMPLETE: {n_trades} trades, obj={result['objective']:.2f} ({elapsed:.0f}s)",
+              flush=True)
         return result['objective']
 
     objective._heartbeat = None  # type: ignore[attr-defined]  # set externally after creation
@@ -777,6 +910,122 @@ def _make_objective(
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+
+def build_permissive_cache(
+    start_date: str,
+    end_date: str,
+    cache_dir: str,
+    min_symbols: int = 500,
+) -> int:
+    """Run a single permissive simulation pass over the full date range to warm
+    the memory cache.  Uses maximally permissive config (lowest thresholds, all
+    patterns/filters enabled) so EVERY day with qualifying stocks gets cached —
+    regardless of what the optimizer will later tune.
+
+    This decouples cache building from trial 0, which previously used random
+    Optuna params and only cached ~19% of days (those that survived a random,
+    often-bad filter set).
+
+    Returns the number of days saved to the cache pkl file.
+    """
+    from pathlib import Path
+    from date_sampler import DateSampler
+
+    print(f"\n{'='*60}")
+    print(f"[BUILD-CACHE] Permissive cache warm-up: {start_date} -> {end_date}")
+    print(f"[BUILD-CACHE] Cache dir: {cache_dir}")
+    print(f"{'='*60}\n")
+
+    # Build a maximally permissive RunConfig:
+    #   - All patterns enabled
+    #   - Score thresholds at floor (1 pt = always pass)
+    #   - Widest price/float/gain filters
+    #   - Exit config: generous targets (won't hurt cache hit rate)
+    permissive_scoring = ScoringConfig(
+        threshold_hot=1,
+        threshold_neutral=1,
+        threshold_cold=1,
+        threshold_chop=1,
+    )
+    permissive_momentum = MomentumScanConfig(
+        min_intraday_gain=3.0,   # lower than locked 6.0 → more stocks qualify
+        min_price=1.0,
+        max_price=50.0,          # wider than default
+        max_float=200_000_000,   # 200M float → very permissive
+        min_relative_volume=1.0, # almost everything passes
+    )
+    permissive_entry = EntryConfig(
+        enable_ema9=False,          # don't restrict entries
+        enable_rr=False,
+        enable_whole_dollar=False,
+        enable_micro_pullback=True,
+        enable_bull_flag=True,
+        enable_abcd=True,
+        enable_flat_top=True,
+        enable_dip_buy=True,
+        enable_gap_and_go=True,
+        enable_vwap_reclaim=True,
+        enable_orb=True,
+        enable_trend=True,
+    )
+
+    cfg = RunConfig(
+        scanner=ScannerConfig(),
+        entry=permissive_entry,
+        exit_=ExitConfig(),
+        scoring=permissive_scoring,
+        add_on=AddOnConfig(),
+        momentum=permissive_momentum,
+    )
+
+    # Query all valid trading days (same pool as DateSampler uses)
+    print(f"[BUILD-CACHE] Querying DB for valid trading days (min_symbols={min_symbols})...")
+    _ds = DateSampler.from_db(
+        pool_start=start_date,
+        pool_end=end_date,
+        holdout_start=None,
+        min_symbols=min_symbols,
+    )
+    all_dates = []
+    for days in _ds.weeks.values():
+        all_dates.extend(days)
+    all_dates.sort()
+    print(f"[BUILD-CACHE] Running {len(all_dates)} days with permissive config...\n")
+
+    t0 = time.time()
+    days_done = [0]
+
+    def _tick(date_str: str):
+        days_done[0] += 1
+        if days_done[0] % 50 == 0:
+            elapsed = time.time() - t0
+            rate = days_done[0] / elapsed
+            eta = (len(all_dates) - days_done[0]) / rate if rate > 0 else 0
+            print(f"  [{days_done[0]}/{len(all_dates)}] {date_str}  "
+                  f"({elapsed/60:.1f}m elapsed, ~{eta/60:.1f}m remaining)", flush=True)
+
+    run_date_range(
+        cfg,
+        start_date,
+        end_date,
+        verbose=False,
+        debug=False,
+        cache_data=True,
+        cache_dir=cache_dir,
+        on_day_complete=_tick,
+        print_dates=True,
+        early_abort_days=0,   # never abort — we want ALL days cached
+        dates=all_dates,
+    )
+
+    # Save to disk
+    Path(cache_dir).mkdir(parents=True, exist_ok=True)
+    mc_path = str(Path(cache_dir) / 'memory_cache.pkl')
+    n_saved = save_memory_cache(mc_path)
+    elapsed = time.time() - t0
+    print(f"\n[BUILD-CACHE] Done in {elapsed/60:.1f}m -- {n_saved} days cached -> {mc_path}")
+    return n_saved
+
 
 def run_optuna(
     start_date: str,
@@ -801,6 +1050,9 @@ def run_optuna(
     stratified_sample: bool = False,
     days_per_week: int = 2,
     min_symbols: int = 500,
+    n_jobs: int = 1,
+    canary_days: list[str] | None = None,
+    no_median_prune: bool = False,
 ) -> None:
     if log_file:
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
@@ -854,39 +1106,83 @@ def run_optuna(
     _date_sampler = None
     if stratified_sample:
         from date_sampler import DateSampler
-        _date_sampler = DateSampler.from_db(
-            pool_start=start_date,
-            pool_end=end_date,
-            holdout_start=None,  # holdout managed separately via run_holdout.py
-            min_symbols=min_symbols,
-            min_days_per_week=days_per_week,
-        )
+        from pathlib import Path
+        from datetime import date as _date_cls
+        import re as _re
+
+        _sampler_built = False
+
+        # Try cache-based sampler first (no DB needed, instant)
+        if cache_data and cache_dir:
+            _cache_path = Path(cache_dir)
+            _minute_files = sorted(_cache_path.glob('simcache_v2_*.minute.parquet'))
+            if _minute_files:
+                _pool_s = _date_cls.fromisoformat(start_date)
+                _pool_e = _date_cls.fromisoformat(end_date)
+                _cached_dates = []
+                for f in _minute_files:
+                    m = _re.search(r'simcache_v2_(\d{4}-\d{2}-\d{2})\.minute', f.name)
+                    if m:
+                        d = _date_cls.fromisoformat(m.group(1))
+                        if _pool_s <= d <= _pool_e:
+                            _cached_dates.append(d)
+                if _cached_dates:
+                    print(f"[DateSampler] Using {len(_cached_dates)} cached days from {cache_dir} (no DB query)")
+                    _date_sampler = DateSampler.from_cache(
+                        _cached_dates,
+                        min_days_per_week=days_per_week,
+                    )
+                    _sampler_built = True
+
+        # Fallback to DB query
+        if not _sampler_built:
+            _date_sampler = DateSampler.from_db(
+                pool_start=start_date,
+                pool_end=end_date,
+                holdout_start=None,  # holdout managed separately via run_holdout.py
+                min_symbols=min_symbols,
+                min_days_per_week=days_per_week,
+            )
+
         stats = _date_sampler.stats(days_per_week)
         print(f"[SAMPLER] Stratified {days_per_week}/week: {stats['days_per_trial']} days/trial "
               f"({stats['sample_pct']}% of {stats['total_pool_days']} pool days across {stats['total_weeks']} weeks)")
 
-    # ── Pre-load memory cache from disk (skips ~2hr trial-0 warm-up) ────────
+    # ── Pre-load memory cache from disk ──────────────────────────────────────
+    _cache_prebuilt = False
     if cache_data and cache_dir:
         from pathlib import Path
         _mc_path = str(Path(cache_dir) / 'memory_cache.pkl')
         n_loaded = load_memory_cache(_mc_path)
         if n_loaded:
-            print(f"[CACHE] Loaded memory cache from disk ({n_loaded} days) — trial 0 will be instant")
+            _cache_prebuilt = True
+            print(f"[CACHE] Loaded memory cache from disk ({n_loaded} days) — all trials use sampled days")
         else:
-            print(f"[CACHE] No memory cache found at {_mc_path} — trial 0 will build it")
+            print(f"[CACHE] No memory cache found at {_mc_path} — trial 0 will build it (legacy path)")
+            print(f"[CACHE] TIP: Run with --build-cache-only first for a full permissive cache")
 
-    storage = optuna_db_url or 'sqlite:///optimizer/optuna.db'
+    storage = optuna_db_url or 'postgresql://postgres:changeme123@localhost:5432/optuna'
     sname   = study_name or f'trading_{start_date}_{end_date}'
     if log_file:
         logging.info("=== Optuna run start: %s | mode=%s | cache=%s | debug=%s ===", sname, mode, cache_data, debug)
 
+    _pruner = (
+        optuna.pruners.NopPruner()
+        if no_median_prune
+        else optuna.pruners.MedianPruner(
+            n_startup_trials=5,   # need 5 completed trials before pruning begins
+            n_warmup_steps=1,     # skip step 0 (first checkpoint too noisy)
+            interval_steps=1,     # evaluate every step
+        )
+    )
+    print(f"Pruner     : {'DISABLED (--no-median-prune) — use this for validation runs' if no_median_prune else 'MedianPruner (n_startup=5)'}")
     study = optuna.create_study(
         study_name=sname,
         direction='maximize',
         storage=storage,
         load_if_exists=True,
         sampler=optuna.samplers.TPESampler(seed=42),
-        pruner=optuna.pruners.MedianPruner(n_warmup_steps=0),
+        pruner=_pruner,
     )
 
     # Enqueue seed trial before any TPE sampling
@@ -910,6 +1206,11 @@ def run_optuna(
         print(f"Locked     : {locked_params}")
     if adaptive_trend_controller:
         print(f"Adaptive trend : burn_in={trend_burnin}, recheck={trend_recheck}")
+    _effective_canary = canary_days if canary_days is not None else CANARY_DAYS
+    if _effective_canary:
+        print(f"Canary days : {_effective_canary} ({len(_effective_canary)} days — pass --no-canary to disable)")
+    else:
+        print(f"Canary days : disabled (--no-canary)")
     print(f"Dashboard  : pip install optuna-dashboard && optuna-dashboard {storage}")
     print()
 
@@ -918,9 +1219,12 @@ def run_optuna(
     else:
         heartbeat = _Heartbeat(interval=30)
         obj_fn = _make_objective(
-            start_date, end_date, results_conn, mode, debug, cache_data,
+            start_date, end_date, results_conn, results_db_path,
+            mode, debug, cache_data,
             disable_relative_volume, cache_dir, symbol_universe, locked_params,
             adaptive_trend_controller, _date_sampler, days_per_week,
+            cache_prebuilt=_cache_prebuilt,
+            canary_days=canary_days,
         )
         obj_fn._heartbeat = heartbeat  # type: ignore[attr-defined]
         heartbeat.start()
@@ -928,6 +1232,7 @@ def run_optuna(
             study.optimize(
                 obj_fn,
                 n_trials=n_remaining,
+                n_jobs=n_jobs,
                 show_progress_bar=True,
             )
         finally:
@@ -988,6 +1293,14 @@ if __name__ == '__main__':
                         help='Days to sample per ISO week when --stratified-sample is on (default: 2)')
     parser.add_argument('--min-symbols', type=int, default=500,
                         help='Minimum symbols/day to include in sampling pool (default: 500)')
+    parser.add_argument('--n-jobs', type=int, default=1,
+                        help='Number of parallel trial workers (default: 1, use 4 for parallel). '
+                             'Requires PostgreSQL storage (not SQLite).')
+    parser.add_argument('--build-cache-only', action='store_true',
+                        help='Run a single permissive pass over the full date range to warm '
+                             'the memory cache, then exit. Use this before --cache-data runs '
+                             'to ensure ALL qualifying days are cached (not just those that '
+                             'survive random trial-0 params). Requires --cache-data.')
     parser.add_argument('--adaptive-trend', action='store_true',
                         help='Explore b_enable_trend freely for --trend-burnin trials, '
                              'then lock to the winner (top-20%% analysis). Rechecks every '
@@ -996,6 +1309,14 @@ if __name__ == '__main__':
                         help='Trials before locking b_enable_trend (default: 50)')
     parser.add_argument('--trend-recheck', type=int, default=25,
                         help='Re-test opposite trend setting every N trials after lock (default: 25)')
+    parser.add_argument('--no-canary', action='store_true', default=False,
+                        help='Disable canary pre-screening of trials (runs full sim on every trial). '
+                             'Use when canary days are outside the study date range or for debugging.')
+    parser.add_argument('--no-median-prune', action='store_true', default=False,
+                        help='Use NopPruner instead of MedianPruner. Required for validation runs: '
+                             'MedianPruner is designed for optimization (comparing configs) and '
+                             'corrupts validation distributions by pruning unlucky day samples once '
+                             'a high-scoring trial exists. Always pass this for --validate-style runs.')
     args = parser.parse_args()
 
     # Load locked params from JSON file (keys starting with _ are metadata/comments)
@@ -1030,6 +1351,19 @@ if __name__ == '__main__':
                     pass
         locked[k] = v
 
+    # ── Cache-only mode: build full permissive cache then exit ───────────────
+    if args.build_cache_only:
+        if not args.cache_data:
+            print("ERROR: --build-cache-only requires --cache-data")
+            sys.exit(1)
+        build_permissive_cache(
+            start_date=args.start,
+            end_date=args.end,
+            cache_dir=args.cache_dir,
+            min_symbols=args.min_symbols,
+        )
+        sys.exit(0)
+
     run_optuna(
         start_date=args.start,
         end_date=args.end,
@@ -1053,4 +1387,7 @@ if __name__ == '__main__':
         stratified_sample=args.stratified_sample,
         days_per_week=args.days_per_week,
         min_symbols=args.min_symbols,
+        n_jobs=args.n_jobs,
+        canary_days=[] if args.no_canary else None,  # None = use CANARY_DAYS default
+        no_median_prune=args.no_median_prune,
     )

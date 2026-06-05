@@ -39,6 +39,10 @@ class ObjectiveParams:
     concentration_cap: float = 0.5 # hybrid: penalize when best_day/total_pnl exceeds this
     min_days: int = 5              # 'consistency': below this many days, shrink (thin sample)
     green_floor: float = 0.0       # 'consistency': green_rate below this zeroes the bonus
+    variance_penalty_k: float = 1.0  # 'consistency': subtract k * stdev(daily_pnls) from final
+                                     # score. Penalises wild day-to-day swings even when total P&L
+                                     # looks good (e.g. one $500 day + many -$5 days).  Set to 0
+                                     # to disable.
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────────
@@ -70,6 +74,15 @@ def green_day_rate(daily_pnls: list[float]) -> float:
     if not daily_pnls:
         return 0.0
     return sum(1 for d in daily_pnls if d > 0) / len(daily_pnls)
+
+
+def daily_std_dev(daily_pnls: list[float]) -> float:
+    """Sample standard deviation of daily P&Ls (ddof=1). Returns 0 if < 2 data points."""
+    n = len(daily_pnls)
+    if n < 2:
+        return 0.0
+    mean = sum(daily_pnls) / n
+    return math.sqrt(sum((d - mean) ** 2 for d in daily_pnls) / (n - 1))
 
 
 def downside_deviation(daily_pnls: list[float]) -> float:
@@ -163,6 +176,9 @@ def compute_objective(
     # base (dd-penalized $) scaled by green-day rate, payoff floor, and sample size.
     # Keeps the right tail (uses downside-only risk via the green-rate multiplier,
     # never subtracts up days). green_rate is the primary consistency lever.
+    # variance_penalty_k * stdev(daily_pnls) is subtracted from the final score:
+    # penalises configs that win big on a few days and chop/lose the rest, even if
+    # total P&L is positive (e.g. +$500 on day 1, -$5 every other day).
     pf = payoff_ratio(trade_pnls)
     payoff_factor = min(1.0, pf / p.target_payoff) if p.target_payoff > 0 else 1.0
     gr = green_day_rate(daily_pnls)
@@ -170,7 +186,10 @@ def compute_objective(
     base = total_pnl - p.dd_penalty * max_drawdown
     factor = (green_factor * payoff_factor) if base > 0 else 1.0
     days_factor = _sample_factor(len(daily_pnls), p.min_days)
-    return base * factor * _sample_factor(n_trades, min_trades) * days_factor
+    score = base * factor * _sample_factor(n_trades, min_trades) * days_factor
+    if p.variance_penalty_k > 0:
+        score -= p.variance_penalty_k * daily_std_dev(daily_pnls)
+    return score
 
 
 # ── Evaluation scheme: worst-fold / walk-forward ─────────────────────────────────
