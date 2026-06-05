@@ -806,14 +806,19 @@ def _make_objective(
             relative to the median of completed trials at the same step.
             The exception propagates through run_date_range to Optuna.
             """
-            from optimizer.objective_functions import compute_objective
+            from optimizer.objective_functions import compute_objective, ObjectiveParams
             try:
+                # Variance penalty is intentionally excluded from intermediate objectives:
+                # (1) partial daily_pnls has wrong std vs final, distorting the signal
+                # (2) MedianPruner needs a stable trajectory signal, not the final quality metric
+                # The final compute_objective in simulate_one.py applies k=1.0 (default).
                 intermediate_obj = compute_objective(
                     formula='consistency',
                     total_pnl=partial_metrics.get('total_pnl', 0.0),
                     max_drawdown=partial_metrics.get('max_drawdown', 0.0),
                     trade_pnls=partial_metrics.get('trade_pnls', []),
                     daily_pnls=partial_metrics.get('daily_pnls', []),
+                    params=ObjectiveParams(variance_penalty_k=0.0),
                 )
             except Exception:
                 intermediate_obj = -9999.0
