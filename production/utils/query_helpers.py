@@ -657,27 +657,44 @@ class StockDataDB:
     def get_trading_days(self, start_date, end_date):
         """
         Get list of trading days (days with data) between dates.
-        Checks both 1m and 1d tables so live-collected data is found
-        even before daily bars are written.
+
+        Strategy: try daily_gappers cache first (instant), then stock_candles_1d,
+        then stock_candles_1m as last resort. The 1m table DISTINCT scan is very
+        slow on large datasets so we avoid it when possible.
 
         Returns:
             List of dates
         """
         cursor = self.conn.cursor()
 
-        # Union both tables - 1m catches today's live data, 1d catches backfilled history
-        query = """
-            SELECT DISTINCT trade_date FROM (
-                SELECT time::date AS trade_date FROM stock_candles_1m
-                WHERE time >= %s::date AND time <= %s::date
-                UNION
-                SELECT time::date AS trade_date FROM stock_candles_1d
-                WHERE time >= %s::date AND time <= %s::date
-            ) combined
+        # 1) Try daily_gappers cache (fastest — already indexed by trade_date)
+        cursor.execute("""
+            SELECT DISTINCT trade_date FROM daily_gappers
+            WHERE trade_date >= %s::date AND trade_date <= %s::date
             ORDER BY trade_date
-        """
+        """, [start_date, end_date])
+        results = cursor.fetchall()
+        if results:
+            cursor.close()
+            return [row[0] for row in results]
 
-        cursor.execute(query, [start_date, end_date, start_date, end_date])
+        # 2) Fall back to stock_candles_1d (fast — much smaller than 1m)
+        cursor.execute("""
+            SELECT DISTINCT time::date AS trade_date FROM stock_candles_1d
+            WHERE time >= %s::date AND time <= %s::date
+            ORDER BY trade_date
+        """, [start_date, end_date])
+        results = cursor.fetchall()
+        if results:
+            cursor.close()
+            return [row[0] for row in results]
+
+        # 3) Last resort — 1m table (slow but catches live-only data)
+        cursor.execute("""
+            SELECT DISTINCT time::date AS trade_date FROM stock_candles_1m
+            WHERE time >= %s::date AND time <= %s::date
+            ORDER BY trade_date
+        """, [start_date, end_date])
         results = cursor.fetchall()
         cursor.close()
 
@@ -710,6 +727,258 @@ class StockDataDB:
         cursor.close()
 
         return [row[0] for row in results]
+
+
+    # ========================================================================
+    # GAPPER DISCOVERY (shared by scalp simulation + news backfill)
+    # ========================================================================
+
+    def find_gappers(self, trade_date, min_gap_pct: float = 10.0,
+                     max_price: float = 50.0, limit: int = 50):
+        """
+        Find stocks gapping up >= min_gap_pct on a given date.
+
+        Reads from the `daily_gappers` cache table (pre-computed, ~1-5ms).
+        Falls back to live computation from stock_candles_1d if cache miss.
+
+        This is the SINGLE SOURCE OF TRUTH for gapper discovery.
+        Used by scalp_simulation.py, backfill_news.py, and Optuna optimizer.
+
+        Args:
+            trade_date:   date or string 'YYYY-MM-DD'
+            min_gap_pct:  minimum gap % to qualify (default 10%)
+            max_price:    maximum stock price (default $50)
+            limit:        max candidates returned (default 50)
+
+        Returns:
+            List of dicts sorted by gap_pct DESC:
+            [{symbol, open_price, prior_close, gap_pct, daily_volume}, ...]
+        """
+        # Try cache first (fast path: ~1-5ms vs ~500ms-2s)
+        result = self._find_gappers_cached(trade_date, min_gap_pct, max_price, limit)
+        if result is not None:
+            return result
+
+        # Fallback: live computation (for dates not yet in cache)
+        return self._find_gappers_live(trade_date, min_gap_pct, max_price, limit)
+
+    def _find_gappers_cached(self, trade_date, min_gap_pct, max_price, limit):
+        """Read from daily_gappers cache table. Returns None on cache miss."""
+        cursor = self.conn.cursor()
+
+        # Check if this date exists in cache
+        cursor.execute(
+            "SELECT COUNT(*) FROM daily_gappers WHERE trade_date = %s::date",
+            [trade_date],
+        )
+        count = cursor.fetchone()[0]
+        if count == 0:
+            cursor.close()
+            return None  # cache miss — caller will use live path
+
+        query = """
+            SELECT symbol, open_price, prior_close, gap_pct, daily_volume
+            FROM daily_gappers
+            WHERE trade_date = %s::date
+              AND gap_pct >= %s
+              AND open_price <= %s
+            ORDER BY gap_pct DESC
+            LIMIT %s
+        """
+        cursor.execute(query, [trade_date, min_gap_pct, max_price, limit])
+        rows = cursor.fetchall()
+        cursor.close()
+
+        return [
+            {
+                'symbol': row[0],
+                'open_price': float(row[1]),
+                'prior_close': float(row[2]),
+                'gap_pct': float(row[3]),
+                'daily_volume': int(row[4]),
+            }
+            for row in rows
+        ]
+
+    def _find_gappers_live(self, trade_date, min_gap_pct, max_price, limit):
+        """Compute gappers from stock_candles_1d (slow path, for uncached dates)."""
+        cursor = self.conn.cursor()
+
+        query = """
+            WITH today AS (
+                SELECT symbol, open, high, close, volume
+                FROM stock_candles_1d
+                WHERE time::date = %s::date
+                  AND open > 0
+            ),
+            yesterday AS (
+                SELECT DISTINCT ON (symbol) symbol, close AS prior_close
+                FROM stock_candles_1d
+                WHERE time::date < %s::date
+                ORDER BY symbol, time DESC
+            )
+            SELECT
+                t.symbol,
+                t.open AS open_price,
+                y.prior_close,
+                CASE WHEN y.prior_close > 0
+                     THEN ((t.open - y.prior_close) / y.prior_close * 100)
+                     ELSE 0 END AS gap_pct,
+                t.volume
+            FROM today t
+            JOIN yesterday y ON t.symbol = y.symbol
+            WHERE y.prior_close > 0
+              AND t.open > 0
+              AND t.open <= %s
+              AND ((t.open - y.prior_close) / y.prior_close * 100) >= %s
+            ORDER BY gap_pct DESC
+            LIMIT %s
+        """
+
+        cursor.execute(query, [trade_date, trade_date, max_price, min_gap_pct, limit])
+        rows = cursor.fetchall()
+        cursor.close()
+
+        return [
+            {
+                'symbol': row[0],
+                'open_price': float(row[1]),
+                'prior_close': float(row[2]),
+                'gap_pct': float(row[3]),
+                'daily_volume': int(row[4]),
+            }
+            for row in rows
+        ]
+
+    def refresh_daily_gappers(self, trade_date, min_gap_pct: float = 5.0):
+        """
+        Recompute and cache daily_gappers for a single date.
+        Used for backfilling new dates or refreshing stale data.
+        Stores all gappers >= min_gap_pct (default 5%) so Optuna can
+        tune the threshold without re-caching.
+        """
+        gappers = self._find_gappers_live(trade_date, min_gap_pct, max_price=9999, limit=9999)
+        if not gappers:
+            return 0
+
+        cursor = self.conn.cursor()
+        inserted = 0
+        for g in gappers:
+            cursor.execute("""
+                INSERT INTO daily_gappers
+                    (trade_date, symbol, open_price, prior_close, gap_pct, daily_volume)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (trade_date, symbol) DO NOTHING
+            """, [
+                trade_date, g['symbol'], g['open_price'],
+                g['prior_close'], g['gap_pct'], g['daily_volume'],
+            ])
+            inserted += 1
+        self.conn.commit()
+        cursor.close()
+        return inserted
+
+    # ========================================================================
+    # NEWS QUERIES (for Opening Bell Scalp strategy)
+    # ========================================================================
+
+    def get_news_for_symbol(self, symbol, before_time, hours_back=24):
+        """
+        Get cached news articles for a symbol in a time window.
+
+        Args:
+            symbol:      Stock ticker
+            before_time: Upper bound (datetime, tz-aware)
+            hours_back:  How many hours before before_time to search
+
+        Returns:
+            List of dicts with headline, source, created_at, news_tier, etc.
+        """
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        start_time = before_time - timedelta(hours=hours_back)
+
+        query = """
+            SELECT symbol, headline, source, created_at, summary, url,
+                   symbol_count, is_specific, news_tier
+            FROM stock_news
+            WHERE symbol = %s
+              AND created_at >= %s
+              AND created_at <= %s
+            ORDER BY created_at DESC
+        """
+        cursor.execute(query, [symbol, start_time, before_time])
+        results = [dict(row) for row in cursor.fetchall()]
+        cursor.close()
+        return results
+
+    def get_news_tier(self, symbol, before_time, hours_back=24):
+        """
+        Get the best news tier for a symbol in a time window.
+        Returns the highest-quality tier found: tier1 > tier2 > tier3 > presence > none.
+        """
+        articles = self.get_news_for_symbol(symbol, before_time, hours_back)
+        if not articles:
+            return 'none'
+
+        tier_priority = {'tier1': 0, 'tier2': 1, 'tier3': 2, 'presence': 3, 'none': 4}
+        best = min(articles, key=lambda a: tier_priority.get(a.get('news_tier', 'none'), 4))
+        return best.get('news_tier', 'none')
+
+    def insert_news_batch(self, articles):
+        """
+        Batch-insert news articles into stock_news table.
+        Skips duplicates via ON CONFLICT.
+
+        Args:
+            articles: List of dicts with keys: symbol, headline, source,
+                     created_at, summary, url, symbol_count, is_specific, news_tier
+        """
+        if not articles:
+            return 0
+
+        cursor = self.conn.cursor()
+        inserted = 0
+        for a in articles:
+            try:
+                cursor.execute("""
+                    INSERT INTO stock_news
+                        (symbol, headline, source, created_at, summary, url,
+                         symbol_count, is_specific, news_tier)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (symbol, headline, created_at) DO NOTHING
+                """, [
+                    a['symbol'], a['headline'], a.get('source'),
+                    a['created_at'], a.get('summary'), a.get('url'),
+                    a.get('symbol_count'), a.get('is_specific'),
+                    a.get('news_tier', 'none'),
+                ])
+                inserted += 1
+            except Exception:
+                self.conn.rollback()
+                continue
+        self.conn.commit()
+        cursor.close()
+        return inserted
+
+    def get_news_coverage_stats(self, start_date, end_date):
+        """Get news coverage stats for a date range. Useful for backfill monitoring."""
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        query = """
+            SELECT
+                created_at::date AS news_date,
+                COUNT(*) AS article_count,
+                COUNT(DISTINCT symbol) AS symbol_count,
+                COUNT(*) FILTER (WHERE news_tier IN ('tier1', 'tier2')) AS catalyst_count
+            FROM stock_news
+            WHERE created_at >= %s::date
+              AND created_at < %s::date + INTERVAL '1 day'
+            GROUP BY created_at::date
+            ORDER BY news_date
+        """
+        cursor.execute(query, [start_date, end_date])
+        results = [dict(row) for row in cursor.fetchall()]
+        cursor.close()
+        return results
 
 
 # ============================================================================
