@@ -131,11 +131,23 @@ class LiveScalpRunner:
             self._load_env(env_path)
 
         # Connect broker + data feed
-        if not dry_run:
-            self.broker = Config.get_broker()
-            self.data_feed = Config.get_data_feed()
+        # Paper mode: force sandbox=True on BOTH broker and data feed
+        # so quotes, bars, and fills are all 15-min delayed uniformly.
+        # At 9:45 wall clock you see 9:30 data and fill at 9:30 prices.
+        if not live:
+            from trading.broker.tradier import TradierBroker, TradierDataFeed
+            token = Config.TRADIER_PAPER_TOKEN
+            acct = Config.TRADIER_ACCOUNT_ID
+            if not dry_run:
+                self.broker = TradierBroker(token=token, account_id=acct, sandbox=True)
+            else:
+                self.broker = None
+            self.data_feed = TradierDataFeed(token=token, sandbox=True)
         else:
-            self.broker = None
+            if not dry_run:
+                self.broker = Config.get_broker()
+            else:
+                self.broker = None
             self.data_feed = Config.get_data_feed()
 
         # News fetcher (Alpaca -- free tier)
@@ -333,7 +345,7 @@ class LiveScalpRunner:
         # Start bar poller for this symbol
         from trading.broker.tradier import TradierBarPoller
         poller = TradierBarPoller(
-            token=Config.TRADIER_TOKEN,
+            token=Config.TRADIER_PAPER_TOKEN if not self.live else Config.TRADIER_PRODUCTION_TOKEN,
             sandbox=not self.live,
             bar_queue=self._bar_queue,
         )
