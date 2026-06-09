@@ -1,0 +1,28 @@
+# Render Blueprint — deploy via https://dashboard.render.com
+# Docs: https://docs.render.com/blueprint-spec
+
+services:
+  - type: web
+    name: jtrader-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    rootDir: production
+    plan: free
+    region: ohio  # US East — closest to NYSE
+    healthCheckPath: /health
+    envVars:
+      - key: BROKER
+        value: tradier
+      - key: TRADIER_PAPER_TOKEN
+        sync: false  # Set manually in Render dashboard
+      - key: TRADIER_ACCOUNT_ID
+        sync: false
+      - key: APCA_API_KEY_ID
+        sync: false
+      - key: APCA_API_SECRET_KEY
+        sync: false
+      - key: APCA_API_BASE_URL
+        value: https://api.alpaca.markets
+      - key: JTRADER_STATE_DIR
+        value: /tmp/jtrader

@@ -216,8 +216,7 @@ class LiveScalpRunner:
         logger.info(f"Found {len(gappers)} gappers >= {self.config.min_gap_pct:.1f}%")
 
         if not gappers:
-            logger.warning("No gappers found. No trade today.")
-            self.state.trade_done = True
+            logger.warning("No gappers found this scan.")
             return
 
         # Step 3: Enrich top 20 with news + fundamentals
@@ -234,8 +233,7 @@ class LiveScalpRunner:
             filtered.append(g)
 
         if not filtered:
-            logger.warning("No gappers passed news filter. No trade today.")
-            self.state.trade_done = True
+            logger.warning("No gappers passed news filter this scan.")
             return
 
         # Step 5: Rank and pick #1
@@ -564,20 +562,61 @@ class LiveScalpRunner:
         logger.info("Market open!")
 
     def _load_symbols(self) -> list[str]:
-        """Load tradable symbol list."""
-        paths = [
-            os.path.join(os.path.dirname(__file__), '..', 'services', 'stocks_in_price_range.txt'),
-            os.path.join(os.path.dirname(__file__), '..', '..', 'database', 'stocks_1_to_20.txt'),
-        ]
-        for p in paths:
-            if os.path.exists(p):
-                with open(p) as f:
-                    symbols = [line.strip() for line in f if line.strip()]
-                logger.info(f"Loaded {len(symbols):,} symbols from {os.path.basename(p)}")
-                return symbols
+        """Fetch fresh US stock universe from NASDAQ, then filter by live price."""
+        symbols = self._fetch_nasdaq_symbols()
+        if not symbols:
+            # Fallback to static file
+            paths = [
+                os.path.join(os.path.dirname(__file__), '..', 'services', 'stocks_in_price_range.txt'),
+                os.path.join(os.path.dirname(__file__), '..', '..', 'database', 'stocks_1_to_20.txt'),
+            ]
+            for p in paths:
+                if os.path.exists(p):
+                    with open(p) as f:
+                        symbols = [line.strip() for line in f if line.strip()]
+                    logger.warning(f"Using static fallback: {len(symbols):,} symbols from {os.path.basename(p)}")
+                    break
 
-        logger.warning("No symbol file found. Using empty list.")
-        return []
+        if not symbols:
+            logger.warning("No symbols available.")
+            return []
+
+        # Live-filter: keep only symbols with price $0.50-$30
+        if self.data_feed:
+            logger.info(f"Fetching live quotes for {len(symbols):,} symbols to filter by price...")
+            quotes = self.data_feed.get_quotes(symbols)
+            alive = [s for s, q in quotes.items() if 0.50 <= q.last <= 30.0]
+            logger.info(f"Live universe: {len(alive):,} stocks in $0.50-$30 range")
+            return alive
+
+        return symbols
+
+    @staticmethod
+    def _fetch_nasdaq_symbols() -> list[str]:
+        """Fetch full US stock list from NASDAQ trader (updated daily, free)."""
+        import requests as req
+        url = 'https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqtraded.txt'
+        try:
+            r = req.get(url, timeout=15)
+            r.raise_for_status()
+            lines = r.text.strip().split('\n')
+            symbols = []
+            for line in lines[1:-1]:  # skip header + footer
+                parts = line.split('|')
+                if len(parts) < 8:
+                    continue
+                sym = parts[1]
+                is_etf = parts[5] == 'Y'
+                is_test = parts[7] == 'Y'
+                # Keep non-ETF, non-test, normal ticker symbols
+                if (not is_etf and not is_test and sym and ' ' not in sym
+                        and '$' not in sym and '.' not in sym and len(sym) <= 5):
+                    symbols.append(sym)
+            logger.info(f"Fetched {len(symbols):,} symbols from NASDAQ trader")
+            return symbols
+        except Exception as e:
+            logger.warning(f"Failed to fetch NASDAQ symbol list: {e}")
+            return []
 
     def _load_env(self, path: str):
         """Load .env file into os.environ."""
@@ -636,8 +675,26 @@ def run_scalp_session(dry_run=False, live=False, start_time='9:00'):
         logger.info(f"Waiting {wait:.0f}s until {start_time} ET to start scanning...")
         time.sleep(wait)
 
-    # Phase 1: Premarket scan
-    runner.scan_premarket()
+    # Phase 1: Premarket scan — rescan every 5 min until 9:25
+    scan_cutoff = now.replace(hour=9, minute=25, second=0, microsecond=0)
+    scan_interval = 300  # 5 minutes
+
+    while True:
+        runner.state.trade_done = False  # reset for rescan
+        runner.scan_premarket()
+
+        if runner.state.candidates:
+            break  # found gappers, proceed
+
+        now = datetime.now(ET)
+        if now >= scan_cutoff:
+            logger.info("9:25 ET reached, no gappers found. No trade today.")
+            runner.state.trade_done = True
+            break
+
+        next_scan = min(scan_interval, (scan_cutoff - now).total_seconds())
+        logger.info(f"Rescanning in {next_scan:.0f}s...")
+        time.sleep(next_scan)
 
     if not runner.state.trade_done:
         # Refresh at 9:25

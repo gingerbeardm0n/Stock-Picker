@@ -513,7 +513,7 @@ def backfill_daily_bars(symbols, trading_days: list[date_type], batch_num, total
         batch_start = time.time()
 
         logger.info(f"Fetching daily bars for {len(symbols):,} symbols "
-                    f"({trading_days[0]} → {trading_days[-1]})...")
+                    f"({trading_days[0]} -> {trading_days[-1]})...")
         request = StockBarsRequest(
             symbol_or_symbols=symbols,
             timeframe=TimeFrame.Day,
@@ -774,15 +774,15 @@ Prerequisite for minute/hour bars:
             end_date   = datetime.strptime(end_str, '%Y-%m-%d').date() if end_str else today
 
     trading_days = get_trading_days(start_date, end_date)
-    logger.info(f"Date range: {start_date} → {end_date}  ({len(trading_days)} trading days)")
+    logger.info(f"Date range: {start_date} -> {end_date}  ({len(trading_days)} trading days)")
 
     # ── What to backfill ───────────────────────────────────────────────────────
     if args.type:
         backfill_choice = {'1min': '1', 'hour': '2', 'daily': '3', 'all': '4'}[args.type]
     else:
         print("\nSelect what to backfill:")
-        print("  1. Minute bars only (8am-12pm → stock_candles_1m)")
-        print("  2. Hour bars only   (4am-8am  → stock_candles_1h)")
+        print("  1. Minute bars only (8am-12pm -> stock_candles_1m)")
+        print("  2. Hour bars only   (4am-8am  -> stock_candles_1h)")
         print("  3. Daily bars only             (stock_candles_1d)")
         print("  4. All three (recommended)")
         backfill_choice = input("\nEnter choice (1/2/3/4): ").strip()

@@ -115,22 +115,47 @@ def get_all_tradable_symbols() -> list[str]:
     This list is stable (exchange membership doesn't change daily) so we
     only need to call it once per run.
     """
-    logger.info("Fetching full symbol universe from Alpaca (one-time call)...")
-    client = TradingClient(
-        Config.ALPACA_API_KEY,
-        Config.ALPACA_SECRET_KEY,
-        paper=(Config.TRADING_MODE == 'PAPER'),
-    )
-    assets = client.get_all_assets()
-    tradable = [
-        a.symbol for a in assets
-        if a.tradable
-        and a.status == 'active'
-        and a.exchange in ('NASDAQ', 'NYSE', 'ARCA', 'AMEX')
-        and a.asset_class == 'us_equity'
-    ]
-    logger.info(f"Universe: {len(tradable):,} symbols")
-    return tradable
+    # Try Alpaca Trading API first, fall back to NASDAQ trader FTP
+    try:
+        logger.info("Fetching full symbol universe from Alpaca (one-time call)...")
+        client = TradingClient(
+            Config.ALPACA_API_KEY,
+            Config.ALPACA_SECRET_KEY,
+            paper=(Config.TRADING_MODE == 'PAPER'),
+        )
+        assets = client.get_all_assets()
+        tradable = [
+            a.symbol for a in assets
+            if a.tradable
+            and a.status == 'active'
+            and a.exchange in ('NASDAQ', 'NYSE', 'ARCA', 'AMEX')
+            and a.asset_class == 'us_equity'
+        ]
+        logger.info(f"Universe: {len(tradable):,} symbols (Alpaca)")
+        return tradable
+    except Exception as e:
+        logger.warning(f"Alpaca assets fetch failed: {e}")
+        logger.info("Falling back to NASDAQ trader FTP for symbol universe...")
+        try:
+            r = requests.get('https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqtraded.txt', timeout=15)
+            r.raise_for_status()
+            lines = r.text.strip().split('\n')
+            symbols = []
+            for line in lines[1:-1]:
+                parts = line.split('|')
+                if len(parts) < 8:
+                    continue
+                sym = parts[1]
+                is_etf = parts[5] == 'Y'
+                is_test = parts[7] == 'Y'
+                if (not is_etf and not is_test and sym and ' ' not in sym
+                        and '$' not in sym and '.' not in sym and len(sym) <= 5):
+                    symbols.append(sym)
+            logger.info(f"Universe: {len(symbols):,} symbols (NASDAQ FTP)")
+            return symbols
+        except Exception as e2:
+            logger.error(f"NASDAQ FTP also failed: {e2}")
+            return []
 
 
 def fetch_price_range_from_api(

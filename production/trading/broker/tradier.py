@@ -142,12 +142,15 @@ class TradierBroker(BrokerInterface):
         r = self._session.get(url, timeout=10)
         r.raise_for_status()
         balances = r.json()['balances']
-        # Cash account → balances.cash.cash_available
-        # Margin account → balances.margin.buying_power
+        # Best source: total_equity (works for both cash and margin accounts)
+        if balances.get('total_equity'):
+            return float(balances['total_equity'])
+        # Fallback: cash account
         if 'cash' in balances and isinstance(balances['cash'], dict):
             return float(balances['cash'].get('cash_available', 0.0))
+        # Fallback: margin account (stock_buying_power, not 'buying_power')
         if 'margin' in balances and isinstance(balances['margin'], dict):
-            return float(balances['margin'].get('buying_power', 0.0))
+            return float(balances['margin'].get('stock_buying_power', 0.0))
         return float(balances.get('total_cash', 0.0))
 
     def get_position(self, symbol: str) -> Optional[PositionResult]:

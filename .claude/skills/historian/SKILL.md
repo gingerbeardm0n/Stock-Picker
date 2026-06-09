@@ -45,8 +45,37 @@ to do the git-log read + file-tree audit and return the updates, then apply them
 `docs/PROJECT_HISTORY.md` in the main thread. (This is an explicitly authorized agent — it does not
 violate the "no unprompted parallel agents" rule.) For a small delta, just do it inline.
 
+## Step 7: Data Sources & API audit
+
+Maintain `docs/DATA_SOURCES.md` alongside the project history. On each run:
+
+1. **Check for API/credential changes.** Scan recent commits and env files for new or changed
+   API keys, endpoints, or data source configs. Update the "Active Sources" section.
+2. **Record backfill events.** If any backfill script ran since the last watermark (check
+   `*_progress.json` timestamps, git log mentions of "backfill"), add a row to "Backfill History"
+   with date, range, source, script, and notes.
+3. **Update DB coverage.** Query latest timestamps from key tables (`stock_candles_1m`,
+   `stock_candles_1d`, `stock_news`, `daily_gappers`, `rel_vol_cum_cache`) and update the
+   "DB Coverage" table.
+4. **Record lessons learned.** If the session involved debugging a data source issue (key died,
+   wrong tier, API changed), add a numbered entry to "Lessons Learned" so future sessions
+   can look it up instead of re-debugging.
+
+The goal: any future session should be able to read `DATA_SOURCES.md` and know exactly what
+APIs are active, what keys to use, what data we have, and what pitfalls to avoid.
+
+### What to track in DATA_SOURCES.md
+- API name, tier/plan, what it provides (and what it does NOT)
+- Env var names and which `.env` file they live in
+- Rate limits
+- Last verified working date
+- Key history (which key was used when, why it changed)
+- Scripts that depend on each source
+- Known gotchas / lessons learned
+
 ## Hard rules
 - **Never delete or move files** — the custodian only *flags*. Deletions are the user's call.
 - Keep `PROJECT_HISTORY.md` append-mostly: never rewrite history, only add + update statuses.
+- Keep `DATA_SOURCES.md` current: update on every run, don't let it go stale.
 - One Timeline entry per commit (or per logical group); keep "why" to one line.
 - If unsure whether something is deprecated vs active, mark it `unknown — verify` and flag it.
