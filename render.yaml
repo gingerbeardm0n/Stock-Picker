@@ -26,3 +26,5 @@ services:
         value: https://api.alpaca.markets
       - key: JTRADER_STATE_DIR
         value: /tmp/jtrader
+      - key: JTRADER_API_KEY
+        sync: false  # Set manually in Render dashboard

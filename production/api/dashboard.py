@@ -21,8 +21,9 @@ from collections import deque
 from datetime import datetime, date
 from pathlib import Path
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -52,6 +53,22 @@ if _root.level > logging.INFO:
     _root.setLevel(logging.INFO)
 
 app = FastAPI(title="jTrader API", version="1.0")
+
+# API key auth — all endpoints except /health require X-API-Key header
+_API_KEY = os.getenv("JTRADER_API_KEY", "")
+_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json"}
+
+
+@app.middleware("http")
+async def check_api_key(request: Request, call_next):
+    if not _API_KEY:
+        return await call_next(request)
+    if request.url.path in _PUBLIC_PATHS:
+        return await call_next(request)
+    key = request.headers.get("X-API-Key", "")
+    if key != _API_KEY:
+        return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
+    return await call_next(request)
 
 app.add_middleware(
     CORSMiddleware,
