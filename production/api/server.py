@@ -104,7 +104,7 @@ def main():
         _run_scalp_and_save_state,
         CronTrigger(
             day_of_week='mon-fri',
-            hour=13, minute=55,  # 8:55 AM ET = 13:55 UTC (EST+5, EDT+4)
+            hour=8, minute=55,  # 8:55 AM ET
             timezone='US/Eastern',
         ),
         id='daily_scalp',
