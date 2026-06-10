@@ -186,9 +186,37 @@ def get_logs(n: int = Query(default=100, le=500)):
 def trigger_session():
     """Manually trigger a scalp session (runs in background thread)."""
     import threading
-    from api.server import _run_scalp_and_save_state
 
-    t = threading.Thread(target=_run_scalp_and_save_state, daemon=True)
+    def _run():
+        logger.info("=== MANUAL TRIGGER: SCALP SESSION STARTING ===")
+        try:
+            from trading.live_scalp_runner import run_scalp_session
+            state = run_scalp_session(dry_run=False, live=False)
+
+            state_data = {
+                "last_run": datetime.utcnow().isoformat(),
+                "last_result": "trade" if getattr(state, 'trade_placed', False) else "no_trade",
+                "date": str(datetime.now().date()),
+                "candidates": getattr(state, 'candidates', []),
+                "top_pick": getattr(state, 'top_pick', None),
+                "scanned_at": getattr(state, 'scanned_at', None),
+                "has_position": getattr(state, 'has_position', False),
+                "position_symbol": getattr(state, 'position_symbol', None),
+                "entry_price": getattr(state, 'entry_price', None),
+                "pnl": getattr(state, 'pnl', None),
+                "trade_done": getattr(state, 'trade_done', False),
+            }
+            STATE_FILE.write_text(json.dumps(state_data, default=str))
+            logger.info(f"=== MANUAL SESSION COMPLETE: {state_data['last_result']} ===")
+        except Exception as e:
+            logger.error(f"Manual scalp session failed: {e}", exc_info=True)
+            STATE_FILE.write_text(json.dumps({
+                "last_run": datetime.utcnow().isoformat(),
+                "last_result": "error",
+                "error": str(e),
+            }))
+
+    t = threading.Thread(target=_run, daemon=True)
     t.start()
-    logger.info("Manual trigger: scalp session started via /trigger endpoint")
+    logger.info("Manual trigger: scalp session kicked off")
     return {"triggered": True, "message": "Scalp session started in background"}
