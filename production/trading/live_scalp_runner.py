@@ -677,7 +677,7 @@ def run_scalp_session(dry_run=False, live=False, start_time='9:00'):
 
     # Phase 1: Premarket scan — rescan every 5 min until 9:25
     scan_cutoff = now.replace(hour=9, minute=25, second=0, microsecond=0)
-    scan_interval = 300  # 5 minutes
+    scan_interval = 60  # 1 minute
 
     while True:
         runner.state.trade_done = False  # reset for rescan
