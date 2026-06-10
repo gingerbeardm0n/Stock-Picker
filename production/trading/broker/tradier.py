@@ -420,6 +420,7 @@ class TradierBarPoller:
         bar_queue: queue.Queue | None = None,
     ):
         self._feed       = TradierDataFeed(token, sandbox=sandbox)
+        self._sandbox    = sandbox
         self._bar_queue  = bar_queue or queue.Queue(maxsize=10_000)
         self._watchlist: set[str] = set()
         self._lock       = threading.Lock()
@@ -493,6 +494,9 @@ class TradierBarPoller:
         Push bars not yet seen to bar_queue (symbol key added to the dict).
         """
         now_et = datetime.now(pytz.UTC).astimezone(ET)
+        # Sandbox data is 15-min delayed — query 15 min in the past
+        if self._sandbox:
+            now_et = now_et - timedelta(minutes=15)
 
         with self._lock:
             symbols = list(self._watchlist)
@@ -505,7 +509,7 @@ class TradierBarPoller:
             try:
                 bar = self._feed.get_latest_bar(symbol, as_of_et=now_et)
             except Exception as e:
-                logger.debug(f"get_latest_bar({symbol}) failed: {e}")
+                logger.warning(f"get_latest_bar({symbol}) failed: {e}")
                 continue
 
             if bar is None:
@@ -527,8 +531,7 @@ class TradierBarPoller:
             except queue.Full:
                 logger.warning(f"Bar queue full — dropping bar for {symbol}")
 
-        if pushed > 0:
-            logger.debug(
-                f"TradierBarPoller: pushed {pushed}/{len(symbols)} bars "
-                f"at {now_et.strftime('%H:%M:%S')}"
-            )
+        logger.info(
+            f"TradierBarPoller: pushed {pushed}/{len(symbols)} bars "
+            f"at {now_et.strftime('%H:%M:%S')} ({'delayed' if self._sandbox else 'live'})"
+        )

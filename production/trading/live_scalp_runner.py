@@ -351,7 +351,7 @@ class LiveScalpRunner:
         poller_thread = threading.Thread(target=poller.start, daemon=True)
         poller_thread.start()
 
-        # Wait for 9:30 market open
+        # Wait for 9:30 market open (sandbox: wait for 9:45 wall clock = 9:30 delayed)
         self._wait_for_market_open()
 
         # Process bars
@@ -360,7 +360,7 @@ class LiveScalpRunner:
 
         while not self.state.trade_done:
             try:
-                bar = self._bar_queue.get(timeout=90)  # 90s timeout
+                bar = self._bar_queue.get(timeout=180)  # 3 min timeout (sandbox bars arrive slowly)
             except queue.Empty:
                 logger.warning("No bar received in 90s -- timeout")
                 break
@@ -549,17 +549,26 @@ class LiveScalpRunner:
     # ── Helpers ──────────────────────────────────────────────────────────────
 
     def _wait_for_market_open(self):
-        """Sleep until 9:30 AM ET."""
+        """Sleep until market open bars are available.
+
+        Live: wait until 9:30 AM ET.
+        Sandbox: wait until 9:45 AM ET (9:30 + 15-min delay).
+        """
         now = datetime.now(ET)
-        market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
-        if now >= market_open:
-            logger.info("Market already open.")
+        if self.live:
+            target = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        else:
+            target = now.replace(hour=9, minute=45, second=0, microsecond=0)
+
+        if now >= target:
+            logger.info(f"Market {'open' if self.live else 'open (delayed)'} — bars available.")
             return
 
-        wait = (market_open - now).total_seconds()
-        logger.info(f"Waiting {wait:.0f}s for market open (9:30 AM ET)...")
+        wait = (target - now).total_seconds()
+        label = "9:30 AM ET" if self.live else "9:45 AM ET (sandbox 15-min delay)"
+        logger.info(f"Waiting {wait:.0f}s for {label}...")
         time.sleep(wait)
-        logger.info("Market open!")
+        logger.info("Market open — bars available!")
 
     def _load_symbols(self) -> list[str]:
         """Fetch fresh US stock universe from NASDAQ, then filter by live price."""
