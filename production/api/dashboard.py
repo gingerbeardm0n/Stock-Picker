@@ -17,10 +17,11 @@ import os
 import sys
 import json
 import logging
+from collections import deque
 from datetime import datetime, date
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -29,6 +30,23 @@ from config import Config
 from trading.scalp_models import ScalpConfig
 
 logger = logging.getLogger(__name__)
+
+# In-memory log ring buffer (last 500 lines) — survives Render's ephemeral log window
+_LOG_BUFFER: deque[dict] = deque(maxlen=500)
+
+
+class _BufferHandler(logging.Handler):
+    def emit(self, record):
+        _LOG_BUFFER.append({
+            "t": self.format(record)[:19],
+            "level": record.levelname,
+            "msg": record.getMessage(),
+        })
+
+
+_handler = _BufferHandler()
+_handler.setFormatter(logging.Formatter('%(asctime)s', datefmt='%Y-%m-%d %H:%M:%S'))
+logging.getLogger().addHandler(_handler)
 
 app = FastAPI(title="jTrader API", version="1.0")
 
@@ -146,6 +164,7 @@ def get_status():
     return {
         "last_run": state.get("last_run"),
         "last_result": state.get("last_result"),
+        "error": state.get("error"),
         "config": {
             "min_gap_pct": state.get("min_gap_pct", 11.65),
             "entry_mode": state.get("entry_mode", "first_green"),
@@ -154,3 +173,10 @@ def get_status():
         "mode": "paper",
         "server_time": datetime.utcnow().isoformat(),
     }
+
+
+@app.get("/logs")
+def get_logs(n: int = Query(default=100, le=500)):
+    """Return last N log lines from in-memory buffer."""
+    entries = list(_LOG_BUFFER)[-n:]
+    return {"count": len(entries), "logs": entries}

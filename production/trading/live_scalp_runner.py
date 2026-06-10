@@ -539,7 +539,7 @@ class LiveScalpRunner:
                     c['has_news'] = False
                     c['news_tier'] = 'none'
             except Exception as e:
-                logger.debug(f"News fetch failed for {c['symbol']}: {e}")
+                logger.warning(f"News fetch failed for {c['symbol']}: {e}")
                 c['has_news'] = False
                 c['news_tier'] = 'none'
 
