@@ -384,7 +384,7 @@ class LiveScalpRunner:
                 # Try entry
                 entry = evaluate_entry(
                     candidate=self.state.top_pick,
-                    bar=bar,
+                    current_bar=bar,
                     premarket_high=premarket_high,
                     bars_since_open=bars_since_open,
                     config=self.config,
@@ -404,7 +404,7 @@ class LiveScalpRunner:
                 exit_signal = evaluate_exit(
                     entry_price=self.state.entry_price,
                     highest_since_entry=self.state.highest_since_entry,
-                    bar=bar,
+                    current_bar=bar,
                     bars_held=self.state.bars_held,
                     config=self.config,
                 )
