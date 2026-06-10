@@ -46,7 +46,10 @@ class _BufferHandler(logging.Handler):
 
 _handler = _BufferHandler()
 _handler.setFormatter(logging.Formatter('%(asctime)s', datefmt='%Y-%m-%d %H:%M:%S'))
-logging.getLogger().addHandler(_handler)
+_root = logging.getLogger()
+_root.addHandler(_handler)
+if _root.level > logging.INFO:
+    _root.setLevel(logging.INFO)
 
 app = FastAPI(title="jTrader API", version="1.0")
 
@@ -188,6 +191,7 @@ def trigger_session():
     import threading
 
     def _run():
+        import traceback as _tb
         logger.info("=== MANUAL TRIGGER: SCALP SESSION STARTING ===")
         try:
             from trading.live_scalp_runner import run_scalp_session
@@ -209,11 +213,12 @@ def trigger_session():
             STATE_FILE.write_text(json.dumps(state_data, default=str))
             logger.info(f"=== MANUAL SESSION COMPLETE: {state_data['last_result']} ===")
         except Exception as e:
-            logger.error(f"Manual scalp session failed: {e}", exc_info=True)
+            tb_str = _tb.format_exc()
+            logger.error(f"Manual scalp session failed: {e}\n{tb_str}")
             STATE_FILE.write_text(json.dumps({
                 "last_run": datetime.utcnow().isoformat(),
                 "last_result": "error",
-                "error": str(e),
+                "error": f"{e}\n{tb_str}",
             }))
 
     t = threading.Thread(target=_run, daemon=True)
