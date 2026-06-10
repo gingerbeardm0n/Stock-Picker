@@ -180,3 +180,15 @@ def get_logs(n: int = Query(default=100, le=500)):
     """Return last N log lines from in-memory buffer."""
     entries = list(_LOG_BUFFER)[-n:]
     return {"count": len(entries), "logs": entries}
+
+
+@app.post("/trigger")
+def trigger_session():
+    """Manually trigger a scalp session (runs in background thread)."""
+    import threading
+    from api.server import _run_scalp_and_save_state
+
+    t = threading.Thread(target=_run_scalp_and_save_state, daemon=True)
+    t.start()
+    logger.info("Manual trigger: scalp session started via /trigger endpoint")
+    return {"triggered": True, "message": "Scalp session started in background"}
