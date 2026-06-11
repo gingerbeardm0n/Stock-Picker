@@ -203,6 +203,8 @@ class LiveScalpRunner:
 
             if gap_pct < self.config.min_gap_pct:
                 continue
+            if gap_pct > 1000:
+                continue  # bad quote (sandbox sometimes returns garbage prev_close)
             if q.last > self.config.max_price:
                 continue
 
@@ -365,16 +367,29 @@ class LiveScalpRunner:
             try:
                 bar = self._bar_queue.get(timeout=180)  # 3 min timeout (sandbox bars arrive slowly)
             except queue.Empty:
-                logger.warning("No bar received in 90s -- timeout")
+                logger.warning("No bar received in 180s -- timeout")
+                if self.state.in_position:
+                    logger.warning("Timeout while IN POSITION — placing market exit")
+                    self._place_exit(symbol, {'close': self.state.entry_price},
+                                     {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'})
                 break
 
             if bar.get('symbol') != symbol:
                 continue
 
-            bars_since_open += 1
             bar_time = bar.get('time', datetime.now(ET))
             if isinstance(bar_time, str):
                 bar_time = datetime.fromisoformat(bar_time)
+
+            # Skip premarket bars (poller uses session_filter='all'): they must
+            # not count as bars_since_open or trigger first_green entries.
+            bar_et = bar_time.astimezone(ET) if hasattr(bar_time, 'astimezone') else None
+            if bar_et is not None and (bar_et.hour < 9 or (bar_et.hour == 9 and bar_et.minute < 30)):
+                logger.info(f"  Premarket bar {bar_et.strftime('%H:%M')} "
+                            f"C={bar['close']:.2f} V={bar.get('volume', 0):,} — data flowing, skipping")
+                continue
+
+            bars_since_open += 1
 
             logger.info(
                 f"  Bar {bars_since_open}: "
@@ -687,23 +702,23 @@ def run_scalp_session(dry_run=False, live=False, start_time='9:00'):
         logger.info(f"Waiting {wait:.0f}s until {start_time} ET to start scanning...")
         time.sleep(wait)
 
-    # Phase 1: Premarket scan — rescan every 5 min until 9:25
+    # Phase 1: Premarket scan — rescan until 9:25 so late gappers still make
+    # the watchlist. Every 60s while empty, every 5 min once we have candidates
+    # (full scan = quotes for ~8k symbols + news, too heavy to run each minute).
     scan_cutoff = now.replace(hour=9, minute=25, second=0, microsecond=0)
-    scan_interval = 60  # 1 minute
 
     while True:
         runner.state.trade_done = False  # reset for rescan
         runner.scan_premarket()
 
-        if runner.state.candidates:
-            break  # found gappers, proceed
-
         now = datetime.now(ET)
         if now >= scan_cutoff:
-            logger.info("9:25 ET reached, no gappers found. No trade today.")
-            runner.state.trade_done = True
+            if not runner.state.candidates:
+                logger.info("9:25 ET reached, no gappers found. No trade today.")
+                runner.state.trade_done = True
             break
 
+        scan_interval = 300 if runner.state.candidates else 60
         next_scan = min(scan_interval, (scan_cutoff - now).total_seconds())
         logger.info(f"Rescanning in {next_scan:.0f}s...")
         time.sleep(next_scan)

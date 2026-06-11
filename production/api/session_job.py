@@ -43,7 +43,7 @@ def run_daily_sessions():
     # ── Strategy #1: Opening Bell Scalp ────────────────────────────────────
     logger.info("=== SCALP SESSION STARTING ===")
     try:
-        state = run_scalp_session(dry_run=False, live=False)
+        state = run_scalp_session(dry_run=False, live=False, start_time='8:00')
 
         state_data = {
             "last_run": datetime.utcnow().isoformat(),

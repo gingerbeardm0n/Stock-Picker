@@ -246,6 +246,31 @@ class LiveVwapRunner:
         accs = {s: VwapAccumulator() for s in symbols}
         bars_hist: dict[str, list[dict]] = {s: [] for s in symbols}
 
+        # Backfill session bars (9:30 ET onward) so VWAP covers the FULL session,
+        # not just bars after watch start. Without this the accumulator misses
+        # everything from 9:30 to now and computes a wrong VWAP.
+        last_seeded: dict[str, datetime] = {}
+        logger.info("Backfilling session bars for VWAP seed...")
+        try:
+            seed_bars = self.data_feed.get_bars_since_4am(symbols)
+        except Exception as e:
+            logger.warning(f"Session bar backfill failed: {e}")
+            seed_bars = {}
+        for sym, blist in seed_bars.items():
+            for b in blist:
+                b_et = b.time.astimezone(ET)
+                if b_et.hour < 9 or (b_et.hour == 9 and b_et.minute < 30):
+                    continue  # accumulator ignores premarket anyway; skip history too
+                bar_dict = b.to_bar_dict()
+                bar_dict['symbol'] = sym
+                bar_dict['_et'] = b_et
+                accs[sym].update(bar_dict)
+                bars_hist[sym].append(bar_dict)
+                last_seeded[sym] = b.time
+            v = accs[sym].value
+            logger.info(f"  {sym}: seeded {len(bars_hist[sym])} session bars, "
+                        f"VWAP={v:.2f}" if v else f"  {sym}: no session bars yet")
+
         window_end_min = ENTRY_WINDOW_END[0] * 60 + ENTRY_WINDOW_END[1]
 
         while not self.state.trade_done:
@@ -253,6 +278,11 @@ class LiveVwapRunner:
                 bar = self._bar_queue.get(timeout=300)  # bars arrive ~1/min/symbol
             except queue.Empty:
                 logger.warning("No bar received in 300s -- ending session")
+                if self.state.in_position:
+                    logger.warning("Timeout while IN POSITION — placing market exit")
+                    self._place_exit(self.state.symbol,
+                                     {'close': self.state.entry_price},
+                                     {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'})
                 break
 
             sym = bar.get('symbol')
@@ -264,6 +294,11 @@ class LiveVwapRunner:
                 bar_time = datetime.fromisoformat(bar_time)
             bar_et = bar_time.astimezone(ET) if bar_time else None
             bar['_et'] = bar_et
+
+            # Skip bars already covered by the session backfill seed
+            seeded_until = last_seeded.get(sym)
+            if seeded_until is not None and bar_time is not None and bar_time <= seeded_until:
+                continue
 
             accs[sym].update(bar)
             bars_hist[sym].append(bar)
