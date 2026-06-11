@@ -134,18 +134,22 @@ class LiveScalpRunner:
             self._load_env(env_path)
 
         # Connect broker + data feed
-        # Paper mode: force sandbox=True on BOTH broker and data feed
-        # so quotes, bars, and fills are all 15-min delayed uniformly.
-        # At 9:45 wall clock you see 9:30 data and fill at 9:30 prices.
+        # Paper mode: orders go to sandbox, but the DATA FEED uses the
+        # production token when available (sandbox quotes are 15-min delayed
+        # AND blind in premarket — gap% reads 0% before 9:30, so the scan
+        # never finds candidates). Falls back to the delayed sandbox feed
+        # if no production token is set.
+        self.data_delayed = not live and not bool(Config.TRADIER_PRODUCTION_TOKEN)
         if not live:
-            from trading.broker.tradier import TradierBroker, TradierDataFeed
-            token = Config.TRADIER_PAPER_TOKEN
+            from trading.broker.tradier import TradierBroker
             acct = Config.TRADIER_ACCOUNT_ID
             if not dry_run:
-                self.broker = TradierBroker(token=token, account_id=acct, sandbox=True)
+                self.broker = TradierBroker(token=Config.TRADIER_PAPER_TOKEN,
+                                            account_id=acct, sandbox=True)
             else:
                 self.broker = None
-            self.data_feed = TradierDataFeed(token=token, sandbox=True)
+            self.data_feed = Config.get_data_feed()
+            logger.info(f"Data feed: {'sandbox (15-min delayed)' if self.data_delayed else 'production (real-time)'}")
         else:
             if not dry_run:
                 self.broker = Config.get_broker()
@@ -348,8 +352,8 @@ class LiveScalpRunner:
         # Start bar poller for this symbol
         from trading.broker.tradier import TradierBarPoller
         poller = TradierBarPoller(
-            token=Config.TRADIER_PAPER_TOKEN if not self.live else Config.TRADIER_PRODUCTION_TOKEN,
-            sandbox=not self.live,
+            token=Config.TRADIER_PRODUCTION_TOKEN or Config.TRADIER_PAPER_TOKEN,
+            sandbox=self.data_delayed,
             bar_queue=self._bar_queue,
         )
         poller.set_watchlist([symbol])
@@ -569,21 +573,21 @@ class LiveScalpRunner:
     def _wait_for_market_open(self):
         """Sleep until market open bars are available.
 
-        Live: wait until 9:30 AM ET.
-        Sandbox: wait until 9:45 AM ET (9:30 + 15-min delay).
+        Real-time feed: wait until 9:30 AM ET.
+        Delayed sandbox feed: wait until 9:45 AM ET (9:30 + 15-min delay).
         """
         now = datetime.now(ET)
-        if self.live:
+        if not self.data_delayed:
             target = now.replace(hour=9, minute=30, second=0, microsecond=0)
         else:
             target = now.replace(hour=9, minute=45, second=0, microsecond=0)
 
         if now >= target:
-            logger.info(f"Market {'open' if self.live else 'open (delayed)'} — bars available.")
+            logger.info(f"Market {'open (delayed)' if self.data_delayed else 'open'} — bars available.")
             return
 
         wait = (target - now).total_seconds()
-        label = "9:30 AM ET" if self.live else "9:45 AM ET (sandbox 15-min delay)"
+        label = "9:45 AM ET (sandbox 15-min delay)" if self.data_delayed else "9:30 AM ET"
         logger.info(f"Waiting {wait:.0f}s for {label}...")
         time.sleep(wait)
         logger.info("Market open — bars available!")

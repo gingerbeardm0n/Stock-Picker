@@ -121,14 +121,16 @@ class LiveVwapRunner:
         if os.path.exists(env_path):
             self._load_env(env_path)
 
-        # Paper mode: sandbox=True on BOTH broker and data feed so quotes,
-        # bars, and fills are all 15-min delayed uniformly.
+        # Paper mode: orders to sandbox, data feed on production token when
+        # available (sandbox quotes are delayed and blind in premarket).
+        self.data_delayed = not live and not bool(Config.TRADIER_PRODUCTION_TOKEN)
         if not live:
-            from trading.broker.tradier import TradierBroker, TradierDataFeed
-            token = Config.TRADIER_PAPER_TOKEN
+            from trading.broker.tradier import TradierBroker
             acct = Config.TRADIER_ACCOUNT_ID
-            self.broker = None if dry_run else TradierBroker(token=token, account_id=acct, sandbox=True)
-            self.data_feed = TradierDataFeed(token=token, sandbox=True)
+            self.broker = None if dry_run else TradierBroker(
+                token=Config.TRADIER_PAPER_TOKEN, account_id=acct, sandbox=True)
+            self.data_feed = Config.get_data_feed()
+            logger.info(f"Data feed: {'sandbox (15-min delayed)' if self.data_delayed else 'production (real-time)'}")
         else:
             self.broker = None if dry_run else Config.get_broker()
             self.data_feed = Config.get_data_feed()
@@ -235,8 +237,8 @@ class LiveVwapRunner:
 
         from trading.broker.tradier import TradierBarPoller
         poller = TradierBarPoller(
-            token=Config.TRADIER_PAPER_TOKEN if not self.live else Config.TRADIER_PRODUCTION_TOKEN,
-            sandbox=not self.live,
+            token=Config.TRADIER_PRODUCTION_TOKEN or Config.TRADIER_PAPER_TOKEN,
+            sandbox=self.data_delayed,
             bar_queue=self._bar_queue,
         )
         poller.set_watchlist(symbols)
