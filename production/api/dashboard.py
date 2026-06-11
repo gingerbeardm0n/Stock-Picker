@@ -204,41 +204,23 @@ def get_logs(n: int = Query(default=100, le=500)):
 
 @app.post("/trigger")
 def trigger_session():
-    """Manually trigger a scalp session (runs in background thread)."""
+    """Manually trigger the daily sessions (scalp + VWAP reclaim) in background."""
     import threading
+    from api.session_job import run_daily_sessions
 
-    def _run():
-        import traceback as _tb
-        logger.info("=== MANUAL TRIGGER: SCALP SESSION STARTING ===")
-        try:
-            from trading.live_scalp_runner import run_scalp_session
-            state = run_scalp_session(dry_run=False, live=False)
-
-            state_data = {
-                "last_run": datetime.utcnow().isoformat(),
-                "last_result": "trade" if getattr(state, 'trade_placed', False) else "no_trade",
-                "date": str(datetime.now().date()),
-                "candidates": getattr(state, 'candidates', []),
-                "top_pick": getattr(state, 'top_pick', None),
-                "scanned_at": getattr(state, 'scanned_at', None),
-                "has_position": getattr(state, 'has_position', False),
-                "position_symbol": getattr(state, 'position_symbol', None),
-                "entry_price": getattr(state, 'entry_price', None),
-                "pnl": getattr(state, 'pnl', None),
-                "trade_done": getattr(state, 'trade_done', False),
-            }
-            STATE_FILE.write_text(json.dumps(state_data, default=str))
-            logger.info(f"=== MANUAL SESSION COMPLETE: {state_data['last_result']} ===")
-        except Exception as e:
-            tb_str = _tb.format_exc()
-            logger.error(f"Manual scalp session failed: {e}\n{tb_str}")
-            STATE_FILE.write_text(json.dumps({
-                "last_run": datetime.utcnow().isoformat(),
-                "last_result": "error",
-                "error": f"{e}\n{tb_str}",
-            }))
-
-    t = threading.Thread(target=_run, daemon=True)
+    t = threading.Thread(target=run_daily_sessions, daemon=True)
     t.start()
-    logger.info("Manual trigger: scalp session kicked off")
-    return {"triggered": True, "message": "Scalp session started in background"}
+    logger.info("Manual trigger: daily sessions (scalp + vwap) kicked off")
+    return {"triggered": True, "message": "Daily sessions started in background"}
+
+
+@app.get("/vwap")
+def get_vwap_state():
+    """Return latest VWAP Reclaim session state."""
+    vwap_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "vwap_state.json"
+    if vwap_file.exists():
+        try:
+            return json.loads(vwap_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"last_run": None, "last_result": None, "strategy": "vwap_reclaim"}
