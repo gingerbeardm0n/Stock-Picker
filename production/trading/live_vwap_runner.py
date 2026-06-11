@@ -44,6 +44,7 @@ from config import Config
 from trading.vwap_models import VwapReclaimConfig, ENTRY_WINDOW_END, WATCH_TOP_N
 from trading.vwap_engine import VwapAccumulator, evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates
+from trading.bar_capture import record_bar
 
 ET = pytz.timezone('America/New_York')
 
@@ -267,6 +268,7 @@ class LiveVwapRunner:
                 accs[sym].update(bar_dict)
                 bars_hist[sym].append(bar_dict)
                 last_seeded[sym] = b.time
+                record_bar(sym, bar_dict, source='vwap_seed')
             v = accs[sym].value
             logger.info(f"  {sym}: seeded {len(bars_hist[sym])} session bars, "
                         f"VWAP={v:.2f}" if v else f"  {sym}: no session bars yet")

@@ -202,6 +202,14 @@ def get_logs(n: int = Query(default=100, le=500)):
     return {"count": len(entries), "logs": entries}
 
 
+@app.get("/bars_dump")
+def get_bars_dump():
+    """Return all bars captured today (live/sim parity diagnostic)."""
+    from trading.bar_capture import read_today
+    rows = read_today()
+    return {"count": len(rows), "bars": rows}
+
+
 @app.post("/trigger")
 def trigger_session():
     """Manually trigger the daily sessions (scalp + VWAP reclaim) in background."""

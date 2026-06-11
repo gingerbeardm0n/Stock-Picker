@@ -36,6 +36,7 @@ from typing import Optional
 import pytz
 import requests
 
+from trading.bar_capture import record_bar
 from trading.broker.base import (
     BrokerInterface, DataFeedInterface,
     OrderResult, QuoteResult, PositionResult, BarResult,
@@ -530,6 +531,8 @@ class TradierBarPoller:
                 pushed += 1
             except queue.Full:
                 logger.warning(f"Bar queue full — dropping bar for {symbol}")
+
+            record_bar(symbol, bar_dict, source='poller')
 
         logger.info(
             f"TradierBarPoller: pushed {pushed}/{len(symbols)} bars "
