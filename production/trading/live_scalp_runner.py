@@ -62,7 +62,10 @@ TRIAL_173_CONFIG = ScalpConfig(
     max_price=24.69,
     require_news=True,
     entry_mode='first_green',
-    max_entry_bars=4,
+    # PAPER-TESTING OVERRIDE: validated value is 4 (entry by 9:34). Extended to
+    # 30 so the scalp keeps hunting until 10:00 bar time, when the VWAP Reclaim
+    # window opens — more paper data per day. Restore to 4 before live money.
+    max_entry_bars=30,
     min_pm_high_break_pct=0.09,
     profit_target_pct=9.88,
     stop_loss_pct=4.70,
