@@ -264,7 +264,7 @@ def aggregate_premarket_hours(conn, symbols: list[str], trading_date: date) -> i
         GROUP BY bucket, symbol
         ON CONFLICT (time, symbol) DO NOTHING
         """,
-        (symbols, trading_date, trading_date),
+        (symbols, trading_date),
     )
     n = cursor.rowcount
     conn.commit()
