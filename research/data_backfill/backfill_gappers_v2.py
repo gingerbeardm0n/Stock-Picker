@@ -106,9 +106,13 @@ def find_movers_for_day(conn, trading_date: date, args) -> list[dict]:
                  ELSE NULL END                                              AS upper_wick_ratio
         FROM stock_candles_1d t
         JOIN LATERAL (
+            -- prev close must be recent; without this, the first days after a
+            -- data gap compare against bars years old and produce garbage gaps
             SELECT close
             FROM stock_candles_1d p
-            WHERE p.symbol = t.symbol AND p.time < t.time
+            WHERE p.symbol = t.symbol
+              AND p.time < t.time
+              AND p.time > t.time - interval '14 days'
             ORDER BY p.time DESC
             LIMIT 1
         ) prev ON true
@@ -117,12 +121,15 @@ def find_movers_for_day(conn, trading_date: date, args) -> list[dict]:
             FROM (
                 SELECT volume
                 FROM stock_candles_1d p
-                WHERE p.symbol = t.symbol AND p.time < t.time
+                WHERE p.symbol = t.symbol
+                  AND p.time < t.time
+                  AND p.time > t.time - interval '60 days'
                 ORDER BY p.time DESC
                 LIMIT 30
             ) w
         ) stats ON true
         WHERE t.time::date = %(day)s
+          AND t.symbol NOT LIKE '%%ZZT'   -- NASDAQ test symbols (ZXZZT, ZJZZT, ...)
           AND prev.close BETWEEN %(min_price)s AND %(max_price)s
           AND (
                 t.open >= prev.close * (1.0 + %(min_gap)s / 100.0)
