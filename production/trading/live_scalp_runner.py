@@ -140,6 +140,12 @@ class LiveScalpRunner:
         # never finds candidates). Falls back to the delayed sandbox feed
         # if no production token is set.
         self.data_delayed = not live and not bool(Config.TRADIER_PRODUCTION_TOKEN)
+        # Engine clock delay: in paper mode the sandbox fills orders against
+        # quotes that run 15 min behind real time. Even with the real-time
+        # production data feed, the ENGINE must consume bars 15 min late so
+        # the price it decides on matches the price the sandbox fills at.
+        # Live mode: no delay.
+        self.engine_delay_min = 0 if live else 15
         if not live:
             from trading.broker.tradier import TradierBroker
             acct = Config.TRADIER_ACCOUNT_ID
@@ -354,6 +360,7 @@ class LiveScalpRunner:
         poller = TradierBarPoller(
             token=Config.TRADIER_PRODUCTION_TOKEN or Config.TRADIER_PAPER_TOKEN,
             sandbox=self.data_delayed,
+            delay_minutes=self.engine_delay_min,
             bar_queue=self._bar_queue,
         )
         poller.set_watchlist([symbol])
@@ -573,21 +580,20 @@ class LiveScalpRunner:
     def _wait_for_market_open(self):
         """Sleep until market open bars are available.
 
-        Real-time feed: wait until 9:30 AM ET.
-        Delayed sandbox feed: wait until 9:45 AM ET (9:30 + 15-min delay).
+        Live (no engine delay): wait until 9:30 AM ET.
+        Paper (engine delayed to match sandbox fills): wait until 9:30 + delay.
         """
         now = datetime.now(ET)
-        if not self.data_delayed:
-            target = now.replace(hour=9, minute=30, second=0, microsecond=0)
-        else:
-            target = now.replace(hour=9, minute=45, second=0, microsecond=0)
+        target = (now.replace(hour=9, minute=30, second=0, microsecond=0)
+                  + timedelta(minutes=self.engine_delay_min))
 
         if now >= target:
-            logger.info(f"Market {'open (delayed)' if self.data_delayed else 'open'} — bars available.")
+            logger.info(f"Market {'open (engine delayed)' if self.engine_delay_min else 'open'} — bars available.")
             return
 
         wait = (target - now).total_seconds()
-        label = "9:45 AM ET (sandbox 15-min delay)" if self.data_delayed else "9:30 AM ET"
+        label = (f"{target.strftime('%H:%M')} ET (9:30 + {self.engine_delay_min}-min engine delay)"
+                 if self.engine_delay_min else "9:30 AM ET")
         logger.info(f"Waiting {wait:.0f}s for {label}...")
         time.sleep(wait)
         logger.info("Market open — bars available!")

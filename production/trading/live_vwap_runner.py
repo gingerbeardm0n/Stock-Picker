@@ -33,7 +33,7 @@ import logging
 import time
 import queue
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 
 import pytz
@@ -124,6 +124,10 @@ class LiveVwapRunner:
         # Paper mode: orders to sandbox, data feed on production token when
         # available (sandbox quotes are delayed and blind in premarket).
         self.data_delayed = not live and not bool(Config.TRADIER_PRODUCTION_TOKEN)
+        # Engine clock delay: sandbox fills run on 15-min-delayed quotes, so in
+        # paper mode the engine consumes bars 15 min late — the price it acts
+        # on matches the price the sandbox fills at. Live mode: no delay.
+        self.engine_delay_min = 0 if live else 15
         if not live:
             from trading.broker.tradier import TradierBroker
             acct = Config.TRADIER_ACCOUNT_ID
@@ -239,6 +243,7 @@ class LiveVwapRunner:
         poller = TradierBarPoller(
             token=Config.TRADIER_PRODUCTION_TOKEN or Config.TRADIER_PAPER_TOKEN,
             sandbox=self.data_delayed,
+            delay_minutes=self.engine_delay_min,
             bar_queue=self._bar_queue,
         )
         poller.set_watchlist(symbols)
@@ -259,11 +264,17 @@ class LiveVwapRunner:
         except Exception as e:
             logger.warning(f"Session bar backfill failed: {e}")
             seed_bars = {}
+        # Seed only up to the engine clock (now - delay); the poller delivers
+        # the rest on the same delayed schedule. Seeding past the engine clock
+        # would let the VWAP peek at data the sandbox fill engine hasn't seen.
+        engine_now = datetime.now(pytz.UTC) - timedelta(minutes=self.engine_delay_min)
         for sym, blist in seed_bars.items():
             for b in blist:
                 b_et = b.time.astimezone(ET)
                 if b_et.hour < 9 or (b_et.hour == 9 and b_et.minute < 30):
                     continue  # accumulator ignores premarket anyway; skip history too
+                if b.time > engine_now:
+                    continue  # ahead of the engine clock — poller will deliver it
                 bar_dict = b.to_bar_dict()
                 bar_dict['symbol'] = sym
                 bar_dict['_et'] = b_et

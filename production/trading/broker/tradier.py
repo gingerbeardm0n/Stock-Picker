@@ -419,16 +419,26 @@ class TradierBarPoller:
         token: str,
         sandbox: bool = True,
         bar_queue: queue.Queue | None = None,
+        delay_minutes: int | None = None,
     ):
+        """
+        delay_minutes: shift the engine clock into the past. The poller only
+        delivers bars at least this old, so trade decisions line up with the
+        sandbox fill engine (whose quotes run 15 min behind real time) even
+        when the DATA comes from the real-time production feed.
+        None (default) = legacy behavior: 15 when sandbox feed, else 0.
+        """
         self._feed       = TradierDataFeed(token, sandbox=sandbox)
         self._sandbox    = sandbox
+        self._delay_min  = (15 if sandbox else 0) if delay_minutes is None else delay_minutes
         self._bar_queue  = bar_queue or queue.Queue(maxsize=10_000)
         self._watchlist: set[str] = set()
         self._lock       = threading.Lock()
         self._stop_event = threading.Event()
         # Per-symbol: UTC time of last bar already pushed (deduplication)
         self._last_pushed: dict[str, datetime] = {}
-        logger.info(f"TradierBarPoller initialized ({'sandbox' if sandbox else 'LIVE'})")
+        logger.info(f"TradierBarPoller initialized ({'sandbox' if sandbox else 'LIVE'}"
+                    f"{f', engine delay {self._delay_min}min' if self._delay_min else ''})")
 
     @property
     def bar_queue(self) -> queue.Queue:
@@ -495,9 +505,10 @@ class TradierBarPoller:
         Push bars not yet seen to bar_queue (symbol key added to the dict).
         """
         now_et = datetime.now(pytz.UTC).astimezone(ET)
-        # Sandbox data is 15-min delayed — query 15 min in the past
-        if self._sandbox:
-            now_et = now_et - timedelta(minutes=15)
+        # Engine clock shift: deliver bars at least delay_min old so paper
+        # decisions match the sandbox fill engine's delayed quotes
+        if self._delay_min:
+            now_et = now_et - timedelta(minutes=self._delay_min)
 
         with self._lock:
             symbols = list(self._watchlist)
@@ -536,5 +547,6 @@ class TradierBarPoller:
 
         logger.info(
             f"TradierBarPoller: pushed {pushed}/{len(symbols)} bars "
-            f"at {now_et.strftime('%H:%M:%S')} ({'delayed' if self._sandbox else 'live'})"
+            f"at {now_et.strftime('%H:%M:%S')} "
+            f"({'delayed' if self._delay_min else 'live'})"
         )
