@@ -29,7 +29,7 @@ import argparse
 import json
 import logging
 import time
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 
 import psycopg2
@@ -97,11 +97,17 @@ def save_progress(pfile: Path, p: dict) -> None:
 
 def fetch_batch(client, symbols: list[str], start: date, end: date) -> list[tuple]:
     """Fetch daily bars for a symbol batch. Returns insert tuples. Raises on API error."""
+    # Free tier rejects any request window touching "recent SIP data"
+    # (roughly the last 15 minutes) — clamp the end to now - 16 min.
+    end_dt = ET.localize(datetime.combine(end, datetime.max.time().replace(microsecond=0)))
+    now_clamp = datetime.now(pytz.UTC).astimezone(ET) - timedelta(minutes=16)
+    if end_dt > now_clamp:
+        end_dt = now_clamp
     request = StockBarsRequest(
         symbol_or_symbols=symbols,
         timeframe=TimeFrame.Day,
         start=ET.localize(datetime.combine(start, datetime.min.time())),
-        end=ET.localize(datetime.combine(end, datetime.max.time().replace(microsecond=0))),
+        end=end_dt,
     )
     response = client.get_stock_bars(request)
     values = []
