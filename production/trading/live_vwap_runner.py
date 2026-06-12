@@ -44,7 +44,7 @@ from config import Config
 from trading.vwap_models import VwapReclaimConfig, ENTRY_WINDOW_END, WATCH_TOP_N
 from trading.vwap_engine import VwapAccumulator, evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates
-from trading.bar_capture import record_bar
+from trading.bar_capture import record_bar, record_news
 
 ET = pytz.timezone('America/New_York')
 
@@ -464,6 +464,7 @@ class LiveVwapRunner:
                     tier = self.classify_news_tier(articles)
                     c['has_news'] = tier in ('tier1', 'tier2', 'presence')
                     c['news_tier'] = tier
+                    record_news(c['symbol'], articles, tier)
                 else:
                     c['has_news'] = False
                     c['news_tier'] = 'none'

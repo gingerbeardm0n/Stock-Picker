@@ -138,17 +138,15 @@ def run_backfill(start_date, end_date, min_gap_pct=10.0, dry_run=False):
         logger.info("[DRY RUN — no API calls or DB writes]")
 
     with StockDataDB(socket_timeout=0) as db:
-        # Use daily_gappers cache for trading days (fast) instead of
-        # get_trading_days() which scans stock_candles_1m (slow/timeout)
         cursor = db.conn.cursor()
         cursor.execute("""
-            SELECT DISTINCT trade_date FROM daily_gappers
-            WHERE trade_date >= %s AND trade_date <= %s
-            ORDER BY trade_date
+            SELECT DISTINCT time::date FROM stock_candles_1d
+            WHERE time::date >= %s AND time::date <= %s
+            ORDER BY 1
         """, [start_date, end_date])
         trading_days = [row[0] for row in cursor.fetchall()]
         cursor.close()
-        logger.info(f"Found {len(trading_days)} trading days (from daily_gappers cache)")
+        logger.info(f"Found {len(trading_days)} trading days (from stock_candles_1d)")
 
         fetcher = None if dry_run else NewsFetcher()
 

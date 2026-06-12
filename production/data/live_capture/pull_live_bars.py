@@ -34,6 +34,33 @@ DB_DSN = os.getenv('DB_DSN') or os.getenv('OPTUNA_STORAGE')
 if not DB_DSN:
     sys.exit("Set DB_DSN (postgresql://user:pass@host:5432/stockdata) in env or .env.paper")
 
+CREATE_NEWS_SQL = """
+CREATE TABLE IF NOT EXISTS stock_news_live (
+    id           BIGSERIAL PRIMARY KEY,
+    symbol       TEXT NOT NULL,
+    headline     TEXT NOT NULL,
+    source       TEXT,
+    created_at   TIMESTAMPTZ,
+    summary      TEXT,
+    url          TEXT,
+    symbol_count INT,
+    is_specific  BOOLEAN,
+    news_tier    TEXT,
+    received_at  TIMESTAMPTZ NOT NULL,
+    UNIQUE(symbol, headline, created_at)
+);
+CREATE INDEX IF NOT EXISTS idx_news_live_symbol_time
+    ON stock_news_live (symbol, created_at DESC);
+"""
+
+INSERT_NEWS_SQL = """
+INSERT INTO stock_news_live
+    (symbol, headline, source, created_at, summary, url,
+     symbol_count, is_specific, news_tier, received_at)
+VALUES %s
+ON CONFLICT (symbol, headline, created_at) DO NOTHING
+"""
+
 CREATE_SQL = """
 CREATE TABLE IF NOT EXISTS stock_candles_live_1m (
     time        TIMESTAMPTZ      NOT NULL,
@@ -75,8 +102,6 @@ def main():
     r.raise_for_status()
     bars = r.json().get('bars', [])
     print(f"  {len(bars)} bars captured today")
-    if not bars:
-        return
 
     rows = []
     for b in bars:
@@ -91,14 +116,45 @@ def main():
         except (KeyError, TypeError, ValueError) as e:
             print(f"  skipping malformed row: {e} — {b}", file=sys.stderr)
 
+    print(f"Fetching {args.api}/news_dump ...")
+    news_rows = []
+    try:
+        rn = requests.get(f"{args.api}/news_dump", headers=headers, timeout=60)
+        rn.raise_for_status()
+        news = rn.json().get('news', [])
+        print(f"  {len(news)} news articles captured today")
+        for a in news:
+            try:
+                news_rows.append((
+                    a['symbol'], a.get('headline', ''), a.get('source'),
+                    a.get('created_at') or None, a.get('summary'), a.get('url'),
+                    a.get('symbol_count'), a.get('is_specific'),
+                    a.get('news_tier', 'none'),
+                    a.get('received_at') or datetime.now(timezone.utc).isoformat(),
+                ))
+            except (KeyError, TypeError) as e:
+                print(f"  skipping malformed news row: {e} — {a}", file=sys.stderr)
+    except requests.RequestException as e:
+        print(f"  news_dump unavailable ({e}) — older API build? continuing", file=sys.stderr)
+
+    if not rows and not news_rows:
+        return
+
     conn = psycopg2.connect(DB_DSN)
     try:
         with conn, conn.cursor() as cur:
             cur.execute(CREATE_SQL)
-            psycopg2.extras.execute_values(cur, INSERT_SQL, rows, page_size=1000)
+            cur.execute(CREATE_NEWS_SQL)
+            if rows:
+                psycopg2.extras.execute_values(cur, INSERT_SQL, rows, page_size=1000)
+            if news_rows:
+                psycopg2.extras.execute_values(cur, INSERT_NEWS_SQL, news_rows, page_size=1000)
             cur.execute("SELECT COUNT(*) FROM stock_candles_live_1m")
             total = cur.fetchone()[0]
-        print(f"  inserted {len(rows)} rows (duplicates skipped); table total = {total}")
+            cur.execute("SELECT COUNT(*) FROM stock_news_live")
+            news_total = cur.fetchone()[0]
+        print(f"  inserted {len(rows)} bars + {len(news_rows)} news rows (duplicates skipped); "
+              f"totals: bars={total}, news={news_total}")
     finally:
         conn.close()
 

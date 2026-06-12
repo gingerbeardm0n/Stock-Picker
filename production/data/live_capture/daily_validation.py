@@ -100,8 +100,11 @@ def _print_result(label: str, res: dict):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--date', default=date.today().isoformat(),
-                        help='Session date to validate (default today)')
+    # Default to YESTERDAY: Alpaca free tier cannot reliably serve same-day
+    # minute bars (SIP clamp + unsettled data). Today's session only becomes
+    # validatable historical data the next morning.
+    parser.add_argument('--date', default=(date.today() - timedelta(days=1)).isoformat(),
+                        help='Session date to validate (default yesterday)')
     parser.add_argument('--start', default=None,
                         help='Backfill window start (default: date - 5 days; '
                              'first/catch-up run should pass an early start)')

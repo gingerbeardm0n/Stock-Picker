@@ -41,6 +41,7 @@ from config import Config
 from trading.scalp_models import ScalpConfig
 from trading.scalp_engine import evaluate_entry, evaluate_exit, get_premarket_high
 from trading.scalp_ranker import rank_candidates, get_top_candidate
+from trading.bar_capture import record_news
 from trading.broker.base import OrderResult
 
 ET = pytz.timezone('America/New_York')
@@ -578,6 +579,7 @@ class LiveScalpRunner:
                     tier = self.classify_news_tier(articles)
                     c['has_news'] = tier in ('tier1', 'tier2', 'presence')
                     c['news_tier'] = tier
+                    record_news(c['symbol'], articles, tier)
                 else:
                     c['has_news'] = False
                     c['news_tier'] = 'none'

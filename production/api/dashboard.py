@@ -210,6 +210,14 @@ def get_bars_dump():
     return {"count": len(rows), "bars": rows}
 
 
+@app.get("/news_dump")
+def get_news_dump():
+    """Return all news articles the live runners fetched today (parity diagnostic)."""
+    from trading.bar_capture import read_today_news
+    rows = read_today_news()
+    return {"count": len(rows), "news": rows}
+
+
 @app.post("/trigger")
 def trigger_session():
     """Manually trigger the daily sessions (scalp + VWAP reclaim) in background."""
