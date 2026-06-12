@@ -394,9 +394,22 @@ class LiveVwapRunner:
                 logger.info(f"    FILLED: {shares} @ ${entry_price:.2f}")
             else:
                 logger.warning("    Entry not filled after 12s. Cancelling.")
-                self.broker.cancel_order(result.order_id)
-                self.state.trade_done = True
-                return
+                cancelled = self.broker.cancel_order(result.order_id)
+                # A cancel can race a fill — a failed cancel usually means the
+                # order already executed. Verify final state; adopt any filled
+                # shares rather than leaving an orphan position with no stop.
+                time.sleep(2)
+                fill = self.broker.get_order(result.order_id)
+                if fill.status in ('filled', 'partially_filled') and fill.filled_qty > 0:
+                    entry_price = fill.filled_price or entry_price
+                    shares = fill.filled_qty
+                    logger.warning(
+                        f"    Cancel raced a fill ({fill.status}, cancel ok={cancelled}): "
+                        f"{shares} @ ${entry_price:.2f} — adopting position."
+                    )
+                else:
+                    self.state.trade_done = True
+                    return
 
             stop_result = self.broker.place_stop_sell(symbol, shares, round(stop_price, 2))
             self.state.stop_order_id = stop_result.order_id

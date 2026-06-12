@@ -502,9 +502,23 @@ class LiveScalpRunner:
                         break
                 else:
                     logger.warning("    Entry not filled after 10s. Cancelling.")
-                    self.broker.cancel_order(result.order_id)
-                    self.state.trade_done = True
-                    return
+                    cancelled = self.broker.cancel_order(result.order_id)
+                    # A cancel can race a fill — a failed cancel usually means
+                    # the order already executed. Verify the order's final
+                    # state; anything filled must be adopted and managed,
+                    # never left as an orphan position with no stop.
+                    time.sleep(2)
+                    fill = self.broker.get_order(result.order_id)
+                    if fill.status in ('filled', 'partially_filled') and fill.filled_qty > 0:
+                        entry_price = fill.filled_price or entry_price
+                        shares = fill.filled_qty
+                        logger.warning(
+                            f"    Cancel raced a fill ({fill.status}, cancel ok={cancelled}): "
+                            f"{shares} @ ${entry_price:.2f} — adopting position."
+                        )
+                    else:
+                        self.state.trade_done = True
+                        return
 
             # Place stop loss order
             stop_price = round(entry_price * (1 - self.config.stop_loss_pct / 100), 2)
