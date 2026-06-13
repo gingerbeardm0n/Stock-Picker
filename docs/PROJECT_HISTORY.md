@@ -4,7 +4,7 @@ Living record of what was built, when, why — plus a component index and file-h
 Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pass written manually
 2026-05-31 from git history + session context; incremental passes append from `git log`.
 
-**History watermark (last commit folded in):** `b75b9a0` (2026-06-12)
+**History watermark (last commit folded in):** `4ae4cf7` (2026-06-13)
 
 ---
 
@@ -103,6 +103,14 @@ Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pa
 - `446b27d` 06-12 — shared candidate screen: top-20 cut + 1000% gap cap (selection parity).
 - `b75b9a0` 06-12 — docs: REL_VOL_LIVE_PARITY_DESIGN — baseline export via data branch.
 
+### Phase 12 — Rel-vol live parity + parity audit + record-keeping (2026-06-12 → 06-13)
+- `73bf2a5` 06-12 — **live rel-vol from shipped baseline** (`rel_vol_live.py`, Gap #1): fetch 30-day-avg denominator from the `data` branch, divide live quote volume; sim-matching 10.0 fallback. Tradier `QuoteResult.volume` added.
+- `cfce03c` 06-12 — baseline fetch sends `GITHUB_TOKEN` (repo is private).
+- `2438523` 06-13 — thread-safe symbol table + `_DATA_CACHE` locks (cache cap 250→1500); NaN rel_vol guard + bypass gate when avg_vol=0 (orchestrator); date blacklist 2021-01-04 + `extra_blacklist`; `validate_batch` CLI trial override; export `git add -f`.
+- `ff219c2` 06-13 — **date-param on `/bars_dump` + `/news_dump`** (`read_bars_for_date`/`read_news_for_date`/`available_dates`) so a prior day's capture can be pulled before a redeploy wipes ephemeral disk; `pull_live_bars --date`.
+- `4ae4cf7` 06-13 — **parity audit fixes** (3 gaps): shared news gate `has_news_catalyst()`/`NEWS_CATALYST_TIERS` (live had excluded tier3); ship float baseline + live scalp float filter; VWAP rel-vol numerator reconstructed as cumulative-through-9:25 (was instantaneous quote vol, 2-3x inflated). See `docs/PARITY.md`.
+- Record-keeping overhaul (uncommitted docs): new `docs/PARITY.md` (sim/live gap ledger), `STATUS.md` (current-state snapshot); `MEMORY.md` slimmed 411→~62 lines (legacy detail → `memory/archive_legacy_monolith.md`).
+
 ---
 
 ## Component Index
@@ -128,7 +136,8 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 | `live_broker.py` | LiveBroker (Broker over LiveTradeManager) | 🟢 | c2fa532 |
 | `live_scanner.py` | live runtime: premarket scan + **intraday momentum scan** (9:35-10:45, cap=50) + (flag-gated) orchestrator path | 🟡 flip default-OFF | d1cd5cd |
 | `broker/base.py`,`broker/tradier.py` | broker/data-feed interfaces + Tradier impl (prod-token data feed in paper) | 🟢 | cf1a431 |
-| `bar_capture.py` | records every live bar to daily JSONL (`bars_YYYYMMDD.jsonl`) for live/sim parity; news capture | 🟢 | f5ccb3c |
+| `bar_capture.py` | records every live bar + news to daily JSONL (`bars_/news_YYYYMMDD.jsonl`); `read_*_for_date`/`available_dates` for prior-day pulls | 🟢 | f5ccb3c |
+| `rel_vol_live.py` | live rel-vol parity: fetch 30-day baseline (+floats) from `data` branch, `compute_rel_vol` w/ 10.0 fallback | 🟢 | 73bf2a5 |
 
 ### Strategy #1 — Opening Bell Scalp (`production/trading/`, LIVE)
 | File | Purpose | Status | Since |
@@ -202,6 +211,9 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 | `docs/REL_VOL_LIVE_PARITY_DESIGN.md` | design: rel-vol live parity, baseline export via data branch | 🟢 | b75b9a0 |
 | `docs/ANTI_OVERFITTING_PLAYBOOK.md` | overfitting playbook (cut params, walk-forward, plateau-select) | 🟢 | phase 8 |
 | `docs/DATA_SOURCES.md` | data-source status (Alpaca/Polygon/Tradier tokens, DB coverage) | 🟢 | phase 9 |
+| `docs/PARITY.md` | sim/live parity ledger — every divergence + status (fixed/open/inherent) | 🟢 | phase 12 |
+| `STATUS.md` (root) | current-state snapshot: deployed / live configs / next actions / blockers | 🟢 | phase 12 |
+| `production/data/live_capture/export_rel_vol_baseline.py` | export rel-vol baseline + floats → `data` branch (`--push`) | 🟢 | phase 11-12 |
 
 ---
 
@@ -259,3 +271,8 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 - ⚠️ **Untracked `docs/backtesting_pipeline_discovery.md`** — session notes; commit or fold into a permanent doc.
 - ⏭ **OPEN (carried)** — concept pages dated 2026-05-21 may describe pre-fix code; refresh against current engine (low priority).
 - ℹ️ **NOTE — 4 modified-but-uncommitted engine files** at pass time (`simulation_engine.py`, `orchestrator.py`, `date_sampler.py`, `scalp/validate_batch.py`) — work in progress, not folded into this history; will appear in next pass.
+
+## Hygiene flags — custodian pass 2026-06-13 (FLAG ONLY — nothing deleted/moved)
+- ✅ **RESOLVED — the 4 engine files** flagged 06-12 are now committed (`2438523`).
+- ⚠️ **Carried, still untracked (unchanged from 06-12):** `bash.exe.stackdump`, `FILE_ORGANIZATION_SETUP.md`, backfill `*_progress_*.json`, optimizer scratch (`data/`, `ablation/`, `cache/`, `*_log.txt`, `findings_*.json`, `locked_params_v8_trial180.json`), corpus tooling under `Ross Cameron Day Trading Videos/`, diagnostics (`debug_vwap_jun12.py`, `profile_trial.py`), `research/analysis/outputs/`, `production/data/stream/`, `docs/backtesting_pipeline_discovery.md`. **Recommend one `.gitignore` sweep** — most are regenerable run-state.
+- ℹ️ **NOTE — record-keeping restructure (this session):** `MEMORY.md` slimmed 411→~62 lines; legacy detail preserved verbatim in `memory/archive_legacy_monolith.md`. New `STATUS.md` (root) + `docs/PARITY.md` are the live "where are we" + parity-ledger sources going forward.
