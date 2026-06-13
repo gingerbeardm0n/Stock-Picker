@@ -32,6 +32,8 @@ import re
 from datetime import datetime, date
 
 import requests
+import psycopg2
+import psycopg2.extras
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env.paper'))
@@ -39,6 +41,88 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env.paper'))
 DASHBOARD = os.getenv('JTRADER_DASHBOARD_URL', 'https://jtrader-api.onrender.com')
 API_KEY = os.getenv('JTRADER_API_KEY', '')
 PROD_TOKEN = os.getenv('TRADIER_PRODUCTION_TOKEN', '')
+DB_DSN = os.getenv('DB_DSN') or os.getenv('OPTUNA_STORAGE')
+
+
+# ── live_trades table ──────────────────────────────────────────────────────
+
+CREATE_LIVE_TRADES = """
+CREATE TABLE IF NOT EXISTS live_trades (
+    id              BIGSERIAL PRIMARY KEY,
+    trade_date      DATE NOT NULL,
+    strategy        TEXT NOT NULL,
+    symbol          TEXT NOT NULL,
+    shares          INT NOT NULL,
+    decision_time   TIMESTAMPTZ,
+    decision_price  NUMERIC(10,4),
+    paper_fill      NUMERIC(10,4),
+    paper_exit      NUMERIC(10,4),
+    paper_pnl       NUMERIC(12,4),
+    exit_reason     TEXT,
+    cf_entry        NUMERIC(10,4),
+    cf_exit         NUMERIC(10,4),
+    cf_pnl          NUMERIC(12,4),
+    cf_reason       TEXT,
+    cf_bars_held    INT,
+    inserted_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(trade_date, strategy, symbol, decision_time)
+);
+CREATE INDEX IF NOT EXISTS idx_live_trades_date
+    ON live_trades (trade_date DESC);
+"""
+
+INSERT_LIVE_TRADE = """
+INSERT INTO live_trades (
+    trade_date, strategy, symbol, shares,
+    decision_time, decision_price,
+    paper_fill, paper_exit, paper_pnl, exit_reason,
+    cf_entry, cf_exit, cf_pnl, cf_reason, cf_bars_held
+) VALUES %s
+ON CONFLICT (trade_date, strategy, symbol, decision_time) DO UPDATE SET
+    paper_fill = EXCLUDED.paper_fill,
+    paper_exit = EXCLUDED.paper_exit,
+    paper_pnl = EXCLUDED.paper_pnl,
+    exit_reason = EXCLUDED.exit_reason,
+    cf_entry = EXCLUDED.cf_entry,
+    cf_exit = EXCLUDED.cf_exit,
+    cf_pnl = EXCLUDED.cf_pnl,
+    cf_reason = EXCLUDED.cf_reason,
+    cf_bars_held = EXCLUDED.cf_bars_held,
+    inserted_at = NOW();
+"""
+
+
+def persist_trades(trade_date: str, rows: list[dict]):
+    if not DB_DSN:
+        print('[warn] DB_DSN not set — skipping trade persistence')
+        return
+    conn = psycopg2.connect(DB_DSN)
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(CREATE_LIVE_TRADES)
+                if not rows:
+                    return
+                values = []
+                for r in rows:
+                    dt = None
+                    if r.get('decision_time'):
+                        try:
+                            dt = datetime.strptime(r['decision_time'], '%Y-%m-%d %H:%M:%S')
+                        except (ValueError, TypeError):
+                            dt = None
+                    values.append((
+                        trade_date, r.get('strategy'), r.get('symbol'), r.get('shares'),
+                        dt, r.get('decision_price'),
+                        r.get('paper_fill'), r.get('paper_exit'),
+                        r.get('paper_pnl'), r.get('exit_reason'),
+                        r.get('cf_entry'), r.get('cf_exit'),
+                        r.get('cf_pnl'), r.get('cf_reason'), r.get('cf_bars_held'),
+                    ))
+                psycopg2.extras.execute_values(cur, INSERT_LIVE_TRADE, values, page_size=100)
+                print(f'[db] persisted {len(values)} trade(s) to live_trades')
+    finally:
+        conn.close()
 
 
 # ── Log parsing ─────────────────────────────────────────────────────────────
@@ -243,6 +327,8 @@ def main():
     for t in trades:
         tape = fetch_tape(t['symbol'], args.date)
         cf = replay_counterfactual(t, tape) if tape else None
+        if cf:
+            t.update(cf)
         paper_pnl = t['paper_pnl'] if t['paper_pnl'] is not None else 0.0
         total_paper += paper_pnl
         cf_pnl = cf['cf_pnl'] if cf else 0.0
@@ -256,6 +342,9 @@ def main():
     print('-' * 105)
     print(f"{'TOTAL':>26} {'':>21} {total_paper:>+10.2f} | {'':>8} {total_cf:>+10.2f}")
     print(f"\n  Sandbox distortion (paper - counterfactual): {total_paper - total_cf:+.2f}")
+
+    # 4. Persist to DB
+    persist_trades(args.date, trades)
 
 
 if __name__ == '__main__':
