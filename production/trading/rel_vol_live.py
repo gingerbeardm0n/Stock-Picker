@@ -19,6 +19,7 @@ See docs/REL_VOL_LIVE_PARITY_DESIGN.md.
 from __future__ import annotations
 
 import logging
+import os
 
 import requests
 
@@ -44,7 +45,13 @@ def fetch_rel_vol_baseline(url: str = BASELINE_URL) -> dict | None:
     None as "no baseline available" → DEFAULT_REL_VOL for every symbol.
     """
     try:
-        r = requests.get(url, timeout=FETCH_TIMEOUT_S)
+        # Repo is PRIVATE: raw.githubusercontent.com requires a token.
+        # Set GITHUB_TOKEN on Render (fine-grained PAT, contents:read on this repo).
+        headers = {}
+        token = os.getenv("GITHUB_TOKEN", "")
+        if token:
+            headers["Authorization"] = f"token {token}"
+        r = requests.get(url, timeout=FETCH_TIMEOUT_S, headers=headers)
         r.raise_for_status()
         data = r.json()
         baselines = data.get("baselines")
