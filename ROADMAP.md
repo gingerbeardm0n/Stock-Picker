@@ -1,5 +1,10 @@
 # Stock Scanner — Master Roadmap
 
+> **⚠️ SUPERSEDED (2026-06-13).** This describes the pre-pivot monolith (Flask + 5-pillar
+> scanner + the "Phase 6" ML parameter-sweep vision). The project pivoted June 2026 to two
+> standalone, individually-optimized strategies (Opening Bell Scalp + VWAP Reclaim). For the
+> current plan + ranked backlog see **`docs/STRATEGY_ROADMAP.md`**. Kept for history.
+
 ## Architecture Overview
 
 ```

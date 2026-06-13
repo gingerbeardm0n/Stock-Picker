@@ -26,13 +26,20 @@ _Updated: 2026-06-13 (Sat)_
 
 ## Next actions
 
+Full ranked backlog → **`docs/STRATEGY_ROADMAP.md`** (current, post-pivot; the root
+`ROADMAP.md` is superseded). Immediate:
 1. **Tue (after Mon session)**: `pull_live_bars.py --date 2026-06-15` then
    `daily_validation.py --date 2026-06-15` — first real sim/live parity test with
    the new `--date` endpoint support.
 2. **Before Mon open (optional, to make the parity fixes live)**: re-push data
    branch (`export_rel_vol_baseline.py --push`) + set `GITHUB_TOKEN` on Render +
    off-hours redeploy.
-3. Root-cause VWAP trial 173 non-reproduction (task #20).
+3. **P0 — VWAP non-reproduction (task #20):** use `research/maintenance/db_fingerprint.py`
+   to fingerprint the sealed range, commit the baseline, re-validate VWAP 173 on the
+   fingerprinted DB, THEN seal. No live cutover until a reproducible number exists.
+4. **P1 — corpus-backed safety nets:** daily risk circuit breakers (max-loss/green-to-red/
+   give-back-half — corpus's #1 P&L destroyer) + market-temp gate (cold 53.9% vs hot 71.9% WR).
+5. **P2 — strategy #3 micro-pullback** for the empty 9:40–10:00 window (74.3% WR).
 
 ## Blockers / watch
 
