@@ -65,9 +65,13 @@ TRIAL_173_CONFIG = ScalpConfig(
     max_price=24.69,
     require_news=True,
     entry_mode='first_green',
-    # PAPER-TESTING OVERRIDE: validated value is 4 (entry by 9:34). Extended to
-    # 30 so the scalp keeps hunting until 10:00 bar time, when the VWAP Reclaim
-    # window opens — more paper data per day. Restore to 4 before live money.
+    # PAPER-TESTING OVERRIDE: validated value is 4 (entry by 9:34). Set to 30 to
+    # "keep hunting" — but a 2025 sim sweep proved this is INERT: with
+    # entry_mode='first_green' the first green bar fires in the opening minutes,
+    # so 10/20/30/60/90 all produce the identical trade set (entry effectively
+    # caps by ~9:50, 0 trades after 10:00). It does NOT harvest more paper data.
+    # Restore to the validated 4 before live money. To actually trade 9:40-11:00
+    # needs a different entry mechanism (continuation pattern), not a bigger window.
     max_entry_bars=30,
     min_pm_high_break_pct=0.09,
     profit_target_pct=9.88,

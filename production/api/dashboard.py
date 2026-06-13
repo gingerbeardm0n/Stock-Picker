@@ -21,7 +21,7 @@ from collections import deque
 from datetime import datetime, date
 from pathlib import Path
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Query, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -210,7 +210,10 @@ def get_bars_dump(date: str | None = Query(None, description="YYYY-MM-DD; omit f
     (e.g. Friday's capture fetched Saturday before the next redeploy wipes it).
     """
     from trading.bar_capture import read_today, read_bars_for_date, available_dates
-    rows = read_bars_for_date(date) if date else read_today()
+    try:
+        rows = read_bars_for_date(date) if date else read_today()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD or YYYYMMDD")
     return {"count": len(rows), "date": date or "today",
             "available": available_dates("bars"), "bars": rows}
 
@@ -219,7 +222,10 @@ def get_bars_dump(date: str | None = Query(None, description="YYYY-MM-DD; omit f
 def get_news_dump(date: str | None = Query(None, description="YYYY-MM-DD; omit for today")):
     """Return news the live runners fetched on a given day (default today) — parity diagnostic."""
     from trading.bar_capture import read_today_news, read_news_for_date, available_dates
-    rows = read_news_for_date(date) if date else read_today_news()
+    try:
+        rows = read_news_for_date(date) if date else read_today_news()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD or YYYYMMDD")
     return {"count": len(rows), "date": date or "today",
             "available": available_dates("news"), "news": rows}
 
