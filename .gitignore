@@ -219,6 +219,8 @@ analysis/*.csv                  # Old analysis outputs location
 research/optimizer/*.csv
 research/optimizer/logs/
 data/cache/
+# Generated rel-vol baseline — lives on the dedicated 'data' branch, not main
+data/rel_vol_baseline.json
 
 # Live trading logs (keep locally, don't commit)
 production/logs/

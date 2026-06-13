@@ -45,6 +45,7 @@ from trading.vwap_models import VwapReclaimConfig, ENTRY_WINDOW_END, WATCH_TOP_N
 from trading.vwap_engine import VwapAccumulator, evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_bar, record_news
+from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol
 
 ET = pytz.timezone('America/New_York')
 
@@ -143,6 +144,11 @@ class LiveVwapRunner:
         self.news_fetcher = NewsFetcher()
         self.classify_news_tier = classify_news_tier
 
+        # Live rel-vol parity (Gap #1): fetch the 30-day-avg denominator baseline
+        # from the data branch. None → rel_vol=10.0 fallback (filter no-op).
+        baseline = fetch_rel_vol_baseline()
+        self._rel_vol_baselines = baseline.get('baselines') if baseline else None
+
         self._bar_queue = queue.Queue(maxsize=1000)
 
         logger.info("=" * 60)
@@ -194,6 +200,7 @@ class LiveVwapRunner:
                 'gap_pct': gap_pct,
                 'open_price': q.last,
                 'prior_close': q.prev_close,
+                'quote_volume': q.volume,  # today's cumulative volume (rel-vol numerator)
             })
 
         gappers.sort(key=lambda g: g['gap_pct'], reverse=True)
@@ -210,8 +217,16 @@ class LiveVwapRunner:
             if self.config.require_news and not g.get('has_news', False):
                 logger.info(f"  SKIP {g['symbol']} gap={g['gap_pct']:.1f}% -- no news")
                 continue
-            g['rel_vol'] = 10.0       # no premarket rel-vol source live yet; high default
+            # Live rel-vol (Gap #1): real quote_volume / 30-day baseline, with
+            # sim-matching 10.0 fallback when the baseline is missing.
+            g['rel_vol'] = compute_rel_vol(
+                g['symbol'], g.get('quote_volume'), self._rel_vol_baselines)
             g['float_shares'] = None
+            # Same filter the sim applies — skip thin-volume candidates.
+            if g['rel_vol'] < self.config.min_relative_volume:
+                logger.info(f"  SKIP {g['symbol']} gap={g['gap_pct']:.1f}% "
+                            f"rel_vol={g['rel_vol']:.2f} < {self.config.min_relative_volume:.2f}")
+                continue
             filtered.append(g)
 
         if not filtered:

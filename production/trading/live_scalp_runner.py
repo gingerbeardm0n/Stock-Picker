@@ -43,6 +43,7 @@ from trading.scalp_engine import evaluate_entry, evaluate_exit, get_premarket_hi
 from trading.scalp_ranker import rank_candidates, get_top_candidate, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_news
 from trading.broker.base import OrderResult
+from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol
 
 ET = pytz.timezone('America/New_York')
 
@@ -169,6 +170,11 @@ class LiveScalpRunner:
         self.news_fetcher = NewsFetcher()
         self.classify_news_tier = classify_news_tier
 
+        # Live rel-vol parity (Gap #1): fetch the 30-day-avg denominator baseline
+        # from the data branch. None → rel_vol=10.0 fallback (filter no-op).
+        baseline = fetch_rel_vol_baseline()
+        self._rel_vol_baselines = baseline.get('baselines') if baseline else None
+
         # Symbol list for scanning
         self._symbols = self._load_symbols()
 
@@ -226,6 +232,7 @@ class LiveScalpRunner:
                 'prior_close': q.prev_close,
                 'bid': q.bid,
                 'ask': q.ask,
+                'quote_volume': q.volume,  # today's cumulative volume (rel-vol numerator)
             })
 
         gappers.sort(key=lambda g: g['gap_pct'], reverse=True)
@@ -299,9 +306,31 @@ class LiveScalpRunner:
             q = quotes.get(c['symbol'])
             if q:
                 c['open_price'] = q.last
+                c['quote_volume'] = q.volume
                 # Recalculate gap with latest price
                 if q.prev_close > 0:
                     c['gap_pct'] = (q.last - q.prev_close) / q.prev_close * 100
+
+        # Live rel-vol (Gap #1): now that 9:25 quote volume is fresh, compute the
+        # real rel-vol (quote_volume / 30-day baseline, 10.0 fallback) and apply
+        # the SAME min_relative_volume filter the sim applies. Thin-volume
+        # candidates the optimizer's config would reject are dropped here.
+        survivors = []
+        for c in self.state.candidates:
+            c['rel_vol'] = compute_rel_vol(
+                c['symbol'], c.get('quote_volume'), self._rel_vol_baselines)
+            if c['rel_vol'] < self.config.min_relative_volume:
+                logger.info(f"  SKIP {c['symbol']} gap={c['gap_pct']:.1f}% "
+                            f"rel_vol={c['rel_vol']:.2f} < {self.config.min_relative_volume:.2f}")
+                continue
+            survivors.append(c)
+        self.state.candidates = survivors
+
+        if not survivors:
+            logger.warning("No candidates passed rel-vol filter. No trade today.")
+            self.state.top_pick = None
+            self.state.trade_done = True
+            return
 
         # Re-rank
         ranked = rank_candidates(self.state.candidates)

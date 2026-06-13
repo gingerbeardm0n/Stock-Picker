@@ -57,6 +57,7 @@ class QuoteResult:
     ask: float
     last: float
     prev_close: float = 0.0
+    volume: float = 0.0  # today's cumulative session volume (premarket + RTH)
 
 
 @dataclass

@@ -327,6 +327,7 @@ class TradierDataFeed(DataFeedInterface):
                 ask=float(q.get('ask', 0) or 0),
                 last=float(q.get('last', 0) or 0),
                 prev_close=float(q.get('prevclose', 0) or 0),
+                volume=float(q.get('volume', 0) or 0),
             )
         return results
 
