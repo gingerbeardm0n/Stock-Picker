@@ -40,7 +40,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from config import Config
 from trading.scalp_models import ScalpConfig
 from trading.scalp_engine import evaluate_entry, evaluate_exit, get_premarket_high
-from trading.scalp_ranker import rank_candidates, get_top_candidate
+from trading.scalp_ranker import rank_candidates, get_top_candidate, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_news
 from trading.broker.base import OrderResult
 
@@ -214,7 +214,7 @@ class LiveScalpRunner:
 
             if gap_pct < self.config.min_gap_pct:
                 continue
-            if gap_pct > 1000:
+            if gap_pct > MAX_GAP_PCT:
                 continue  # bad quote (sandbox sometimes returns garbage prev_close)
             if q.last > self.config.max_price:
                 continue
@@ -236,7 +236,7 @@ class LiveScalpRunner:
             return
 
         # Step 3: Enrich top 20 with news + fundamentals
-        top_gappers = gappers[:20]
+        top_gappers = gappers[:ENRICH_TOP_N]
         logger.info(f"Enriching top {len(top_gappers)} gappers with news...")
         self._enrich_with_news(top_gappers)
 

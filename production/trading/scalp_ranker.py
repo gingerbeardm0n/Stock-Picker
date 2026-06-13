@@ -19,6 +19,21 @@ W_RELVOL = 0.30
 W_NEWS = 0.30
 W_FLOAT = 0.10
 
+# Candidate-screening constants shared by live runners AND simulators.
+# Live runners only enrich the top N gappers by gap%% (news API cost) and
+# drop absurd gaps as bad quotes; sims must apply the SAME cuts or they
+# see candidates live never would (parity gap #2/#4, found 2026-06-12).
+ENRICH_TOP_N = 20
+MAX_GAP_PCT = 1000.0
+
+
+def screen_candidates(candidates: list[dict]) -> list[dict]:
+    """Apply the shared pre-enrichment screen: drop gap%>MAX_GAP_PCT,
+    keep only the top ENRICH_TOP_N by gap%. Input may be unsorted."""
+    ok = [c for c in candidates if c.get('gap_pct', 0) <= MAX_GAP_PCT]
+    ok.sort(key=lambda c: c.get('gap_pct', 0), reverse=True)
+    return ok[:ENRICH_TOP_N]
+
 
 def _normalize(values: list[float]) -> list[float]:
     """Min-max normalize to [0, 1]. Returns zeros if all values equal."""

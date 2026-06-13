@@ -26,7 +26,7 @@ import pytz
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from trading.scalp_models import ScalpConfig
-from trading.scalp_ranker import rank_candidates, get_top_candidate
+from trading.scalp_ranker import rank_candidates, get_top_candidate, screen_candidates
 from trading.scalp_engine import get_premarket_high, evaluate_entry, evaluate_exit
 from utils.query_helpers import StockDataDB
 
@@ -111,6 +111,9 @@ class ScalpSimulationRunner:
             if self.verbose:
                 logger.debug(f"{self.trade_date} | No candidates")
             return self._no_trade_result(0, None)
+
+        # Live-parity screen: same top-20 / >1000% cuts the live runner makes
+        candidates = screen_candidates(candidates)
 
         # ── Phase 2: Enrich with news + fundamentals ───────────────────────
         candidates = self._enrich_candidates(db, candidates)

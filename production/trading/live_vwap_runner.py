@@ -43,7 +43,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from config import Config
 from trading.vwap_models import VwapReclaimConfig, ENTRY_WINDOW_END, WATCH_TOP_N
 from trading.vwap_engine import VwapAccumulator, evaluate_entry, evaluate_exit
-from trading.scalp_ranker import rank_candidates
+from trading.scalp_ranker import rank_candidates, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_bar, record_news
 
 ET = pytz.timezone('America/New_York')
@@ -185,7 +185,7 @@ class LiveVwapRunner:
             gap_pct = (q.last - q.prev_close) / q.prev_close * 100
             if gap_pct < self.config.min_gap_pct:
                 continue
-            if gap_pct > 1000:
+            if gap_pct > MAX_GAP_PCT:
                 continue  # bad quote (sandbox sometimes returns garbage prev_close)
             if q.last > self.config.max_price:
                 continue
@@ -201,7 +201,7 @@ class LiveVwapRunner:
         if not gappers:
             return
 
-        top_gappers = gappers[:20]
+        top_gappers = gappers[:ENRICH_TOP_N]
         logger.info(f"Enriching top {len(top_gappers)} gappers with news...")
         self._enrich_with_news(top_gappers)
 
