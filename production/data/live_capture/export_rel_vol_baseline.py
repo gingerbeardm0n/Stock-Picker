@@ -107,7 +107,9 @@ def push_to_data_branch(json_path: str) -> None:
             os.makedirs(os.path.join(wt, os.path.dirname(rel_path)), exist_ok=True)
             with open(json_path) as src, open(os.path.join(wt, rel_path), 'w') as dst:
                 dst.write(src.read())
-            git('add', rel_path, cwd=wt)
+            # -f: the file is in the repo's .gitignore (generated artifact on
+            # main); on the data branch it IS the content.
+            git('add', '-f', rel_path, cwd=wt)
             git('commit', '-m', f'data: rel_vol baseline {date.today().isoformat()}', cwd=wt)
             git('push', '--force', 'origin', f'{DATA_BRANCH}:{DATA_BRANCH}', cwd=wt)
             print(f"Force-pushed {rel_path} to origin/{DATA_BRANCH}")

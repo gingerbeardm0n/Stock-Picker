@@ -47,11 +47,16 @@ sys.path.insert(0, os.path.abspath('production'))
 class DateSampler:
     """Stratified random day sampler grouped by ISO week."""
 
+    # Days that should never be sampled because they have known data issues.
+    # 2021-01-04: first trading day in DB, no prior_close possible (no data before it).
+    BLACKLISTED_DATES = {date(2021, 1, 4)}
+
     def __init__(
         self,
         weeks: dict[tuple[int, int], list[date]],
         holdout_dates: list[date] | None = None,
         min_days_per_week: int = 2,
+        extra_blacklist: set[date] | None = None,
     ):
         """
         Parameters
@@ -59,17 +64,25 @@ class DateSampler:
         weeks : {(iso_year, iso_week): [date, ...]} — available trading days per week.
         holdout_dates : dates reserved for final validation (never sampled).
         min_days_per_week : skip weeks with fewer days than this (can't sample 2 from 1).
+        extra_blacklist : additional dates to exclude (merged with BLACKLISTED_DATES).
         """
-        # Filter weeks that have enough days to sample from
-        self.weeks = {
-            wk: sorted(days) for wk, days in weeks.items()
-            if len(days) >= min_days_per_week
-        }
+        blacklist = self.BLACKLISTED_DATES | (extra_blacklist or set())
+
+        # Filter blacklisted dates, then filter weeks that have enough days
+        self.weeks = {}
+        removed = 0
+        for wk, days in weeks.items():
+            clean = sorted(d for d in days if d not in blacklist)
+            removed += len(days) - len(clean)
+            if len(clean) >= min_days_per_week:
+                self.weeks[wk] = clean
         self.holdout_dates = set(holdout_dates or [])
         self._week_keys = sorted(self.weeks.keys())
 
         # Stats
         total_days = sum(len(d) for d in self.weeks.values())
+        if removed:
+            print(f"[DateSampler] Excluded {removed} blacklisted date(s)")
         print(f"[DateSampler] {len(self._week_keys)} weeks, {total_days} pool days, "
               f"{len(self.holdout_dates)} holdout days")
 

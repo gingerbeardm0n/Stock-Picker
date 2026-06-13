@@ -58,22 +58,29 @@ BAR_HISTORY_SIZE = 40  # H0 FIX: was 30 < 35 (=slow26+signal9) so calculate_macd
                        # (optimizer tuned with MACD off). 40 matches live BAR_HISTORY_DEPTH.
 
 # Cache to reuse data across trials (keyed by trade date).
+import threading
 _DATA_CACHE: dict = {}          # date → cached day data
-_DATA_CACHE_MAX = 250           # LRU safety cap
+_DATA_CACHE_MAX = 1500          # Hot-filtered ~1 MB/day; 1500 slots covers full 5yr pool (~1215 days) for --build-cache-only
+_DATA_CACHE_LOCK = threading.Lock()
 _PERSIST_CACHE_VERSION = "v2"  # bumped: added rel_vol_30d column
 
 # Global symbol table — maps symbol string ↔ uint16 index.
 # Shared across all days so each unique string is allocated once.
 _SYM_TO_IDX: dict = {}         # 'TSLA' → 0
 _IDX_TO_SYM: list = []         # 0 → 'TSLA'
+_SYM_LOCK = threading.Lock()
 
 def _intern_symbol(sym: str) -> int:
-    """Return uint16 index for symbol, registering if new."""
+    """Return uint16 index for symbol, registering if new. Thread-safe."""
     idx = _SYM_TO_IDX.get(sym)
     if idx is None:
-        idx = len(_IDX_TO_SYM)
-        _SYM_TO_IDX[sym] = idx
-        _IDX_TO_SYM.append(sym)
+        with _SYM_LOCK:
+            # Double-check after acquiring lock
+            idx = _SYM_TO_IDX.get(sym)
+            if idx is None:
+                idx = len(_IDX_TO_SYM)
+                _SYM_TO_IDX[sym] = idx
+                _IDX_TO_SYM.append(sym)
     return idx
 
 
@@ -83,15 +90,16 @@ def save_memory_cache(path: str) -> int:
     process restarts skip the ~2hr warm-up."""
     import pickle
     global _DATA_CACHE, _SYM_TO_IDX, _IDX_TO_SYM
-    blob = {
-        'version': _PERSIST_CACHE_VERSION,
-        'data_cache': _DATA_CACHE,
-        'sym_to_idx': _SYM_TO_IDX,
-        'idx_to_sym': _IDX_TO_SYM,
-    }
-    with open(path, 'wb') as f:
-        pickle.dump(blob, f, protocol=pickle.HIGHEST_PROTOCOL)
-    return len(_DATA_CACHE)
+    with _DATA_CACHE_LOCK:
+        blob = {
+            'version': _PERSIST_CACHE_VERSION,
+            'data_cache': _DATA_CACHE,
+            'sym_to_idx': _SYM_TO_IDX,
+            'idx_to_sym': _IDX_TO_SYM,
+        }
+        with open(path, 'wb') as f:
+            pickle.dump(blob, f, protocol=pickle.HIGHEST_PROTOCOL)
+        return len(_DATA_CACHE)
 
 
 def load_memory_cache(path: str) -> int:
@@ -104,10 +112,11 @@ def load_memory_cache(path: str) -> int:
             blob = pickle.load(f)
         if blob.get('version') != _PERSIST_CACHE_VERSION:
             return 0
-        _DATA_CACHE = blob['data_cache']
-        _SYM_TO_IDX = blob['sym_to_idx']
-        _IDX_TO_SYM = blob['idx_to_sym']
-        return len(_DATA_CACHE)
+        with _DATA_CACHE_LOCK:
+            _DATA_CACHE = blob['data_cache']
+            _SYM_TO_IDX = blob['sym_to_idx']
+            _IDX_TO_SYM = blob['idx_to_sym']
+            return len(_DATA_CACHE)
     except (FileNotFoundError, EOFError, pickle.UnpicklingError, KeyError):
         return 0
 
@@ -227,7 +236,8 @@ class SimulationRunner:
             cached = _DATA_CACHE[self.date]
             # Invalidate if the cached universe doesn't match ours
             if cached.get('universe_key') != self._universe_key:
-                del _DATA_CACHE[self.date]
+                with _DATA_CACHE_LOCK:
+                    _DATA_CACHE.pop(self.date, None)
             else:
                 pass  # fall through to load from cache below
         if self.cache_data and self.date in _DATA_CACHE:
@@ -359,20 +369,19 @@ class SimulationRunner:
         else:
             self.minute_syms = np.array([], dtype=np.uint16)
             self.minute_array = np.empty((0, 8), dtype=np.float64)
-        _ti: dict = {}
-        for idx in range(len(self.minute_array)):
-            dt = datetime.fromtimestamp(self.minute_array[idx, 0], tz=ET)
-            if dt not in _ti:
-                _ti[dt] = []
-            _ti[dt].append(idx)
-        self.time_index = {k: np.array(v, dtype=np.uint32) for k, v in _ti.items()}
-
         if self.minute_array.size == 0:
             logger.warning(f"No minute bars found for {self.date}")
             return False
 
+        # Build hot_symbols FIRST (vectorized numpy — ~5ms vs 200ms Python loop on 229K rows),
+        # then filter minute_array/syms to hot-symbol rows only. This makes time_index
+        # construction ~19× faster (12K rows vs 229K) and shrinks the per-day cache
+        # entry from ~14 MB to ~0.8 MB, allowing 300+ days to fit in RAM.
+        self.hot_symbols = self._build_hot_symbols()
+        self.minute_array, self.minute_syms, self.time_index = self._filter_to_hot_symbols()
+
         if self.verbose:
-            logger.info(f"Loaded {len(self.minute_array):,} minute bars for {self.date}")
+            logger.info(f"Loaded {len(self.minute_array):,} minute bars for {self.date} ({len(self.hot_symbols)} hot symbols)")
             logger.info(f"Seeded cumulative volume from 4am-8am hourly bars for {len(set([r[1] for r in hour_rows]))} symbols")
         if self.debug:
             self._stats['load_seconds'] = time.perf_counter() - t0
@@ -380,73 +389,130 @@ class SimulationRunner:
             self._stats['minute_bars_total'] = len(self.minute_array)
             self._stats['hour_symbols_seeded'] = len(set([r[1] for r in hour_rows]))
             self._stats['cache_hit'] = False
-
-        self.hot_symbols = self._build_hot_symbols()
         if self.cache_data:
-            _DATA_CACHE[self.date] = {
-                'minute_array': self.minute_array,
-                'minute_syms': self.minute_syms,
-                'time_index': dict(self.time_index),
-                'premarket_volume_by_symbol': dict(premarket_volume),
-                'daily_bars_by_symbol': self.daily_bars_by_symbol,
-                'prior_close': self.prior_close,
-                'prior_day_high': self.prior_day_high,
-                'fundamentals': self.fundamentals,
-                'symbols_total': len(symbols),
-                'hot_symbols': self.hot_symbols,
-                'universe_key': self._universe_key,
-            }
-            # LRU eviction: keep at most _DATA_CACHE_MAX days in memory
-            while len(_DATA_CACHE) > _DATA_CACHE_MAX:
-                _DATA_CACHE.pop(next(iter(_DATA_CACHE)))
+            with _DATA_CACHE_LOCK:
+                _DATA_CACHE[self.date] = {
+                    'minute_array': self.minute_array,
+                    'minute_syms': self.minute_syms,
+                    'time_index': dict(self.time_index),
+                    'premarket_volume_by_symbol': dict(premarket_volume),
+                    'daily_bars_by_symbol': self.daily_bars_by_symbol,
+                    'prior_close': self.prior_close,
+                    'prior_day_high': self.prior_day_high,
+                    'fundamentals': self.fundamentals,
+                    'symbols_total': len(symbols),
+                    'hot_symbols': self.hot_symbols,
+                    'universe_key': self._universe_key,
+                }
+                # LRU eviction: keep at most _DATA_CACHE_MAX days in memory
+                while len(_DATA_CACHE) > _DATA_CACHE_MAX:
+                    _DATA_CACHE.pop(next(iter(_DATA_CACHE)))
         if self.cache_data and self.cache_dir:
             self._persist_cache(dict(premarket_volume), symbols)
         return True
 
     def _build_hot_symbols(self) -> set:
         """
-        Scan minute_array once to find symbols that are worth evaluating this day.
+        Find symbols worth evaluating this day — vectorized numpy (replaces O(N_bars) Python loop).
 
         A symbol qualifies if ANY of its bars has price in [min_price, max_price]
-        AND gain% >= min_gain vs prior_close.  We use hardcoded defaults regardless
-        of the current trial's config so the result can be safely cached and shared
-        across all trials in the same process.
+        AND gain% >= min_gain vs prior_close. Hardcoded permissive defaults so the
+        result is always a true superset across all Optuna configs. qualifies_momentum()
+        is the authoritative gate; this is only a cheap pre-filter.
 
-        MIN_GAIN must be <= the Optuna search space floor for m_min_intraday_gain
-        (currently 2.0) so this set is always a true superset of what
-        qualifies_momentum() could approve at any gain threshold Optuna tries.
-        qualifies_momentum() is the authoritative gate — this is only a coarse
-        pre-filter to avoid scanning all 4000 symbols every minute.
+        MIN_GAIN must be <= the Optuna search space floor for m_min_intraday_gain.
+
+        When called on a cache-hit (filtered minute_array, ~12K rows), this runs in ~1ms.
+        When called on a fresh DB load (full minute_array, ~229K rows), ~5ms (vs 200ms
+        for the old Python loop). The _filter_to_hot_symbols() call after this reduces
+        subsequent calls to the fast path.
         """
         # TODO (SIM/LIVE DIVERGENCE — low priority):
         # This scans the WHOLE day's bars to build the superset (look-ahead).
-        # A stock that surges at 2 PM is in hot_symbols from 9:30 AM. In live
-        # trading, symbols are discovered in real-time via the per-minute
-        # intraday scan (_run_intraday_momentum_scan). qualifies_momentum()'s
-        # time-forward gates (G2 HOD, G3 time, G6 gain) prevent acting on
-        # future data, so no incorrect trades result — but the sim evaluates
-        # some candidates earlier than live would discover them, which can
-        # cause slightly more entries than live. True time-forward sim discovery
-        # would require running a streaming intraday scan during simulation.
+        # qualifies_momentum()'s time-forward gates (G2 HOD, G3 time, G6 gain)
+        # prevent acting on future data, so no incorrect trades result — but the
+        # sim evaluates some candidates earlier than live would discover them.
+        if self.minute_array is None or len(self.minute_array) == 0:
+            return set()
+
         MIN_PRICE = 1.0   # match lowest possible a_min_price in Optuna search space
         MAX_PRICE = 25.0  # match highest possible a_max_price in Optuna search space
-        MIN_GAIN  = 5.0   # must match Optuna search space floor for m_min_intraday_gain
+        MIN_GAIN  = 5.0   # must be <= Optuna search space floor for m_min_intraday_gain
 
-        hot = set()
-        for idx in range(len(self.minute_array)):
-            symbol = _IDX_TO_SYM[self.minute_syms[idx]]
-            if symbol in hot:
-                continue
-            prior = self.prior_close.get(symbol)
-            if not prior or prior <= 0:
-                continue
-            close = self.minute_array[idx, 4]   # col 4 = close (0=unix_ts,1=open,2=high,3=low,4=close)
-            if close < MIN_PRICE or close > MAX_PRICE:
-                continue
-            if (close - prior) / prior * 100 < MIN_GAIN:
-                continue
-            hot.add(symbol)
-        return hot
+        # Build a contiguous prior_close array indexed by sym_id.
+        # O(n_unique_symbols) — far cheaper than dict.get per bar in Python loop.
+        n_syms = len(_IDX_TO_SYM)
+        prior_arr = np.zeros(n_syms, dtype=np.float64)
+        for sym, pc in self.prior_close.items():
+            sid = _SYM_TO_IDX.get(sym)
+            if sid is not None and pc and pc > 0:
+                prior_arr[sid] = float(pc)
+
+        # Vectorized bar filter — one numpy pass over all rows.
+        closes  = self.minute_array[:, 4]              # col 4 = close
+        sym_ids = self.minute_syms.astype(np.int32)    # uint16 → int32 for fancy indexing
+        priors  = prior_arr[sym_ids]                   # broadcast prior_close per bar
+
+        # Gains: 0.0 where prior == 0 (naturally excluded since MIN_GAIN > 0)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            gains = np.where(priors > 0, (closes - priors) / priors * 100.0, 0.0)
+
+        valid = (
+            (closes >= MIN_PRICE) &
+            (closes <= MAX_PRICE) &
+            (gains  >= MIN_GAIN)
+        )
+
+        hot_ids = np.unique(sym_ids[valid])
+        return {_IDX_TO_SYM[int(i)] for i in hot_ids}
+
+    def _filter_to_hot_symbols(self):
+        """
+        Return (minute_array, minute_syms, time_index) filtered to hot_symbols rows only.
+
+        Reduces per-day cache entry from ~14 MB (229K bars for all symbols) to ~0.8 MB
+        (~12K bars for 50-200 hot symbols) — 19× reduction. Allows _DATA_CACHE_MAX=300
+        to hold a full 5yr stratified sample (259 days) in ~300 MB vs 4+ GB.
+
+        Also makes time_index construction ~19× faster since it iterates the small
+        filtered array. Safe to call before time_index is built on self (builds fresh).
+
+        If hot_symbols is empty, falls back to building time_index on the full array.
+        """
+        if not self.hot_symbols or self.minute_array is None or len(self.minute_array) == 0:
+            # Fallback: build time_index on full (unfiltered) array
+            _ti: dict = {}
+            if self.minute_array is not None:
+                for idx in range(len(self.minute_array)):
+                    dt = datetime.fromtimestamp(self.minute_array[idx, 0], tz=ET)
+                    if dt not in _ti:
+                        _ti[dt] = []
+                    _ti[dt].append(idx)
+            return (
+                self.minute_array,
+                self.minute_syms,
+                {k: np.array(v, dtype=np.uint32) for k, v in _ti.items()},
+            )
+
+        # Build mask: keep only rows whose sym_id is in hot_symbols
+        hot_ids = np.array(
+            [_SYM_TO_IDX[s] for s in self.hot_symbols if s in _SYM_TO_IDX],
+            dtype=np.uint16,
+        )
+        mask   = np.isin(self.minute_syms, hot_ids)
+        f_arr  = self.minute_array[mask]
+        f_syms = self.minute_syms[mask]
+
+        # Build time_index on the small filtered array (~12K rows vs 229K)
+        _ti: dict = {}
+        for idx in range(len(f_arr)):
+            dt = datetime.fromtimestamp(f_arr[idx, 0], tz=ET)
+            if dt not in _ti:
+                _ti[dt] = []
+            _ti[dt].append(idx)
+        f_ti = {k: np.array(v, dtype=np.uint32) for k, v in _ti.items()}
+
+        return f_arr, f_syms, f_ti
 
     def _load_historical_data(self, db, symbols):
         t0 = time.perf_counter()
@@ -468,6 +534,38 @@ class SimulationRunner:
             for symbol, close, high in cursor.fetchall():
                 self.prior_close[symbol] = float(close)
                 self.prior_day_high[symbol] = float(high)
+
+        # Fallback: derive prior_close from stock_candles_1m when stock_candles_1d
+        # has no coverage (e.g. 2021-01 through 2021-05). Uses the last minute bar's
+        # close from the most recent prior trading day as the prior close, and the
+        # max high across all minute bars that day as the prior day high.
+        if not self.prior_close:
+            cursor.execute("SET statement_timeout = '120s'")
+            # Use time range to leverage index: look back 7 days max for prior trading day
+            prior_start = self.date - timedelta(days=7)
+            cursor.execute("""
+                SELECT DISTINCT time::date as d FROM stock_candles_1m
+                WHERE time >= %s AND time < %s
+                ORDER BY d DESC LIMIT 1
+            """, (prior_start, self.date))
+            result = cursor.fetchone()
+            prior_1m_date = result[0] if result else None
+            if prior_1m_date:
+                cursor.execute("""
+                    SELECT symbol,
+                           (array_agg(close ORDER BY time DESC))[1] as last_close,
+                           MAX(high) as day_high
+                    FROM stock_candles_1m
+                    WHERE time >= %s AND time < %s
+                    GROUP BY symbol
+                """, (prior_1m_date, prior_1m_date + timedelta(days=1)))
+                for symbol, close, high in cursor.fetchall():
+                    self.prior_close[symbol] = float(close)
+                    self.prior_day_high[symbol] = float(high)
+                if self.verbose:
+                    logger.info(f"  Prior close fallback from 1m bars ({prior_1m_date}): "
+                                f"{len(self.prior_close)} symbols")
+            cursor.execute("RESET statement_timeout")
 
         cursor.execute("""
             SELECT symbol, float_shares, market_cap FROM stock_fundamentals
@@ -807,22 +905,23 @@ class SimulationRunner:
             logger.info(f"Seeded cumulative volume from 4am-8am hourly bars for {len(premarket_rows)} symbols")
 
         self.hot_symbols = self._build_hot_symbols()
-        _DATA_CACHE[self.date] = {
-            'minute_array': self.minute_array,
-            'minute_syms': self.minute_syms,
-            'time_index': dict(self.time_index),
-            'premarket_volume_by_symbol': {r['symbol']: float(r['volume']) for r in premarket_rows},
-            'daily_bars_by_symbol': self.daily_bars_by_symbol,
-            'prior_close': self.prior_close,
-            'prior_day_high': self.prior_day_high,
-            'fundamentals': self.fundamentals,
-            'symbols_total': len(self.prior_close),
-            'hot_symbols': self.hot_symbols,
-            'universe_key': self._universe_key,
-        }
-        # LRU eviction
-        while len(_DATA_CACHE) > _DATA_CACHE_MAX:
-            _DATA_CACHE.pop(next(iter(_DATA_CACHE)))
+        with _DATA_CACHE_LOCK:
+            _DATA_CACHE[self.date] = {
+                'minute_array': self.minute_array,
+                'minute_syms': self.minute_syms,
+                'time_index': dict(self.time_index),
+                'premarket_volume_by_symbol': {r['symbol']: float(r['volume']) for r in premarket_rows},
+                'daily_bars_by_symbol': self.daily_bars_by_symbol,
+                'prior_close': self.prior_close,
+                'prior_day_high': self.prior_day_high,
+                'fundamentals': self.fundamentals,
+                'symbols_total': len(self.prior_close),
+                'hot_symbols': self.hot_symbols,
+                'universe_key': self._universe_key,
+            }
+            # LRU eviction
+            while len(_DATA_CACHE) > _DATA_CACHE_MAX:
+                _DATA_CACHE.pop(next(iter(_DATA_CACHE)))
         return True
 
     def _persist_cache(self, premarket_volume: dict, symbols: list[str]) -> None:
@@ -841,40 +940,49 @@ class SimulationRunner:
         prior_path = prefix.with_suffix(".prior.parquet")
         fundamentals_path = prefix.with_suffix(".fundamentals.parquet")
 
-        minute_tbl = pa.Table.from_pylist(
-            [
-                {
-                    'time': datetime.fromtimestamp(self.minute_array[i, 0], tz=ET),
-                    'symbol': _IDX_TO_SYM[self.minute_syms[i]],
-                    'open': self.minute_array[i, 1],
-                    'high': self.minute_array[i, 2],
-                    'low': self.minute_array[i, 3],
-                    'close': self.minute_array[i, 4],
-                    'volume': self.minute_array[i, 5],
-                    'rel_vol_30d': None if (self.minute_array[i, 6] != self.minute_array[i, 6]) else self.minute_array[i, 6],
-                    'vwap': self.minute_array[i, 7],
-                }
-                for i in range(len(self.minute_array))
-            ]
-        )
-        premarket_tbl = pa.Table.from_pylist(
-            [{'symbol': s, 'volume': float(v)} for s, v in premarket_volume.items()]
-        )
+        # Skip minute/premarket/fundamentals if they already exist on disk —
+        # only prior.parquet needs rewriting (it may have been empty before the
+        # 1m-fallback fix). This avoids a MemoryError from building a 200k-row
+        # Python list for minute_tbl when RAM is tight (250 cached days ~4GB).
+        _need_full_write = not (minute_path.exists() and premarket_path.exists()
+                                and fundamentals_path.exists())
+
+        if _need_full_write:
+            minute_tbl = pa.Table.from_pylist(
+                [
+                    {
+                        'time': datetime.fromtimestamp(self.minute_array[i, 0], tz=ET),
+                        'symbol': _IDX_TO_SYM[self.minute_syms[i]],
+                        'open': self.minute_array[i, 1],
+                        'high': self.minute_array[i, 2],
+                        'low': self.minute_array[i, 3],
+                        'close': self.minute_array[i, 4],
+                        'volume': self.minute_array[i, 5],
+                        'rel_vol_30d': None if (self.minute_array[i, 6] != self.minute_array[i, 6]) else self.minute_array[i, 6],
+                        'vwap': self.minute_array[i, 7],
+                    }
+                    for i in range(len(self.minute_array))
+                ]
+            )
+            premarket_tbl = pa.Table.from_pylist(
+                [{'symbol': s, 'volume': float(v)} for s, v in premarket_volume.items()]
+            )
+            fundamentals_tbl = pa.Table.from_pylist(
+                [{'symbol': s,
+                  'float_shares': self.fundamentals.get(s, {}).get('float_shares'),
+                  'market_cap': self.fundamentals.get(s, {}).get('market_cap')}
+                 for s in self.fundamentals.keys()]
+            )
+            pq.write_table(minute_tbl, minute_path)
+            pq.write_table(premarket_tbl, premarket_path)
+            pq.write_table(fundamentals_tbl, fundamentals_path)
+
+        # Always write prior_tbl — may need updating after 1m-fallback fix
         prior_tbl = pa.Table.from_pylist(
             [{'symbol': s, 'close': self.prior_close.get(s), 'high': self.prior_day_high.get(s)}
              for s in self.prior_close.keys()]
         )
-        fundamentals_tbl = pa.Table.from_pylist(
-            [{'symbol': s,
-              'float_shares': self.fundamentals.get(s, {}).get('float_shares'),
-              'market_cap': self.fundamentals.get(s, {}).get('market_cap')}
-             for s in self.fundamentals.keys()]
-        )
-
-        pq.write_table(minute_tbl, minute_path)
-        pq.write_table(premarket_tbl, premarket_path)
         pq.write_table(prior_tbl, prior_path)
-        pq.write_table(fundamentals_tbl, fundamentals_path)
 
     # ── Reporting ─────────────────────────────────────────────────────────────
 

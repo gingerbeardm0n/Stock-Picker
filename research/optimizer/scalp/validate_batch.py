@@ -24,6 +24,8 @@ OPTUNA_STORAGE = 'postgresql://postgres:changeme123@localhost:5432/stockdata'
 TRIALS = [173, 139, 136, 65, 91, 79, 103]
 
 START, END = sys.argv[1], sys.argv[2]
+if len(sys.argv) > 3:  # optional: comma-separated trial list override
+    TRIALS = [int(x) for x in sys.argv[3].split(',')]
 
 study = optuna.load_study(study_name='scalp_v1', storage=OPTUNA_STORAGE)
 by_num = {t.number: t for t in study.trials}

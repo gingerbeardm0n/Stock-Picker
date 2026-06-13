@@ -334,10 +334,23 @@ class Orchestrator:
             precomputed = bar.get('rel_vol_30d')
             if precomputed is not None:
                 rel_vol = float(precomputed)
+                # NaN guard: precomputed rel_vol_30d can be NaN when DB had
+                # no historical data for averaging.  Treat as "unknown" → bypass.
+                if rel_vol != rel_vol:  # NaN check
+                    rel_vol = scfg.min_relative_volume if scfg.enable_relative_volume else 0.0
             else:
+                # No precomputed rel_vol available (NULL in DB / cache).
+                # Try resolver (live path); if resolver also has nothing,
+                # bypass the rel_vol gate rather than hard-rejecting.
                 avg_vol = avg_vols.get(symbol, 0)
                 cum_vol = self._cumulative_volume.get(symbol, 0)
-                rel_vol = cum_vol / avg_vol if avg_vol > 0 else 0.0
+                if avg_vol > 0:
+                    rel_vol = cum_vol / avg_vol
+                else:
+                    # No avg_vol data at all — bypass rel_vol gate (set to threshold).
+                    # This prevents silent rejection of all stocks on days where
+                    # rel_vol_30d was never backfilled (e.g., 2024-12 through 2025).
+                    rel_vol = scfg.min_relative_volume if scfg.enable_relative_volume else 0.0
 
             entry_signal = evaluate_entry(
                 symbol=symbol,
