@@ -44,6 +44,7 @@ from trading.scalp_ranker import rank_candidates, get_top_candidate, ENRICH_TOP_
 from trading.bar_capture import record_news
 from trading.broker.base import OrderResult
 from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol
+from backend.news_fetcher import has_news_catalyst
 
 ET = pytz.timezone('America/New_York')
 
@@ -174,6 +175,9 @@ class LiveScalpRunner:
         # from the data branch. None → rel_vol=10.0 fallback (filter no-op).
         baseline = fetch_rel_vol_baseline()
         self._rel_vol_baselines = baseline.get('baselines') if baseline else None
+        # Float baseline (Gap #2): shipped alongside rel-vol on the data branch
+        # so the live float filter matches the sim's stock_fundamentals gate.
+        self._floats = baseline.get('floats') if baseline else None
 
         # Symbol list for scanning
         self._symbols = self._load_symbols()
@@ -322,6 +326,15 @@ class LiveScalpRunner:
             if c['rel_vol'] < self.config.min_relative_volume:
                 logger.info(f"  SKIP {c['symbol']} gap={c['gap_pct']:.1f}% "
                             f"rel_vol={c['rel_vol']:.2f} < {self.config.min_relative_volume:.2f}")
+                continue
+            # Float filter (Gap #2): match the sim's max_float gate using the
+            # shipped float baseline. None (symbol absent / no baseline) → keep,
+            # exactly like the sim (`if float_shares and float_shares > max`).
+            float_shares = self._floats.get(c['symbol']) if self._floats else None
+            c['float_shares'] = float_shares
+            if float_shares and float_shares > self.config.max_float:
+                logger.info(f"  SKIP {c['symbol']} gap={c['gap_pct']:.1f}% "
+                            f"float={float_shares:,.0f} > {self.config.max_float:,.0f}")
                 continue
             survivors.append(c)
         self.state.candidates = survivors
@@ -606,7 +619,7 @@ class LiveScalpRunner:
                 )
                 if articles:
                     tier = self.classify_news_tier(articles)
-                    c['has_news'] = tier in ('tier1', 'tier2', 'presence')
+                    c['has_news'] = has_news_catalyst(tier)  # shared sim/live gate
                     c['news_tier'] = tier
                     record_news(c['symbol'], articles, tier)
                 else:

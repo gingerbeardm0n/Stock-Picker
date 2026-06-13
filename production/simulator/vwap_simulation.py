@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from trading.vwap_models import VwapReclaimConfig, WATCH_TOP_N
 from trading.vwap_engine import VwapAccumulator, evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, screen_candidates
+from backend.news_fetcher import has_news_catalyst
 from utils.query_helpers import StockDataDB
 
 logger = logging.getLogger(__name__)
@@ -288,11 +289,14 @@ class VwapSimulationRunner:
             avg_vol = avg_vols.get(sym, 0)
             c['rel_vol'] = today_vol / avg_vol if avg_vol > 0 else 10.0
 
+            # News — shared sim/live gate (has_news_catalyst). Equivalent to the
+            # old any(is_specific): db tier is 'none' iff no specific article.
             try:
                 articles = db.get_news_for_symbol(sym, market_open_930, hours_back=48)
                 if articles:
-                    c['has_news'] = any(a.get('is_specific', True) for a in articles)
-                    c['news_tier'] = db.get_news_tier(sym, market_open_930, hours_back=48)
+                    tier = db.get_news_tier(sym, market_open_930, hours_back=48)
+                    c['news_tier'] = tier
+                    c['has_news'] = has_news_catalyst(tier)
                 else:
                     c['has_news'] = False
                     c['news_tier'] = 'none'

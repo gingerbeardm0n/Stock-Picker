@@ -54,6 +54,14 @@ QUERY = """
     GROUP BY symbol
 """
 
+# Float per symbol — same stock_fundamentals table the simulators read via
+# get_fundamentals_batch, so the live float filter (Gap #2) matches the sim.
+FLOAT_QUERY = """
+    SELECT symbol, float_shares
+    FROM stock_fundamentals
+    WHERE float_shares IS NOT NULL AND float_shares > 0
+"""
+
 
 def export() -> str:
     """Query the baseline and write data/rel_vol_baseline.json. Returns the path."""
@@ -62,22 +70,27 @@ def export() -> str:
         with conn.cursor() as cur:
             cur.execute(QUERY, (MINUTE_OF_DAY,))
             rows = cur.fetchall()
+            cur.execute(FLOAT_QUERY)
+            float_rows = cur.fetchall()
     finally:
         conn.close()
 
     baselines = {sym: float(avg) for sym, avg in rows if avg is not None and float(avg) > 0}
+    floats = {sym: float(fs) for sym, fs in float_rows if fs is not None and float(fs) > 0}
 
     payload = {
         'as_of': date.today().isoformat(),
         'minute_of_day': MINUTE_OF_DAY,
         'baselines': baselines,
+        'floats': floats,
     }
 
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     with open(OUTPUT_PATH, 'w') as f:
         json.dump(payload, f, separators=(',', ':'))
 
-    print(f"Wrote {OUTPUT_PATH}: {len(baselines):,} symbols, as_of={payload['as_of']}")
+    print(f"Wrote {OUTPUT_PATH}: {len(baselines):,} rel-vol baselines, "
+          f"{len(floats):,} floats, as_of={payload['as_of']}")
     return OUTPUT_PATH
 
 

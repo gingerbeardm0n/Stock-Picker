@@ -46,6 +46,7 @@ from trading.vwap_engine import VwapAccumulator, evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_bar, record_news
 from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol
+from backend.news_fetcher import has_news_catalyst
 
 ET = pytz.timezone('America/New_York')
 
@@ -212,15 +213,24 @@ class LiveVwapRunner:
         logger.info(f"Enriching top {len(top_gappers)} gappers with news...")
         self._enrich_with_news(top_gappers)
 
+        # Rel-vol numerator parity (Gap #3): the 30-day baseline denominator is
+        # cumulative volume THROUGH 9:25 ET (rel_vol_cum_cache minute_of_day=565,
+        # premarket-inclusive). The instantaneous quote volume at this ~9:45 scan
+        # is 2-3x larger (volume piles up after the 9:30 open), which would make
+        # min_relative_volume a no-op live. Reconstruct the SAME basis: sum each
+        # candidate's session-bar volume up to 9:25 from the data feed.
+        vol_through_925 = self._cumulative_volume_through_925(
+            [g['symbol'] for g in top_gappers])
+
         filtered = []
         for g in top_gappers:
             if self.config.require_news and not g.get('has_news', False):
                 logger.info(f"  SKIP {g['symbol']} gap={g['gap_pct']:.1f}% -- no news")
                 continue
-            # Live rel-vol (Gap #1): real quote_volume / 30-day baseline, with
-            # sim-matching 10.0 fallback when the baseline is missing.
+            # Live rel-vol (Gap #1 + #3): cumulative-through-9:25 / 30-day baseline,
+            # with sim-matching 10.0 fallback when the baseline/numerator is missing.
             g['rel_vol'] = compute_rel_vol(
-                g['symbol'], g.get('quote_volume'), self._rel_vol_baselines)
+                g['symbol'], vol_through_925.get(g['symbol']), self._rel_vol_baselines)
             g['float_shares'] = None
             # Same filter the sim applies — skip thin-volume candidates.
             if g['rel_vol'] < self.config.min_relative_volume:
@@ -468,6 +478,34 @@ class LiveVwapRunner:
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
+    def _cumulative_volume_through_925(self, symbols: list[str]) -> dict[str, float]:
+        """Sum each symbol's session-bar volume from start-of-data through 9:25 ET
+        — the SAME basis as the rel_vol_cum_cache denominator (minute_of_day=565,
+        premarket-inclusive). Removes the quote-timing skew that made the live
+        rel-vol filter a no-op (Gap #3).
+
+        Cross-vendor caveat: bars come from Tradier, the baseline was built from
+        Alpaca historical data, so a residual volume-definition offset remains —
+        far smaller than the 2-3x timing error this fixes. Symbols with no
+        pre-9:25 bars are omitted → compute_rel_vol falls back to the 10.0 default.
+        """
+        out: dict[str, float] = {}
+        try:
+            bars_by_sym = self.data_feed.get_bars_since_4am(symbols)
+        except Exception as e:
+            logger.warning(f"Session-bar fetch for rel-vol failed ({e}); "
+                           f"rel_vol will use the 10.0 fallback for all candidates.")
+            return out
+        for sym, blist in bars_by_sym.items():
+            total = 0.0
+            for b in blist:
+                b_et = b.time.astimezone(ET)
+                if b_et.hour * 60 + b_et.minute <= 565:  # through 9:25 ET inclusive
+                    total += float(getattr(b, 'volume', 0) or 0)
+            if total > 0:
+                out[sym] = total
+        return out
+
     def _enrich_with_news(self, candidates: list[dict]):
         today = datetime.now(ET).date()
         for c in candidates:
@@ -477,7 +515,7 @@ class LiveVwapRunner:
                 )
                 if articles:
                     tier = self.classify_news_tier(articles)
-                    c['has_news'] = tier in ('tier1', 'tier2', 'presence')
+                    c['has_news'] = has_news_catalyst(tier)  # shared sim/live gate
                     c['news_tier'] = tier
                     record_news(c['symbol'], articles, tier)
                 else:

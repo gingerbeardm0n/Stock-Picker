@@ -69,6 +69,29 @@ def classify_news_tier(articles: list) -> str:
 
     return 'presence'  # news found, just doesn't match known tier keywords
 
+
+# ── Shared sim/live news gate ────────────────────────────────────────────────
+# The set of tiers that count as a tradeable catalyst. Includes 'tier3' (weak:
+# sector sympathy / social-only) to MATCH the simulator the strategies were
+# validated against — the sim gate was `any(is_specific)`, i.e. any article that
+# isn't a multi-symbol roundup, which equals any tier != 'none' (tier1/2/3 or
+# presence). The live runners previously excluded 'tier3', so they skipped days
+# the backtest traded. Unified here.
+#
+# To exclude tier3 (trade only stronger catalysts), drop it from this set AND
+# re-run the optimizer/validation — it changes which days trade.
+NEWS_CATALYST_TIERS = frozenset({'tier1', 'tier2', 'tier3', 'presence'})
+
+
+def has_news_catalyst(tier: str) -> bool:
+    """Shared news gate for sim AND live. True if `tier` counts as a catalyst.
+
+    Single source of truth so the simulator's candidate selection and the live
+    runners' candidate selection can never diverge on the news filter.
+    """
+    return tier in NEWS_CATALYST_TIERS
+
+
 class NewsFetcher:
     def __init__(self):
         from alpaca.data.historical import NewsClient
