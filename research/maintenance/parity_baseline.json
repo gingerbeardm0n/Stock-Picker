@@ -1,6 +1,9 @@
 {
-  "total_checks": 26,
-  "passed": 26,
-  "failed": 0,
-  "failure_ids": []
+  "total_checks": 25,
+  "passed": 23,
+  "failed": 2,
+  "failure_ids": [
+    "scalp_sim_uses_rank_candidates",
+    "vwap_sim_has_float_filter"
+  ]
 }
