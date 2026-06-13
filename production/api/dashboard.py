@@ -203,19 +203,25 @@ def get_logs(n: int = Query(default=100, le=500)):
 
 
 @app.get("/bars_dump")
-def get_bars_dump():
-    """Return all bars captured today (live/sim parity diagnostic)."""
-    from trading.bar_capture import read_today
-    rows = read_today()
-    return {"count": len(rows), "bars": rows}
+def get_bars_dump(date: str | None = Query(None, description="YYYY-MM-DD; omit for today")):
+    """Return bars captured on a given day (default today) — live/sim parity diagnostic.
+
+    Pass ?date=YYYY-MM-DD to pull a prior day still on Render's ephemeral disk
+    (e.g. Friday's capture fetched Saturday before the next redeploy wipes it).
+    """
+    from trading.bar_capture import read_today, read_bars_for_date, available_dates
+    rows = read_bars_for_date(date) if date else read_today()
+    return {"count": len(rows), "date": date or "today",
+            "available": available_dates("bars"), "bars": rows}
 
 
 @app.get("/news_dump")
-def get_news_dump():
-    """Return all news articles the live runners fetched today (parity diagnostic)."""
-    from trading.bar_capture import read_today_news
-    rows = read_today_news()
-    return {"count": len(rows), "news": rows}
+def get_news_dump(date: str | None = Query(None, description="YYYY-MM-DD; omit for today")):
+    """Return news the live runners fetched on a given day (default today) — parity diagnostic."""
+    from trading.bar_capture import read_today_news, read_news_for_date, available_dates
+    rows = read_news_for_date(date) if date else read_today_news()
+    return {"count": len(rows), "date": date or "today",
+            "available": available_dates("news"), "news": rows}
 
 
 @app.post("/trigger")

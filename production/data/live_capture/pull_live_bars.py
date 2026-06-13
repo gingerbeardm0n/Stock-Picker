@@ -90,6 +90,8 @@ ON CONFLICT (time, symbol, source) DO NOTHING
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--api', default=os.getenv('JTRADER_API_URL', 'https://jtrader-api.onrender.com'))
+    ap.add_argument('--date', default=None,
+                    help='YYYY-MM-DD to pull a prior day still on disk (default: today)')
     args = ap.parse_args()
 
     headers = {}
@@ -97,11 +99,14 @@ def main():
     if api_key:
         headers['X-API-Key'] = api_key
 
-    print(f"Fetching {args.api}/bars_dump ...")
-    r = requests.get(f"{args.api}/bars_dump", headers=headers, timeout=60)
+    params = {'date': args.date} if args.date else {}
+
+    print(f"Fetching {args.api}/bars_dump (date={args.date or 'today'}) ...")
+    r = requests.get(f"{args.api}/bars_dump", headers=headers, params=params, timeout=60)
     r.raise_for_status()
-    bars = r.json().get('bars', [])
-    print(f"  {len(bars)} bars captured today")
+    payload = r.json()
+    bars = payload.get('bars', [])
+    print(f"  {len(bars)} bars captured (available on disk: {payload.get('available')})")
 
     rows = []
     for b in bars:
@@ -116,13 +121,13 @@ def main():
         except (KeyError, TypeError, ValueError) as e:
             print(f"  skipping malformed row: {e} — {b}", file=sys.stderr)
 
-    print(f"Fetching {args.api}/news_dump ...")
+    print(f"Fetching {args.api}/news_dump (date={args.date or 'today'}) ...")
     news_rows = []
     try:
-        rn = requests.get(f"{args.api}/news_dump", headers=headers, timeout=60)
+        rn = requests.get(f"{args.api}/news_dump", headers=headers, params=params, timeout=60)
         rn.raise_for_status()
         news = rn.json().get('news', [])
-        print(f"  {len(news)} news articles captured today")
+        print(f"  {len(news)} news articles captured")
         for a in news:
             try:
                 news_rows.append((

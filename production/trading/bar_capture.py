@@ -56,6 +56,15 @@ def read_today() -> list[dict]:
     return _read_jsonl(_capture_path())
 
 
+def read_bars_for_date(day_str: str) -> list[dict]:
+    """Return bars captured on a specific day. day_str: 'YYYY-MM-DD' or 'YYYYMMDD'.
+
+    Lets a post-session pull fetch a PRIOR day still on disk (the endpoint was
+    today-only, which stranded e.g. Friday's capture when pulled Saturday).
+    """
+    return _read_jsonl(_capture_path(_parse_day(day_str)))
+
+
 def _news_path(day: datetime | None = None) -> Path:
     d = (day or datetime.now(timezone.utc)).strftime("%Y%m%d")
     return _STATE_DIR / f"news_{d}.jsonl"
@@ -95,6 +104,33 @@ def record_news(symbol: str, articles: list[dict], tier: str) -> None:
 def read_today_news() -> list[dict]:
     """Return all news rows captured today (for the /news_dump endpoint)."""
     return _read_jsonl(_news_path())
+
+
+def read_news_for_date(day_str: str) -> list[dict]:
+    """Return news captured on a specific day. day_str: 'YYYY-MM-DD' or 'YYYYMMDD'."""
+    return _read_jsonl(_news_path(_parse_day(day_str)))
+
+
+def available_dates(kind: str = "bars") -> list[str]:
+    """List capture dates still on disk as 'YYYY-MM-DD'. kind: 'bars' or 'news'.
+
+    Lets the puller see what prior days survive before a redeploy wipes them.
+    """
+    prefix = "bars_" if kind == "bars" else "news_"
+    if not _STATE_DIR.exists():
+        return []
+    out = []
+    for p in _STATE_DIR.glob(f"{prefix}*.jsonl"):
+        stem = p.stem[len(prefix):]  # YYYYMMDD
+        if len(stem) == 8 and stem.isdigit():
+            out.append(f"{stem[:4]}-{stem[4:6]}-{stem[6:]}")
+    return sorted(out)
+
+
+def _parse_day(day_str: str) -> datetime:
+    """Parse 'YYYY-MM-DD' or 'YYYYMMDD' into a UTC datetime for path building."""
+    s = day_str.replace("-", "")
+    return datetime.strptime(s, "%Y%m%d").replace(tzinfo=timezone.utc)
 
 
 def _read_jsonl(path: Path) -> list[dict]:
