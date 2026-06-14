@@ -6,6 +6,7 @@ Runs on Render alongside the scalp runner.
 
 Endpoints:
   GET /health          — API + broker + news connectivity check
+  GET /dashboard       — unified endpoint (candidates + position + config + stage)
   GET /watchlist       — today's gapper candidates + rankings
   GET /position        — current open position (if any)
   GET /trades          — trade history log
@@ -29,6 +30,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from config import Config
 from trading.scalp_models import ScalpConfig
+from trading.vwap_models import VwapReclaimConfig
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +94,53 @@ def _read_state() -> dict:
         except (json.JSONDecodeError, OSError):
             return {}
     return {}
+
+
+VWAP_STATE_FILE = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "vwap_state.json"
+
+
+def _read_vwap_state() -> dict:
+    if VWAP_STATE_FILE.exists():
+        try:
+            return json.loads(VWAP_STATE_FILE.read_text())
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
+
+
+def _infer_stage(state_data: dict) -> str:
+    if state_data.get("last_result") == "error":
+        return "ERROR"
+    if state_data.get("trade_done") or state_data.get("exit_price"):
+        return "EXITED"
+    if state_data.get("entry_price") and state_data["entry_price"] > 0:
+        return "ENTERED"
+    candidates = state_data.get("candidates") or state_data.get("watchlist") or []
+    if not candidates:
+        return "IDLE"
+    if state_data.get("top_pick"):
+        return "ARMED"
+    return "SCANNING"
+
+
+def _candidate_stage(candidate: dict, top_pick, strategy_stage: str) -> str:
+    sym = candidate.get("symbol", "")
+    if isinstance(top_pick, dict):
+        is_top = top_pick.get("symbol") == sym
+    else:
+        is_top = top_pick == sym
+    if strategy_stage == "ENTERED" and is_top:
+        return "ENTERED"
+    if strategy_stage == "EXITED" and is_top:
+        return "EXITED"
+    if is_top:
+        return "ARMED"
+    return "WATCHING"
+
+
+def _config_to_dict(config) -> dict:
+    from dataclasses import asdict
+    return asdict(config)
 
 
 @app.api_route("/health", methods=["GET", "HEAD"])
@@ -240,6 +289,82 @@ def trigger_session():
     t.start()
     logger.info("Manual trigger: daily sessions (scalp + vwap) kicked off")
     return {"triggered": True, "message": "Daily sessions started in background"}
+
+
+@app.get("/dashboard")
+def get_dashboard():
+    """Unified dashboard endpoint — all data in one call."""
+    scalp_state = _read_state()
+    vwap_state = _read_vwap_state()
+
+    scalp_stage = _infer_stage(scalp_state)
+    vwap_stage = _infer_stage(vwap_state)
+
+    scalp_candidates = scalp_state.get("candidates", [])
+    scalp_top = scalp_state.get("top_pick")
+    for c in scalp_candidates:
+        if isinstance(c, dict):
+            c["stage"] = _candidate_stage(c, scalp_top, scalp_stage)
+
+    vwap_candidates = vwap_state.get("watchlist", [])
+    vwap_top = vwap_state.get("top_pick") or vwap_state.get("symbol")
+    for c in vwap_candidates:
+        if isinstance(c, dict):
+            c["stage"] = _candidate_stage(c, vwap_top, vwap_stage)
+
+    scalp_position = None
+    if scalp_stage in ("ENTERED", "EXITED"):
+        scalp_position = {
+            "entry_price": scalp_state.get("entry_price"),
+            "exit_price": scalp_state.get("exit_price"),
+            "pnl": scalp_state.get("pnl"),
+            "shares": scalp_state.get("shares"),
+            "stop_price": scalp_state.get("stop_price"),
+            "bars_held": scalp_state.get("bars_held"),
+        }
+
+    vwap_position = None
+    if vwap_stage in ("ENTERED", "EXITED"):
+        vwap_position = {
+            "entry_price": vwap_state.get("entry_price"),
+            "exit_price": vwap_state.get("exit_price"),
+            "pnl": vwap_state.get("pnl"),
+            "exit_reason": vwap_state.get("exit_reason"),
+        }
+
+    scalp_pnl = scalp_state.get("pnl") or 0
+    vwap_pnl = vwap_state.get("pnl") or 0
+    trade_count = sum(1 for s in [scalp_state, vwap_state]
+                      if s.get("entry_price") and s["entry_price"] > 0)
+
+    from trading.live_scalp_runner import TRIAL_173_CONFIG as SCALP_CONFIG
+    from trading.live_vwap_runner import TRIAL_173_CONFIG as VWAP_CONFIG
+
+    return {
+        "server_time": datetime.utcnow().isoformat(),
+        "scalp": {
+            "stage": scalp_stage,
+            "last_run": scalp_state.get("last_run"),
+            "last_result": scalp_state.get("last_result"),
+            "date": scalp_state.get("date"),
+            "candidates": scalp_candidates,
+            "top_pick": scalp_top,
+            "position": scalp_position,
+            "config": _config_to_dict(SCALP_CONFIG),
+        },
+        "vwap": {
+            "stage": vwap_stage,
+            "last_run": vwap_state.get("last_run"),
+            "last_result": vwap_state.get("last_result"),
+            "date": vwap_state.get("date"),
+            "candidates": vwap_candidates,
+            "top_pick": vwap_top,
+            "position": vwap_position,
+            "config": _config_to_dict(VWAP_CONFIG),
+        },
+        "session_pnl": scalp_pnl + vwap_pnl,
+        "trade_count": trade_count,
+    }
 
 
 @app.get("/vwap")

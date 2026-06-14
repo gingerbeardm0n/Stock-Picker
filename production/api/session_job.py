@@ -22,6 +22,20 @@ logger = logging.getLogger(__name__)
 STATE_DIR = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader"))
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 
+_CANDIDATE_FIELDS = (
+    'symbol', 'gap_pct', 'open_price', 'prior_close', 'rel_vol',
+    'float_shares', 'has_news', 'news_tier', 'scalp_score', 'quote_volume',
+)
+
+
+def _serialize_candidates(candidates: list[dict] | None) -> list[dict]:
+    if not candidates:
+        return []
+    return [
+        {k: c.get(k) for k in _CANDIDATE_FIELDS}
+        for c in candidates
+    ]
+
 
 def _append_trade(trade_data: dict):
     trades_file = STATE_DIR / "trades.json"
@@ -50,7 +64,7 @@ def run_daily_sessions():
             "strategy": "opening_bell_scalp",
             "last_result": "trade" if getattr(state, 'entry_price', 0) > 0 else "no_trade",
             "date": str(datetime.now().date()),
-            "candidates": [c.get('symbol') for c in (getattr(state, 'candidates', None) or [])],
+            "candidates": _serialize_candidates(getattr(state, 'candidates', None)),
             "top_pick": getattr(state, 'top_pick', None),
             "entry_price": getattr(state, 'entry_price', None),
             "exit_price": getattr(state, 'exit_price', None),
@@ -85,7 +99,7 @@ def run_daily_sessions():
             "exit_price": getattr(vstate, 'exit_price', None),
             "pnl": getattr(vstate, 'pnl', None),
             "exit_reason": getattr(vstate, 'exit_reason', ''),
-            "watchlist": [c.get('symbol') for c in getattr(vstate, 'watchlist', [])],
+            "watchlist": _serialize_candidates(getattr(vstate, 'watchlist', [])),
         }
         (STATE_DIR / "vwap_state.json").write_text(json.dumps(vwap_data, default=str))
         if vwap_data["last_result"] == "trade":
