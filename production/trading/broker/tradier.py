@@ -238,6 +238,7 @@ class TradierDataFeed(DataFeedInterface):
             'Authorization': f'Bearer {token}',
             'Accept':        'application/json',
         })
+        logger.info(f"TradierDataFeed initialized: base={self._base} sandbox={sandbox}")
 
     # ── DataFeedInterface ─────────────────────────────────────────────────────
 

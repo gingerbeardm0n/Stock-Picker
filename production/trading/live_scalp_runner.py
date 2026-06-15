@@ -221,16 +221,30 @@ class LiveScalpRunner:
 
         # Step 2: Compute gaps
         gappers = []
+        zero_prev = 0
+        zero_last = 0
+        over_max_price = 0
+        over_max_gap = 0
+        all_gaps = []  # (gap_pct, sym, last, prev_close) for diagnostics
         for sym, q in quotes.items():
             if q.prev_close <= 0 or q.last <= 0:
+                if q.prev_close <= 0:
+                    zero_prev += 1
+                if q.last <= 0:
+                    zero_last += 1
                 continue
             gap_pct = (q.last - q.prev_close) / q.prev_close * 100
+
+            if gap_pct >= 5.0:
+                all_gaps.append((gap_pct, sym, q.last, q.prev_close))
 
             if gap_pct < self.config.min_gap_pct:
                 continue
             if gap_pct > MAX_GAP_PCT:
+                over_max_gap += 1
                 continue  # bad quote (sandbox sometimes returns garbage prev_close)
             if q.last > self.config.max_price:
+                over_max_price += 1
                 continue
 
             gappers.append({
@@ -245,6 +259,16 @@ class LiveScalpRunner:
 
         gappers.sort(key=lambda g: g['gap_pct'], reverse=True)
         logger.info(f"Found {len(gappers)} gappers >= {self.config.min_gap_pct:.1f}%")
+
+        # Diagnostic: show why symbols were filtered and top gaps in market
+        if zero_prev or zero_last or over_max_price or over_max_gap:
+            logger.info(f"  Filter stats: zero_prev_close={zero_prev}, zero_last={zero_last}, "
+                        f"over_max_price={over_max_price}, over_max_gap_1000={over_max_gap}")
+        all_gaps.sort(reverse=True)
+        if all_gaps:
+            logger.info(f"  Top 10 gaps in market (>=5%%):")
+            for gap, sym, last, prev in all_gaps[:10]:
+                logger.info(f"    {sym}: gap={gap:.1f}% last={last:.2f} prev={prev:.2f}")
 
         if not gappers:
             logger.warning("No gappers found this scan.")
@@ -684,8 +708,12 @@ class LiveScalpRunner:
         if self.data_feed:
             logger.info(f"Fetching live quotes for {len(symbols):,} symbols to filter by price...")
             quotes = self.data_feed.get_quotes(symbols)
+            no_quote = len(symbols) - len(quotes)
+            zero_last = sum(1 for q in quotes.values() if q.last <= 0)
             alive = [s for s, q in quotes.items() if 0.50 <= q.last <= 30.0]
-            logger.info(f"Live universe: {len(alive):,} stocks in $0.50-$30 range")
+            logger.info(f"Live universe: {len(alive):,} stocks in $0.50-$30 range "
+                        f"(no_quote={no_quote}, zero_last={zero_last}, "
+                        f"total_fetched={len(quotes)})")
             return alive
 
         return symbols
