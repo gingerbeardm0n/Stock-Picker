@@ -54,12 +54,15 @@ def run_daily_sessions():
     from trading.live_scalp_runner import run_scalp_session
     from trading.live_vwap_runner import run_vwap_session
 
+    scalp_state_data = {}
+    vwap_state_data = {}
+
     # ── Strategy #1: Opening Bell Scalp ────────────────────────────────────
     logger.info("=== SCALP SESSION STARTING ===")
     try:
         state = run_scalp_session(dry_run=False, live=False, start_time='8:00')
 
-        state_data = {
+        scalp_state_data = {
             "last_run": datetime.utcnow().isoformat(),
             "strategy": "opening_bell_scalp",
             "last_result": "trade" if getattr(state, 'entry_price', 0) > 0 else "no_trade",
@@ -71,24 +74,25 @@ def run_daily_sessions():
             "pnl": getattr(state, 'pnl', None),
             "trade_done": getattr(state, 'trade_done', False),
         }
-        (STATE_DIR / "state.json").write_text(json.dumps(state_data, default=str))
-        if state_data["last_result"] == "trade":
-            _append_trade(state_data)
-        logger.info(f"=== SCALP SESSION COMPLETE: {state_data['last_result']} ===")
+        (STATE_DIR / "state.json").write_text(json.dumps(scalp_state_data, default=str))
+        if scalp_state_data["last_result"] == "trade":
+            _append_trade(scalp_state_data)
+        logger.info(f"=== SCALP SESSION COMPLETE: {scalp_state_data['last_result']} ===")
     except Exception as e:
         logger.error(f"Scalp session failed: {e}", exc_info=True)
-        (STATE_DIR / "state.json").write_text(json.dumps({
+        scalp_state_data = {
             "last_run": datetime.utcnow().isoformat(),
             "strategy": "opening_bell_scalp",
             "last_result": "error",
             "error": str(e),
-        }))
+        }
+        (STATE_DIR / "state.json").write_text(json.dumps(scalp_state_data))
 
     # ── Strategy #2: VWAP Reclaim ──────────────────────────────────────────
     logger.info("=== VWAP RECLAIM SESSION STARTING ===")
     try:
         vstate = run_vwap_session(dry_run=False, live=False)
-        vwap_data = {
+        vwap_state_data = {
             "last_run": datetime.utcnow().isoformat(),
             "strategy": "vwap_reclaim",
             "date": str(datetime.now().date()),
@@ -101,15 +105,24 @@ def run_daily_sessions():
             "exit_reason": getattr(vstate, 'exit_reason', ''),
             "watchlist": _serialize_candidates(getattr(vstate, 'watchlist', [])),
         }
-        (STATE_DIR / "vwap_state.json").write_text(json.dumps(vwap_data, default=str))
-        if vwap_data["last_result"] == "trade":
-            _append_trade(vwap_data)
-        logger.info(f"=== VWAP RECLAIM COMPLETE: {vwap_data['last_result']} ===")
+        (STATE_DIR / "vwap_state.json").write_text(json.dumps(vwap_state_data, default=str))
+        if vwap_state_data["last_result"] == "trade":
+            _append_trade(vwap_state_data)
+        logger.info(f"=== VWAP RECLAIM COMPLETE: {vwap_state_data['last_result']} ===")
     except Exception as e:
         logger.error(f"VWAP session failed: {e}", exc_info=True)
-        (STATE_DIR / "vwap_state.json").write_text(json.dumps({
+        vwap_state_data = {
             "last_run": datetime.utcnow().isoformat(),
             "strategy": "vwap_reclaim",
             "last_result": "error",
             "error": str(e),
-        }))
+        }
+        (STATE_DIR / "vwap_state.json").write_text(json.dumps(vwap_state_data))
+
+    # ── Persist everything to TimescaleDB ──────────────────────────────────
+    logger.info("=== PERSISTING SESSION TO DB ===")
+    try:
+        from api.session_persistence import persist_session
+        persist_session(scalp_state_data, vwap_state_data)
+    except Exception as e:
+        logger.error(f"Session persistence import/call failed: {e}", exc_info=True)

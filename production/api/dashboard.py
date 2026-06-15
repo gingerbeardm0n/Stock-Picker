@@ -377,3 +377,40 @@ def get_vwap_state():
         except (json.JSONDecodeError, OSError):
             pass
     return {"last_run": None, "last_result": None, "strategy": "vwap_reclaim"}
+
+
+@app.post("/persist")
+def force_persist():
+    """Force-persist current session data to TimescaleDB (use before manual deploys)."""
+    from api.session_persistence import persist_session
+    scalp = _read_state()
+    vwap = _read_vwap_state()
+    if not scalp and not vwap:
+        return {"persisted": False, "reason": "no session data on disk"}
+    persist_session(scalp, vwap)
+    return {"persisted": True, "scalp_result": scalp.get("last_result"), "vwap_result": vwap.get("last_result")}
+
+
+@app.get("/session_history")
+def get_session_history(days: int = Query(default=30, le=365)):
+    """Return past session runs from TimescaleDB."""
+    try:
+        from api.session_persistence import _get_conn
+        conn = _get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT run_date, strategy, result, top_pick,
+                           entry_price, exit_price, pnl, persisted_at
+                    FROM session_runs
+                    WHERE run_date >= CURRENT_DATE - %s
+                    ORDER BY run_date DESC, strategy
+                """, (days,))
+                cols = [d[0] for d in cur.description]
+                rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            return {"count": len(rows), "sessions": rows}
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"session_history query failed: {e}")
+        return {"count": 0, "sessions": [], "error": str(e)}
