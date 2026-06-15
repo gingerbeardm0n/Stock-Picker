@@ -67,6 +67,7 @@ class Config:
 
     # ── Other API keys ─────────────────────────────────────────────────────────
     FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', '')
+    MARKETAUX_API_KEY = os.getenv('MARKETAUX_API_KEY', '')
 
     # ── Scanner criteria — Ross Cameron's 5 Pillars ───────────────────────────
     SCANNER_CRITERIA = {
