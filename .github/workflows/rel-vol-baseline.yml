@@ -40,11 +40,12 @@ jobs:
       - name: Extract active_gapper_symbols.json from data branch
         run: |
           mkdir -p data
-          if git show data:data/active_gapper_symbols.json > data/active_gapper_symbols.json 2>/dev/null; then
+          if git show data:data/active_gapper_symbols.json > data/active_gapper_symbols.json 2>/dev/null && [ -s data/active_gapper_symbols.json ]; then
             echo "Loaded existing active_gapper_symbols.json from data branch"
             python3 -c "import json; d=json.load(open('data/active_gapper_symbols.json')); print(f'  {d[\"total\"]} symbols, as_of={d[\"as_of\"]}')"
           else
             echo "No existing active_gapper_symbols.json — starting from embedded seed list"
+            rm -f data/active_gapper_symbols.json
           fi
 
       - name: Build rel-vol baseline
