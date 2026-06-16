@@ -1,0 +1,98 @@
+name: Capture Live Session Data
+
+on:
+  schedule:
+    # 1:00 PM ET = 17:00 UTC, weekdays (both strategies done by ~11:45 ET)
+    - cron: '0 17 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  capture-session:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch data branch
+        run: git fetch origin data:data 2>/dev/null || echo "data branch will be created"
+
+      - name: Pull session data from Render
+        env:
+          JTRADER_API_KEY: ${{ secrets.JTRADER_API_KEY }}
+          API_URL: https://jtrader-api.onrender.com
+        run: |
+          set -e
+          mkdir -p data/sessions
+
+          TODAY=$(date -u +%Y-%m-%d)
+          echo "Pulling session data for ${TODAY}..."
+
+          # Wake up Render (free tier may be sleeping)
+          echo "  Waking Render..."
+          curl -sf "${API_URL}/health" --max-time 60 || {
+            echo "  Render unreachable — retrying in 30s"
+            sleep 30
+            curl -sf "${API_URL}/health" --max-time 60 || { echo "FATAL: Render down"; exit 1; }
+          }
+
+          HEADERS=(-H "X-API-Key: ${JTRADER_API_KEY}")
+
+          echo "  Pulling /dashboard..."
+          curl -sf "${HEADERS[@]}" "${API_URL}/dashboard" -o data/sessions/${TODAY}_dashboard.json
+
+          echo "  Pulling /bars_dump..."
+          curl -sf "${HEADERS[@]}" "${API_URL}/bars_dump" -o data/sessions/${TODAY}_bars.json
+
+          echo "  Pulling /news_dump..."
+          curl -sf "${HEADERS[@]}" "${API_URL}/news_dump" -o data/sessions/${TODAY}_news.json
+
+          echo "  Pulling /trades..."
+          curl -sf "${HEADERS[@]}" "${API_URL}/trades" -o data/sessions/${TODAY}_trades.json
+
+          echo "  Pulling /logs..."
+          curl -sf "${HEADERS[@]}" "${API_URL}/logs?n=500" -o data/sessions/${TODAY}_logs.json
+
+          # Summary
+          for f in data/sessions/${TODAY}_*.json; do
+            SIZE=$(wc -c < "$f")
+            echo "  $(basename $f): ${SIZE} bytes"
+          done
+
+      - name: Push to data branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          TMPDIR=$(mktemp -d)
+
+          # Checkout existing data branch (preserves baseline files etc.)
+          if git show-ref --verify --quiet refs/heads/data; then
+            git worktree add "$TMPDIR/data_wt" data
+          else
+            git worktree add --detach "$TMPDIR/data_wt"
+            cd "$TMPDIR/data_wt"
+            git checkout --orphan data
+            git reset
+            cd "$GITHUB_WORKSPACE"
+          fi
+
+          # Copy session files into the data branch worktree
+          mkdir -p "$TMPDIR/data_wt/data/sessions"
+          cp "$GITHUB_WORKSPACE"/data/sessions/*.json "$TMPDIR/data_wt/data/sessions/"
+
+          cd "$TMPDIR/data_wt"
+          git add -f data/sessions/
+          TODAY=$(date -u +%Y-%m-%d)
+          git commit -m "data: session capture ${TODAY}" || { echo "Nothing to commit"; exit 0; }
+
+          git push origin data
+          echo "Pushed session data to origin/data"
+
+          cd "$GITHUB_WORKSPACE"
+          git worktree remove --force "$TMPDIR/data_wt"
