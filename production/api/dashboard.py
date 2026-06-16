@@ -235,7 +235,7 @@ def get_status():
         "last_result": state.get("last_result"),
         "error": state.get("error"),
         "config": {
-            "min_gap_pct": state.get("min_gap_pct", 11.65),
+            "min_gap_pct": state.get("min_gap_pct", 5.0),
             "entry_mode": state.get("entry_mode", "first_green"),
             "require_news": True,
         },

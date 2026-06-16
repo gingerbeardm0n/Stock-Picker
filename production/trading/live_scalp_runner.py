@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 # ── Trial 173 config (trained 2021-2022, validated 2023-2025) ────────────────
 
 TRIAL_173_CONFIG = ScalpConfig(
-    min_gap_pct=11.65,
+    min_gap_pct=5.0,
     min_relative_volume=3.61,
     max_float=50_000_000,
     max_price=24.69,

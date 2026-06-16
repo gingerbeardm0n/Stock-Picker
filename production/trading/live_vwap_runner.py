@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 #    151 trades, 90.1% WR, +$2,669, PF 4.76) ───────────────────────────────
 
 TRIAL_173_CONFIG = VwapReclaimConfig(
-    min_gap_pct=9.41,
+    min_gap_pct=5.0,
     min_relative_volume=2.79,
     max_price=23.27,
     require_news=True,
