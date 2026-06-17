@@ -86,10 +86,12 @@ class AlpacaBroker(BrokerInterface):
 
     ENTRY_LIMIT_BUFFER = 0.10    # Marketable limit: ask + $0.10
 
-    def __init__(self, api_key: str, secret_key: str):
+    def __init__(self, api_key: str, secret_key: str, paper: bool = True):
         _require_alpaca()
-        self._client = TradingClient(api_key=api_key, secret_key=secret_key)
-        logger.info("AlpacaBroker initialized")
+        self._client = TradingClient(
+            api_key=api_key, secret_key=secret_key, paper=paper,
+        )
+        logger.info(f"AlpacaBroker initialized ({'paper' if paper else 'LIVE'})")
 
     def place_limit_buy(self, symbol: str, qty: int, limit_price: float) -> OrderResult:
         logger.info(f"LIMIT BUY: {qty} {symbol} @ ${limit_price:.2f}")

@@ -34,8 +34,8 @@ from trading.vwap_models import VwapReclaimConfig
 
 logger = logging.getLogger(__name__)
 
-# In-memory log ring buffer (last 500 lines) — survives Render's ephemeral log window
-_LOG_BUFFER: deque[dict] = deque(maxlen=500)
+# In-memory log ring buffer — survives Render's ephemeral log window
+_LOG_BUFFER: deque[dict] = deque(maxlen=2000)
 
 
 class _BufferHandler(logging.Handler):
@@ -245,7 +245,7 @@ def get_status():
 
 
 @app.get("/logs")
-def get_logs(n: int = Query(default=100, le=500)):
+def get_logs(n: int = Query(default=500, le=2000)):
     """Return last N log lines from in-memory buffer."""
     entries = list(_LOG_BUFFER)[-n:]
     return {"count": len(entries), "logs": entries}

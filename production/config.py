@@ -204,7 +204,9 @@ class Config:
             )
         if cls.ALPACA_BASE_URL:
             os.environ['APCA_API_BASE_URL'] = cls.ALPACA_BASE_URL
-        broker = AlpacaBroker(api_key=cls.ALPACA_API_KEY, secret_key=cls.ALPACA_SECRET_KEY)
+        is_paper = (cls.TRADING_MODE == 'PAPER')
+        broker = AlpacaBroker(api_key=cls.ALPACA_API_KEY, secret_key=cls.ALPACA_SECRET_KEY,
+                              paper=is_paper)
         try:
             balance = broker.get_account_balance()
             print("\n" + "=" * 70)

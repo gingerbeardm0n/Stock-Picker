@@ -12,7 +12,7 @@ Flow:
             from the 9:30 bars onward
     bars 10:00-11:30 - evaluate_entry() per bar (the engine itself enforces
             the window on BAR TIME, so the 15-min sandbox delay is harmless)
-    on signal - place orders via TradierBroker; manage exits bar-by-bar
+    on signal - place orders via AlpacaBroker (paper); manage exits bar-by-bar
     bar time > 11:30 with no position - done for the day
 
 Uses the SAME evaluate_entry/evaluate_exit as the simulator -- only the
@@ -84,7 +84,7 @@ class LiveVwapState:
     """Mutable state for one trading day."""
     watchlist: list[dict] = field(default_factory=list)
 
-    # Trade execution
+    # Trade execution (current trade)
     symbol: str = ''
     entry_price: float = 0.0
     stop_price: float = 0.0
@@ -96,15 +96,19 @@ class LiveVwapState:
     bars_held: int = 0
     in_position: bool = False
     trade_done: bool = False
+    traded_symbols: list[str] = field(default_factory=list)
 
-    # Results
+    # Results (current/last trade for backward compat)
     exit_price: float = 0.0
     exit_reason: str = ''
     pnl: float = 0.0
 
+    # Multi-trade tracking
+    completed_trades: list[dict] = field(default_factory=list)
+
 
 class LiveVwapRunner:
-    """Runs the VWAP Reclaim strategy live against Tradier."""
+    """Runs the VWAP Reclaim strategy. Data: Tradier production. Orders: Alpaca paper."""
 
     def __init__(
         self,
@@ -123,20 +127,18 @@ class LiveVwapRunner:
         if os.path.exists(env_path):
             self._load_env(env_path)
 
-        # Paper mode: orders to sandbox, data feed on production token when
-        # available (sandbox quotes are delayed and blind in premarket).
-        self.data_delayed = not live and not bool(Config.TRADIER_PRODUCTION_TOKEN)
-        # Engine clock delay: sandbox fills run on 15-min-delayed quotes, so in
-        # paper mode the engine consumes bars 15 min late — the price it acts
-        # on matches the price the sandbox fills at. Live mode: no delay.
-        self.engine_delay_min = 0 if live else 15
+        # Hybrid architecture: Tradier production for real-time data feed,
+        # Alpaca paper for order execution (real-time fills, no 15-min delay).
+        # Live mode: uses whatever BROKER= is set to in .env.live.
         if not live:
-            from trading.broker.tradier import TradierBroker
-            acct = Config.TRADIER_ACCOUNT_ID
-            self.broker = None if dry_run else TradierBroker(
-                token=Config.TRADIER_PAPER_TOKEN, account_id=acct, sandbox=True)
+            from trading.broker.alpaca import AlpacaBroker
+            self.broker = None if dry_run else AlpacaBroker(
+                api_key=Config.ALPACA_API_KEY,
+                secret_key=Config.ALPACA_SECRET_KEY,
+            )
             self.data_feed = Config.get_data_feed()
-            logger.info(f"Data feed: {'sandbox (15-min delayed)' if self.data_delayed else 'production (real-time)'}")
+            logger.info("Broker: Alpaca paper (real-time fills)")
+            logger.info("Data feed: Tradier production (real-time)")
         else:
             self.broker = None if dry_run else Config.get_broker()
             self.data_feed = Config.get_data_feed()
@@ -290,8 +292,8 @@ class LiveVwapRunner:
         from trading.broker.tradier import TradierBarPoller
         poller = TradierBarPoller(
             token=Config.TRADIER_PRODUCTION_TOKEN or Config.TRADIER_PAPER_TOKEN,
-            sandbox=self.data_delayed,
-            delay_minutes=self.engine_delay_min,
+            sandbox=False,
+            delay_minutes=0,
             bar_queue=self._bar_queue,
         )
         poller.set_watchlist(symbols)
@@ -312,10 +314,7 @@ class LiveVwapRunner:
         except Exception as e:
             logger.warning(f"Session bar backfill failed: {e}")
             seed_bars = {}
-        # Seed only up to the engine clock (now - delay); the poller delivers
-        # the rest on the same delayed schedule. Seeding past the engine clock
-        # would let the VWAP peek at data the sandbox fill engine hasn't seen.
-        engine_now = datetime.now(pytz.UTC) - timedelta(minutes=self.engine_delay_min)
+        engine_now = datetime.now(pytz.UTC)
         for sym, blist in seed_bars.items():
             for b in blist:
                 b_et = b.time.astimezone(ET)
@@ -367,10 +366,13 @@ class LiveVwapRunner:
             bars_hist[sym].append(bar)
 
             if not self.state.in_position:
+                # Skip symbols we already traded
+                if sym in self.state.traded_symbols:
+                    continue
+
                 bar_min = bar_et.hour * 60 + bar_et.minute if bar_et else 0
-                # Past window with no entry -> done
                 if bar_min > window_end_min:
-                    logger.info(f"Bar time {bar_et.strftime('%H:%M')} past window end. No entry today.")
+                    logger.info(f"Bar time {bar_et.strftime('%H:%M')} past window end. Done.")
                     self.state.trade_done = True
                     break
 
@@ -416,8 +418,8 @@ class LiveVwapRunner:
                      int(max_position_value / entry_price))
 
         if shares <= 0:
-            logger.warning("Position size = 0 shares. Skipping entry.")
-            self.state.trade_done = True
+            logger.warning(f"Position size = 0 shares for {symbol}. Skipping.")
+            self.state.traded_symbols.append(symbol)
             return
 
         logger.info(f">>> ENTRY: {shares} shares of {symbol} @ ${entry_price:.2f}")
@@ -456,7 +458,8 @@ class LiveVwapRunner:
                         f"{shares} @ ${entry_price:.2f} — adopting position."
                     )
                 else:
-                    self.state.trade_done = True
+                    logger.warning(f"    Entry failed for {symbol}, skipping.")
+                    self.state.traded_symbols.append(symbol)
                     return
 
             stop_result = self.broker.place_stop_sell(symbol, shares, round(stop_price, 2))
@@ -480,10 +483,18 @@ class LiveVwapRunner:
 
         if not self.dry_run:
             if self.state.stop_order_id:
-                try:
-                    self.broker.cancel_order(self.state.stop_order_id)
-                except Exception as e:
-                    logger.warning(f"    Stop cancel failed (may have filled): {e}")
+                cancelled = self.broker.cancel_order(self.state.stop_order_id)
+                if not cancelled:
+                    time.sleep(1)
+                    stop_status = self.broker.get_order(self.state.stop_order_id)
+                    if stop_status.status == 'filled':
+                        logger.warning(
+                            f"    Stop {self.state.stop_order_id} already filled "
+                            f"@ ${stop_status.filled_price:.2f} — skipping market sell"
+                        )
+                        exit_price = stop_status.filled_price
+                        self._record_trade(exit_price, 'STOP_FILLED_SERVER')
+                        return
 
             result = self.broker.place_market_sell(symbol, self.state.shares)
             logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
@@ -493,11 +504,41 @@ class LiveVwapRunner:
                 exit_price = fill.filled_price
                 logger.info(f"    FILLED: {fill.filled_qty} @ ${exit_price:.2f}")
 
+        self._record_trade(exit_price, exit_signal.get('reason', '?'))
+
+    def _record_trade(self, exit_price: float, reason: str):
+        """Record completed trade, reset position state for next trade."""
+        pnl = (exit_price - self.state.entry_price) * self.state.shares
+        trade = {
+            'symbol': self.state.symbol,
+            'entry_price': self.state.entry_price,
+            'exit_price': exit_price,
+            'shares': self.state.shares,
+            'pnl': pnl,
+            'bars_held': self.state.bars_held,
+            'reason': reason,
+        }
+        self.state.completed_trades.append(trade)
+        self.state.traded_symbols.append(self.state.symbol)
+        logger.info(f"    Trade #{len(self.state.completed_trades)}: "
+                     f"{trade['symbol']} P&L ${pnl:+.2f} ({reason})")
+
+        # Keep last trade in top-level fields for backward compat
         self.state.exit_price = exit_price
-        self.state.exit_reason = exit_signal.get('reason', '?')
-        self.state.pnl = (exit_price - self.state.entry_price) * self.state.shares
+        self.state.exit_reason = reason
+        self.state.pnl = pnl
+
+        # Reset position for next trade
         self.state.in_position = False
-        self.state.trade_done = True
+        self.state.symbol = ''
+        self.state.entry_price = 0.0
+        self.state.stop_price = 0.0
+        self.state.shares = 0
+        self.state.entry_time = None
+        self.state.entry_order_id = ''
+        self.state.stop_order_id = ''
+        self.state.highest_since_entry = 0.0
+        self.state.bars_held = 0
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -566,13 +607,14 @@ class LiveVwapRunner:
         logger.info("\n" + "=" * 60)
         logger.info("VWAP RECLAIM SUMMARY")
         logger.info("=" * 60)
-        if s.entry_price > 0:
-            logger.info(f"Symbol:     {s.symbol}")
-            logger.info(f"Entry:      ${s.entry_price:.2f} ({s.shares} shares)")
-            logger.info(f"Exit:       ${s.exit_price:.2f}")
-            logger.info(f"P&L:        ${s.pnl:+.2f}")
-            logger.info(f"Bars held:  {s.bars_held}")
-            logger.info(f"Reason:     {s.exit_reason}")
+        if s.completed_trades:
+            total_pnl = sum(t['pnl'] for t in s.completed_trades)
+            for i, t in enumerate(s.completed_trades, 1):
+                logger.info(f"Trade {i}:    {t['symbol']} "
+                             f"${t['entry_price']:.2f}→${t['exit_price']:.2f} "
+                             f"({t['shares']} sh, {t['bars_held']} bars) "
+                             f"P&L ${t['pnl']:+.2f} [{t['reason']}]")
+            logger.info(f"Total P&L:  ${total_pnl:+.2f} ({len(s.completed_trades)} trades)")
         else:
             logger.info("Result:     NO TRADE")
         logger.info("=" * 60)

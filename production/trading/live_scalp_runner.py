@@ -11,7 +11,7 @@ Flow:
     9:25     - Lock in #1 pick, start bar polling for that symbol
     9:30     - First bar arrives, run evaluate_entry()
     9:30-9:40 - Bar-by-bar entry/exit via scalp_engine
-               Place orders via TradierBroker
+               Place orders via AlpacaBroker (paper)
     9:40     - Time stop if still in, done for the day
 
 Usage:
@@ -117,10 +117,9 @@ class LiveScalpState:
 
 class LiveScalpRunner:
     """
-    Runs the Opening Bell Scalp strategy live against Tradier.
-
-    Uses the SAME evaluate_entry/evaluate_exit/rank_candidates functions
-    as the simulator -- only the data source differs.
+    Runs the Opening Bell Scalp strategy.
+    Data: Tradier production (real-time). Orders: Alpaca paper (real-time fills).
+    Live mode: uses BROKER= from .env.live.
     """
 
     def __init__(
@@ -141,33 +140,24 @@ class LiveScalpRunner:
             self._load_env(env_path)
 
         # Connect broker + data feed
-        # Paper mode: orders go to sandbox, but the DATA FEED uses the
-        # production token when available (sandbox quotes are 15-min delayed
-        # AND blind in premarket — gap% reads 0% before 9:30, so the scan
-        # never finds candidates). Falls back to the delayed sandbox feed
-        # if no production token is set.
-        self.data_delayed = not live and not bool(Config.TRADIER_PRODUCTION_TOKEN)
-        # Engine clock delay: in paper mode the sandbox fills orders against
-        # quotes that run 15 min behind real time. Even with the real-time
-        # production data feed, the ENGINE must consume bars 15 min late so
-        # the price it decides on matches the price the sandbox fills at.
-        # Live mode: no delay.
-        self.engine_delay_min = 0 if live else 15
+        # Hybrid architecture: Tradier production for real-time data feed,
+        # Alpaca paper for order execution (real-time fills, no 15-min delay).
+        # Live mode: uses whatever BROKER= is set to in .env.live.
         if not live:
-            from trading.broker.tradier import TradierBroker
-            acct = Config.TRADIER_ACCOUNT_ID
+            from trading.broker.alpaca import AlpacaBroker
             if not dry_run:
-                self.broker = TradierBroker(token=Config.TRADIER_PAPER_TOKEN,
-                                            account_id=acct, sandbox=True)
+                self.broker = AlpacaBroker(
+                    api_key=Config.ALPACA_API_KEY,
+                    secret_key=Config.ALPACA_SECRET_KEY,
+                )
             else:
                 self.broker = None
+            # Data feed stays on Tradier production (real-time, free)
             self.data_feed = Config.get_data_feed()
-            logger.info(f"Data feed: {'sandbox (15-min delayed)' if self.data_delayed else 'production (real-time)'}")
+            logger.info("Broker: Alpaca paper (real-time fills)")
+            logger.info("Data feed: Tradier production (real-time)")
         else:
-            if not dry_run:
-                self.broker = Config.get_broker()
-            else:
-                self.broker = None
+            self.broker = None if dry_run else Config.get_broker()
             self.data_feed = Config.get_data_feed()
 
         # News fetcher (Alpaca -- free tier)
@@ -474,15 +464,14 @@ class LiveScalpRunner:
         from trading.broker.tradier import TradierBarPoller
         poller = TradierBarPoller(
             token=Config.TRADIER_PRODUCTION_TOKEN or Config.TRADIER_PAPER_TOKEN,
-            sandbox=self.data_delayed,
-            delay_minutes=self.engine_delay_min,
+            sandbox=False,
+            delay_minutes=0,
             bar_queue=self._bar_queue,
         )
         poller.set_watchlist([symbol])
         poller_thread = threading.Thread(target=poller.start, daemon=True)
         poller_thread.start()
 
-        # Wait for 9:30 market open (sandbox: wait for 9:45 wall clock = 9:30 delayed)
         self._wait_for_market_open()
 
         # Process bars
@@ -656,9 +645,26 @@ class LiveScalpRunner:
         logger.info(f"    Reason: {exit_signal.get('reason', '?')}")
 
         if not self.dry_run:
-            # Cancel existing stop order
+            # Cancel existing stop order — if cancel fails, stop may have
+            # already filled server-side. Verify before placing a market sell
+            # to avoid double-selling (which would open a short position).
             if self.state.stop_order_id:
-                self.broker.cancel_order(self.state.stop_order_id)
+                cancelled = self.broker.cancel_order(self.state.stop_order_id)
+                if not cancelled:
+                    time.sleep(1)
+                    stop_status = self.broker.get_order(self.state.stop_order_id)
+                    if stop_status.status == 'filled':
+                        logger.warning(
+                            f"    Stop {self.state.stop_order_id} already filled "
+                            f"@ ${stop_status.filled_price:.2f} — skipping market sell"
+                        )
+                        exit_price = stop_status.filled_price
+                        self.state.exit_price = exit_price
+                        self.state.exit_reason = 'STOP_FILLED_SERVER'
+                        self.state.pnl = (exit_price - self.state.entry_price) * self.state.shares
+                        self.state.in_position = False
+                        self.state.trade_done = True
+                        return
 
             # Place market sell
             result = self.broker.place_market_sell(symbol, self.state.shares)
@@ -708,23 +714,16 @@ class LiveScalpRunner:
     # ── Helpers ──────────────────────────────────────────────────────────────
 
     def _wait_for_market_open(self):
-        """Sleep until market open bars are available.
-
-        Live (no engine delay): wait until 9:30 AM ET.
-        Paper (engine delayed to match sandbox fills): wait until 9:30 + delay.
-        """
+        """Sleep until 9:30 AM ET when market open bars are available."""
         now = datetime.now(ET)
-        target = (now.replace(hour=9, minute=30, second=0, microsecond=0)
-                  + timedelta(minutes=self.engine_delay_min))
+        target = now.replace(hour=9, minute=30, second=0, microsecond=0)
 
         if now >= target:
-            logger.info(f"Market {'open (engine delayed)' if self.engine_delay_min else 'open'} — bars available.")
+            logger.info("Market open — bars available.")
             return
 
         wait = (target - now).total_seconds()
-        label = (f"{target.strftime('%H:%M')} ET (9:30 + {self.engine_delay_min}-min engine delay)"
-                 if self.engine_delay_min else "9:30 AM ET")
-        logger.info(f"Waiting {wait:.0f}s for {label}...")
+        logger.info(f"Waiting {wait:.0f}s for 9:30 AM ET...")
         time.sleep(wait)
         logger.info("Market open — bars available!")
 
