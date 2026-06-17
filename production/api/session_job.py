@@ -72,6 +72,10 @@ def run_daily_sessions():
             "entry_price": getattr(state, 'entry_price', None),
             "exit_price": getattr(state, 'exit_price', None),
             "pnl": getattr(state, 'pnl', None),
+            "shares": getattr(state, 'shares', None),
+            "stop_price": getattr(state, 'stop_price', None),
+            "bars_held": getattr(state, 'bars_held', None),
+            "exit_reason": getattr(state, 'exit_reason', ''),
             "trade_done": getattr(state, 'trade_done', False),
         }
         (STATE_DIR / "state.json").write_text(json.dumps(scalp_state_data, default=str))
@@ -92,18 +96,25 @@ def run_daily_sessions():
     logger.info("=== VWAP RECLAIM SESSION STARTING ===")
     try:
         vstate = run_vwap_session(dry_run=False, live=False)
+        completed = getattr(vstate, 'completed_trades', [])
+        total_pnl = sum(t.get('pnl', 0) for t in completed) if completed else getattr(vstate, 'pnl', None)
         vwap_state_data = {
             "last_run": datetime.utcnow().isoformat(),
             "strategy": "vwap_reclaim",
             "date": str(datetime.now().date()),
-            "last_result": "trade" if getattr(vstate, 'entry_price', 0) > 0 else "no_trade",
+            "last_result": "trade" if completed or getattr(vstate, 'entry_price', 0) > 0 else "no_trade",
             "symbol": getattr(vstate, 'symbol', ''),
             "top_pick": getattr(vstate, 'symbol', '') or None,
             "entry_price": getattr(vstate, 'entry_price', None),
             "exit_price": getattr(vstate, 'exit_price', None),
-            "pnl": getattr(vstate, 'pnl', None),
+            "pnl": total_pnl,
+            "shares": getattr(vstate, 'shares', None),
+            "stop_price": getattr(vstate, 'stop_price', None),
+            "bars_held": getattr(vstate, 'bars_held', None),
             "exit_reason": getattr(vstate, 'exit_reason', ''),
             "watchlist": _serialize_candidates(getattr(vstate, 'watchlist', [])),
+            "completed_trades": completed,
+            "trade_count": len(completed),
         }
         (STATE_DIR / "vwap_state.json").write_text(json.dumps(vwap_state_data, default=str))
         if vwap_state_data["last_result"] == "trade":

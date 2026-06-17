@@ -333,9 +333,11 @@ def get_dashboard():
         }
 
     scalp_pnl = scalp_state.get("pnl") or 0
+    # VWAP may have multiple trades; use persisted total_pnl if available
     vwap_pnl = vwap_state.get("pnl") or 0
-    trade_count = sum(1 for s in [scalp_state, vwap_state]
-                      if s.get("entry_price") and s["entry_price"] > 0)
+    scalp_trades = 1 if (scalp_state.get("entry_price") or 0) > 0 else 0
+    vwap_trades = vwap_state.get("trade_count") or (1 if (vwap_state.get("entry_price") or 0) > 0 else 0)
+    trade_count = scalp_trades + vwap_trades
 
     from trading.live_scalp_runner import TRIAL_173_CONFIG as SCALP_CONFIG
     from trading.live_vwap_runner import TRIAL_173_CONFIG as VWAP_CONFIG
