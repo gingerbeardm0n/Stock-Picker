@@ -4,7 +4,7 @@ Living record of what was built, when, why — plus a component index and file-h
 Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pass written manually
 2026-05-31 from git history + session context; incremental passes append from `git log`.
 
-**History watermark (last commit folded in):** `4ae4cf7` (2026-06-13)
+**History watermark (last commit folded in):** `26d10ec` (2026-06-17)
 
 ---
 
@@ -111,6 +111,30 @@ Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pa
 - `4ae4cf7` 06-13 — **parity audit fixes** (3 gaps): shared news gate `has_news_catalyst()`/`NEWS_CATALYST_TIERS` (live had excluded tier3); ship float baseline + live scalp float filter; VWAP rel-vol numerator reconstructed as cumulative-through-9:25 (was instantaneous quote vol, 2-3x inflated). See `docs/PARITY.md`.
 - Record-keeping overhaul (uncommitted docs): new `docs/PARITY.md` (sim/live gap ledger), `STATUS.md` (current-state snapshot); `MEMORY.md` slimmed 411→~62 lines (legacy detail → `memory/archive_legacy_monolith.md`).
 
+### Phase 13 — Alpaca paper trading migration + scanner bug fix (2026-06-13 → 06-17)
+- `89f5c82`/`81c1a44`/`fff3c42`/`009355c` 06-13 — docs+tooling: parity ledger, DB fingerprint, strategy roadmap; strategy #3 micro-pullback pipeline (models + engine + sim + optuna + tests).
+- `aec9d07` 06-13 — freeze VWAP sealed-2025 data fingerprint baseline.
+- `2825c65` 06-13 — **session persistence**: `session_persistence.py` persist live trades to DB via `session_report.py`.
+- `3e6ab2f` 06-13 — archive 17 legacy monolith files → `archive/legacy_monolith/`; drop retention policies.
+- `8a2b766` 06-13 — rewrite parity audit for active pipelines (scalp/VWAP, not monolith).
+- `f06a62d` 06-14 — **unified `/dashboard` endpoint** + rich candidate serialization in `session_job.py` / `dashboard.py`.
+- `05f4acf` 06-15 — scanner gap-filter diagnostics added to both runners.
+- `8643b17` 06-15 — **multi-source news waterfall**: Finnhub → Marketaux → Alpaca (`news_fetcher.py`).
+- `89ea43d` 06-15 — auto-persist session data to TimescaleDB after trading.
+- `a25f52d` 06-15 — **GitHub Actions rel-vol baseline builder** (no DB required, `build_baseline_cloud.py`).
+- `07f767c` 06-16 — GitHub Actions daily session capture at 1 PM ET (`session-capture.yml`).
+- `076e9eb` 06-16 — fix empty `active_gapper_symbols.json` edge case in rel-vol workflow.
+- `a0c1417` 06-16 — lower `min_gap_pct` 11.65→5.0 (scalp) / 9.41→5.0 (VWAP) for wider universe.
+- `39bfe0b`/`4029425`/`57b7d45` 06-16 — merge commits from worktrees.
+- `ec5e02c` 06-17 — **bid/ask midpoint fallback** when Tradier `last` is stale in premarket scan.
+- `ab7a3c1` 06-17 — **junk spread filter**: skip quotes where `ask/bid > 3x` (sandbox garbage).
+- `79d96d1` 06-17 — **major broker switch**: paper orders → Alpaca paper (`AlpacaBroker(paper=True)`); double-sell bug fix (check stop status before market sell); VWAP multi-trade loop (one-and-done removed, `_record_trade()` resets state); log buffer 100→2000 lines.
+- `828170f` 06-17 — session capture cron 1 PM → 12 PM ET.
+- `0efea44` 06-17 — **separate Alpaca paper keys** (`APCA_PAPER_KEY_ID`/`APCA_PAPER_SECRET_KEY`) from live data keys; `Config._make_alpaca_broker()` routes by mode.
+- `46e5d00` 06-17 — **`PAPER_STARTING_BALANCE`** env var: runners use $5k for position sizing regardless of Alpaca paper balance ($100k default); `research/reset_paper_account.py` confirms no API reset endpoint.
+- `395a05d` 06-17 — **fix rel-vol CI**: force-push on orphan branch was wiping session files; now mirrors session-capture pattern (checkout existing data branch, normal push).
+- `26d10ec` 06-17 — **critical scanner fix**: `AlpacaDataFeed.get_quotes()` returned `prev_close=0.0` → all symbols skipped → 0 gappers; both runners now call `get_prior_closes()` first and patch; `last=midpoint` not `ask`; VWAP scanner gains midpoint fallback.
+
 ---
 
 ## Component Index
@@ -145,14 +169,14 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 | `scalp_engine.py` | Opening Bell Scalp entry/exit evaluator (strategy #1) | 🟢 | 5faa2a6 |
 | `scalp_models.py` | scalp config dataclasses | 🟢 | 5faa2a6 |
 | `scalp_ranker.py` | ranks gapper candidates (top-N cut) | 🟢 | 5faa2a6 |
-| `live_scalp_runner.py` | live runtime for scalp (paper/live via Tradier; scheduler, premarket scan, API endpoints) | 🟢 | f4e0d45 |
+| `live_scalp_runner.py` | live runtime for scalp (paper/live via Alpaca paper; premarket scan with prior-close fetch, midpoint fallback, double-sell guard) | 🟢 | f4e0d45 |
 
 ### Strategy #2 — VWAP Reclaim (`production/trading/`, LIVE)
 | File | Purpose | Status | Since |
 |---|---|---|---|
 | `vwap_engine.py` | VWAP Reclaim entry/exit evaluator (strategy #2, OOS-validated) | 🟢 | 749c0e5 |
 | `vwap_models.py` | vwap config dataclasses | 🟢 | 749c0e5 |
-| `live_vwap_runner.py` | live runtime for VWAP Reclaim; chained after scalp in daily job | 🟢 | 5b66a32 |
+| `live_vwap_runner.py` | live runtime for VWAP Reclaim; chained after scalp; multi-trade loop, prior-close fetch, midpoint fallback | 🟢 | 5b66a32 |
 
 ### Simulator (`production/simulator/` — adapters only, ZERO logic)
 | `simulation_engine.py` | data loader + minute loop → `orch.on_minute`; SimBroker | 🟢 (+⚫ dead methods inside) |
@@ -164,7 +188,7 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 | File | Purpose | Status | Since |
 |---|---|---|---|
 | `api/server.py` | FastAPI service (health, logs, trigger) | 🟢 | 5b27297 |
-| `api/dashboard.py` | dashboard API powering jtrader.jbirdsall.dev (watchlist/position/trades/status) | 🟢 | 5b27297 |
+| `api/dashboard.py` | dashboard API; unified `GET /dashboard` endpoint + stage inference; log ring buffer 2000 lines | 🟢 | 5b27297 |
 | `api/session_job.py` | scheduled daily session job entrypoint | 🟢 | 5b27297 |
 | `Dockerfile`, `requirements-deploy.txt`, `render.yaml` | Render Blueprint deploy stack | 🟢 | 5b27297 |
 
@@ -202,6 +226,21 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 | `optimizer/vwap/vwap_optuna_run.py` + `validate_batch.py` | VWAP Reclaim Optuna search + OOS batch validate | 🟢 | 749c0e5 |
 | `data_backfill/backfill_daily_history.py` | full-universe daily-bar backfill (pass 1 of mover pipeline) | 🟢 | bef4123 |
 | `data_backfill/backfill_gappers_v2.py` | mover minute bars + premarket 1h rollup (pass 2) | 🟢 | bef4123 |
+
+### New in Phase 13
+| File | Purpose | Status | Since |
+|---|---|---|---|
+| `production/api/session_persistence.py` | persist live trades/bars/news to TimescaleDB post-session | 🟢 | 89ea43d |
+| `production/data/live_capture/build_baseline_cloud.py` | GitHub Actions rel-vol baseline builder (no DB) | 🟢 | a25f52d |
+| `production/trading/micro_pullback_engine.py` | Strategy #3 micro-pullback evaluator | 🟡 research | 009355c |
+| `production/trading/micro_pullback_models.py` | Strategy #3 config dataclasses | 🟡 research | 009355c |
+| `production/simulator/micro_pullback_simulation.py` | Strategy #3 backtest harness | 🟡 research | 009355c |
+| `research/optimizer/micro_pullback/` | Strategy #3 Optuna pipeline | 🟡 research | 009355c |
+| `research/maintenance/db_fingerprint.py` | DB fingerprint for sealed-test reproducibility | 🟢 | fff3c42 |
+| `research/reset_paper_account.py` | Alpaca paper account reset utility (confirms no API endpoint for custom balance) | 🟢 one-shot | 46e5d00 |
+| `.github/workflows/rel-vol-baseline.yml` | Daily 4:30 PM ET rel-vol baseline update to data branch | 🟢 | a25f52d |
+| `.github/workflows/session-capture.yml` | Daily 12 PM ET pull session data from Render → data branch | 🟢 | 07f767c |
+| `production/trading/broker/alpaca.py` | AlpacaBroker (paper/live) + AlpacaDataFeed (midpoint quotes, prior-close-aware) + AlpacaBarStream | 🟢 | 79d96d1 |
 
 ### Infrastructure
 | File | Purpose | Status | Since |
@@ -275,5 +314,12 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 ## Hygiene flags — custodian pass 2026-06-13 (FLAG ONLY — nothing deleted/moved)
 - ✅ **RESOLVED — the 4 engine files** flagged 06-12 are now committed (`2438523`).
 - ⚠️ **Carried, still untracked (unchanged from 06-12):** `bash.exe.stackdump`, `FILE_ORGANIZATION_SETUP.md`, backfill `*_progress_*.json`, optimizer scratch (`data/`, `ablation/`, `cache/`, `*_log.txt`, `findings_*.json`, `locked_params_v8_trial180.json`), corpus tooling under `Ross Cameron Day Trading Videos/`, diagnostics (`debug_vwap_jun12.py`, `profile_trial.py`), `research/analysis/outputs/`, `production/data/stream/`, `docs/backtesting_pipeline_discovery.md`. **Recommend one `.gitignore` sweep** — most are regenerable run-state.
+
+## Hygiene flags — custodian pass 2026-06-17 (FLAG ONLY — nothing deleted/moved)
+- ✅ **RESOLVED — root-level `.env` files**: `.env`, `.env.paper`, `.env.live`, `.env.example` deleted. Single source of truth is now `production/.env.paper`.
+- ⚠️ **Carried (still untracked):** `bash.exe.stackdump`, `FILE_ORGANIZATION_SETUP.md`, `docs/backtesting_pipeline_discovery.md`, `docs/dashboard-ui-plan.md`, backfill `*_progress_*.json`, optimizer scratch, corpus tooling under `Ross Cameron Day Trading Videos/`, `research/analysis/outputs/`, `production/data/stream/`. Recommend `.gitignore` sweep.
+- ⚠️ **Legacy monolith component index stale** — Component Index still lists `orchestrator.py`, `patterns.py`, `indicators.py`, `market_temperature.py`, `portfolio_manager.py`, `trading_engine.py`, `scoring_engine.py`, `entry_engine.py`, `exit_engine.py`, `add_on_engine.py`, `live_scanner.py`, `order_manager.py`, `live_broker.py`, `execution.py`, `data_feed.py`, `models.py` as 🟢 active. These belong to the archived monolith (`archive/legacy_monolith/`), NOT the active dual-pipeline. **Recommend: mark all ⚫ deprecated** once confirmed none are imported by `live_scalp_runner.py`/`live_vwap_runner.py` (the active runners use `scalp_engine.py`, `vwap_engine.py`, `broker/alpaca.py` directly).
+- ⚠️ **`live_scalp_runner.py` still references `Config.TRADING_MODE` for Tradier guard** — doc comment at top still mentions Tradier as data feed; update to reflect Alpaca as both broker and data feed.
+- ℹ️ **NOTE — Alpaca paper has no reset API**: `POST /v2/account` returns 404. Custom balance simulation via `PAPER_STARTING_BALANCE=5000` env var (position-sizing only; actual Alpaca balance stays at $100k). See `research/reset_paper_account.py`.
 - ℹ️ **NOTE — record-keeping restructure (this session):** `MEMORY.md` slimmed 411→~62 lines; legacy detail preserved verbatim in `memory/archive_legacy_monolith.md`. New `STATUS.md` (root) + `docs/PARITY.md` are the live "where are we" + parity-ledger sources going forward.
 - ⚠️ **6 failing tests in the deprecated monolith path** (`tests/test_indicators.py`, `test_patterns.py`, `test_entry_engine.py`) — NOT imported by the deployed scalp/VWAP strategies, so they don't affect live. **Real finding inside:** `calculate_ema([10,11,12,13,14], period=3)` returns 12.0 at index 3 where a true EMA = 11.5 → `indicators.calculate_ema` is computing a trailing **SMA, not an EMA** (name/behavior mismatch). Also flat_top/ABCD/bull_flag/MACD-negative-gate fixtures fail. NOT skip-marked (would hide the EMA bug) and NOT fixed (deprecated path, changing it needs monolith re-validation). Revisit only if the monolith is revived; otherwise candidates for deletion with the rest of the monolith.

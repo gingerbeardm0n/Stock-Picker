@@ -30,22 +30,36 @@
 - **IMPORTANT**: Free tier DOES provide full historical minute bars. Earlier confusion (Jun 9 2026)
   was caused by testing on non-trading days (weekends). Minute bars work on all valid trading days.
 
-### Tradier (Primary — Order Execution + Live Quotes)
-- **Account**: Paper trading (sandbox)
-- **Env vars**: `TRADIER_PAPER_TOKEN`, `TRADIER_ACCOUNT_ID`, `TRADIER_PRODUCTION_TOKEN`
-- **Provides**:
-  - Paper order execution (sandbox) — via paper token
-  - Live quotes (batched, 200 symbols/call) — via paper token (15-min delayed)
-  - Daily historical bars — via production token
-  - **NOT**: minute/hourly historical bars (timesales returns null without funded brokerage)
-- **Last verified working**: 2026-06-09 (paper orders + quotes)
+### Alpaca Paper (Order Execution)
+- **Account**: Paper trading — separate from live data account
+- **Env vars**: `APCA_PAPER_KEY_ID`, `APCA_PAPER_SECRET_KEY` in `production/.env.paper`
+- **Base URL**: `https://paper-api.alpaca.markets` (routed automatically by `TradingClient(paper=True)`)
+- **Provides**: Real-time paper order fills (no delay, unlike Tradier sandbox)
+- **Starting balance**: $100k default. No API to set custom amount — use `PAPER_STARTING_BALANCE=5000` env var so runners size positions as if $5k capital.
+- **Last verified working**: 2026-06-17 (paper balance: $97,797.60)
+- **Key history**:
+  - Old keys (PK...) — generated earlier, failed with 401. Regenerated 2026-06-17.
+  - Current keys — `PK5KVPQMDVQRKK3NDASTQYRTB7` + secret. Working as of 2026-06-17.
 - **Scripts that use it**:
-  - `production/trading/live_scalp_runner.py` — live/paper trading
-  - `production/trading/broker/tradier.py` — broker + data feed layer
+  - `production/trading/live_scalp_runner.py` — paper order execution
+  - `production/trading/live_vwap_runner.py` — paper order execution
+  - `production/trading/broker/alpaca.py` — `AlpacaBroker(paper=True)`
+- **NOTE**: Alpaca paper reset button was removed in 2023-2025 UI redesign. No API endpoint. See `research/reset_paper_account.py`.
+
+### Tradier (Data Feed Only — Real-time Quotes)
+- **Account**: Production token for real-time quotes; paper token for sandbox orders (no longer used for orders)
+- **Env vars**: `TRADIER_PAPER_TOKEN`, `TRADIER_ACCOUNT_ID`, `TRADIER_PRODUCTION_TOKEN` in `production/.env.paper`
+- **Provides**:
+  - Real-time quotes (batched) — via production token
+  - **NOT used for orders anymore** — switched to Alpaca paper 2026-06-17
+  - **NOT**: minute/hourly historical bars (timesales returns null without funded brokerage)
+- **Last verified working**: 2026-06-17 (quotes via production token)
+- **Scripts that use it**:
+  - `production/trading/broker/tradier.py` — TradierDataFeed (still available as fallback, `BROKER=tradier`)
 
 ### Polygon / Massive.com (Inactive)
 - **Account**: Basic tier (free)
-- **Env vars**: `POLYGON_API_KEY` in root `.env.paper`
+- **Env vars**: `POLYGON_API_KEY` in `production/.env.paper`
 - **Key**: `gqXFwv...`
 - **Provides**:
   - Daily bars via grouped endpoint — works
@@ -98,3 +112,9 @@
 
 4. **Static symbol lists go stale.** `stocks_in_price_range.txt` was 3 months old by June 2026.
    Now using NASDAQ trader FTP for daily refresh + Tradier live quotes for price filter.
+
+5. **Alpaca `get_quotes()` returns `prev_close=0.0`** (2026-06-17). The latest-quote endpoint has no prev_close field. Both runners must call `get_prior_closes()` first and patch the QuoteResult. If you forget, every symbol fails `q.prev_close <= 0` → 0 gappers found → no trades.
+
+6. **Alpaca paper reset button is gone** (removed 2023-2025). `POST /v2/account` returns 404. All new paper accounts start at $100k. Use `PAPER_STARTING_BALANCE=5000` in env for realistic position sizing. Contact Alpaca support if you need the actual balance changed.
+
+7. **Alpaca live + paper accounts can run simultaneously.** Each `TradingClient` is independent. Use live keys (`APCA_API_KEY_ID`) for data API; separate paper keys (`APCA_PAPER_KEY_ID`) for `TradingClient(paper=True)`. Regenerating one set does NOT affect the other.
