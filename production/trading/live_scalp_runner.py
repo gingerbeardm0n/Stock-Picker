@@ -219,13 +219,27 @@ class LiveScalpRunner:
         quotes = self.data_feed.get_quotes(self._symbols)
         logger.info(f"Got {len(quotes):,} quotes")
 
+        # Spot-check: dump raw fields for a few symbols to diagnose stale-quote issues
+        spot_check = ['SUGP', 'CRVO', 'PURR', 'HITI', 'ALBT']
+        for sym in spot_check:
+            if sym in quotes:
+                q = quotes[sym]
+                logger.info(f"  SPOT {sym}: last={q.last:.4f} prev={q.prev_close:.4f} "
+                            f"bid={q.bid:.4f} ask={q.ask:.4f} vol={q.volume:,.0f} "
+                            f"gap={(q.last-q.prev_close)/q.prev_close*100:.1f}%" if q.prev_close > 0
+                            else f"  SPOT {sym}: last={q.last} prev={q.prev_close} (no prev)")
+            else:
+                logger.info(f"  SPOT {sym}: NOT IN UNIVERSE")
+
         # Step 2: Compute gaps
         gappers = []
         zero_prev = 0
         zero_last = 0
+        last_eq_prev = 0
         over_max_price = 0
         over_max_gap = 0
         all_gaps = []  # (gap_pct, sym, last, prev_close) for diagnostics
+        positive_gaps = 0
         for sym, q in quotes.items():
             if q.prev_close <= 0 or q.last <= 0:
                 if q.prev_close <= 0:
@@ -233,16 +247,20 @@ class LiveScalpRunner:
                 if q.last <= 0:
                     zero_last += 1
                 continue
+            if q.last == q.prev_close:
+                last_eq_prev += 1
             gap_pct = (q.last - q.prev_close) / q.prev_close * 100
 
-            if gap_pct >= 5.0:
-                all_gaps.append((gap_pct, sym, q.last, q.prev_close))
+            if gap_pct > 0:
+                positive_gaps += 1
+            if gap_pct >= 1.0:
+                all_gaps.append((gap_pct, sym, q.last, q.prev_close, q.bid, q.ask, q.volume))
 
             if gap_pct < self.config.min_gap_pct:
                 continue
             if gap_pct > MAX_GAP_PCT:
                 over_max_gap += 1
-                continue  # bad quote (sandbox sometimes returns garbage prev_close)
+                continue
             if q.last > self.config.max_price:
                 over_max_price += 1
                 continue
@@ -250,25 +268,34 @@ class LiveScalpRunner:
             gappers.append({
                 'symbol': sym,
                 'gap_pct': gap_pct,
-                'open_price': q.last,  # current price as proxy for open
+                'open_price': q.last,
                 'prior_close': q.prev_close,
                 'bid': q.bid,
                 'ask': q.ask,
-                'quote_volume': q.volume,  # today's cumulative volume (rel-vol numerator)
+                'quote_volume': q.volume,
             })
 
         gappers.sort(key=lambda g: g['gap_pct'], reverse=True)
         logger.info(f"Found {len(gappers)} gappers >= {self.config.min_gap_pct:.1f}%")
 
-        # Diagnostic: show why symbols were filtered and top gaps in market
+        # Diagnostic: quote staleness check
+        total_valid = len(quotes) - zero_prev - zero_last
+        logger.info(f"  Quote health: {len(quotes)} returned, {total_valid} valid, "
+                     f"last==prev={last_eq_prev} ({last_eq_prev*100/max(total_valid,1):.0f}%), "
+                     f"positive_gap={positive_gaps}, gaps>=1%={len(all_gaps)}")
         if zero_prev or zero_last or over_max_price or over_max_gap:
             logger.info(f"  Filter stats: zero_prev_close={zero_prev}, zero_last={zero_last}, "
                         f"over_max_price={over_max_price}, over_max_gap_1000={over_max_gap}")
+
+        # Show top gaps (lowered threshold to 1% for diagnostic visibility)
         all_gaps.sort(reverse=True)
         if all_gaps:
-            logger.info(f"  Top 10 gaps in market (>=5%%):")
-            for gap, sym, last, prev in all_gaps[:10]:
-                logger.info(f"    {sym}: gap={gap:.1f}% last={last:.2f} prev={prev:.2f}")
+            logger.info(f"  Top 15 gaps in market (>=1%%):")
+            for gap, sym, last, prev, bid, ask, vol in all_gaps[:15]:
+                logger.info(f"    {sym}: gap={gap:.1f}% last={last:.4f} prev={prev:.4f} "
+                            f"bid={bid:.4f} ask={ask:.4f} vol={vol:,.0f}")
+        else:
+            logger.warning("  NO stocks with gap >= 1% — quotes likely stale (last==prevclose)")
 
         if not gappers:
             logger.warning("No gappers found this scan.")
