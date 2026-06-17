@@ -60,10 +60,15 @@ class Config:
     # Backward-compat: legacy TRADIER_TOKEN key still works if new keys absent
     TRADIER_TOKEN = TRADIER_PAPER_TOKEN or os.getenv('TRADIER_TOKEN', '')
 
-    # ── Alpaca credentials (optional — only needed if BROKER=alpaca) ──────────
+    # ── Alpaca credentials ─────────────────────────────────────────────────────
+    # Live keys: data API (news, bars, calendar, quotes, health checks)
     ALPACA_API_KEY    = os.getenv('APCA_API_KEY_ID', '')
     ALPACA_SECRET_KEY = os.getenv('APCA_API_SECRET_KEY', '')
     ALPACA_BASE_URL   = os.getenv('APCA_API_BASE_URL', '')
+    # Paper keys: order execution only (AlpacaBroker in runners)
+    # Falls back to live keys if not set (e.g. local dev without paper creds)
+    ALPACA_PAPER_KEY    = os.getenv('APCA_PAPER_KEY_ID', '') or os.getenv('APCA_API_KEY_ID', '')
+    ALPACA_PAPER_SECRET = os.getenv('APCA_PAPER_SECRET_KEY', '') or os.getenv('APCA_API_SECRET_KEY', '')
 
     # ── Other API keys ─────────────────────────────────────────────────────────
     FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', '')
@@ -189,24 +194,13 @@ class Config:
     @classmethod
     def _make_alpaca_broker(cls):
         from trading.broker.alpaca import AlpacaBroker
-        if not cls.ALPACA_API_KEY or not cls.ALPACA_SECRET_KEY:
-            raise ValueError(
-                f"ERROR: Alpaca credentials not found in {env_file}.\n"
-                f"Add APCA_API_KEY_ID and APCA_API_SECRET_KEY."
-            )
-        # URL sanity check: paper mode should not hit live API
-        if cls.TRADING_MODE == 'PAPER' and cls.ALPACA_BASE_URL and \
-                'paper-api' not in cls.ALPACA_BASE_URL:
-            raise ValueError(
-                f"ERROR: TRADING_MODE=PAPER but APCA_API_BASE_URL is not paper API.\n"
-                f"Got: {cls.ALPACA_BASE_URL}\n"
-                f"Expected: https://paper-api.alpaca.markets"
-            )
-        if cls.ALPACA_BASE_URL:
-            os.environ['APCA_API_BASE_URL'] = cls.ALPACA_BASE_URL
         is_paper = (cls.TRADING_MODE == 'PAPER')
-        broker = AlpacaBroker(api_key=cls.ALPACA_API_KEY, secret_key=cls.ALPACA_SECRET_KEY,
-                              paper=is_paper)
+        key    = cls.ALPACA_PAPER_KEY    if is_paper else cls.ALPACA_API_KEY
+        secret = cls.ALPACA_PAPER_SECRET if is_paper else cls.ALPACA_SECRET_KEY
+        if not key or not secret:
+            var = 'APCA_PAPER_KEY_ID / APCA_PAPER_SECRET_KEY' if is_paper else 'APCA_API_KEY_ID / APCA_API_SECRET_KEY'
+            raise ValueError(f"ERROR: Alpaca credentials not found. Add {var}.")
+        broker = AlpacaBroker(api_key=key, secret_key=secret, paper=is_paper)
         try:
             balance = broker.get_account_balance()
             print("\n" + "=" * 70)

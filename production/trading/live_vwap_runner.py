@@ -133,8 +133,8 @@ class LiveVwapRunner:
         if not live:
             from trading.broker.alpaca import AlpacaBroker
             self.broker = None if dry_run else AlpacaBroker(
-                api_key=Config.ALPACA_API_KEY,
-                secret_key=Config.ALPACA_SECRET_KEY,
+                api_key=Config.ALPACA_PAPER_KEY,
+                secret_key=Config.ALPACA_PAPER_SECRET,
             )
             self.data_feed = Config.get_data_feed()
             logger.info("Broker: Alpaca paper (real-time fills)")

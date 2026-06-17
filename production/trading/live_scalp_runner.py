@@ -147,8 +147,8 @@ class LiveScalpRunner:
             from trading.broker.alpaca import AlpacaBroker
             if not dry_run:
                 self.broker = AlpacaBroker(
-                    api_key=Config.ALPACA_API_KEY,
-                    secret_key=Config.ALPACA_SECRET_KEY,
+                    api_key=Config.ALPACA_PAPER_KEY,
+                    secret_key=Config.ALPACA_PAPER_SECRET,
                 )
             else:
                 self.broker = None
