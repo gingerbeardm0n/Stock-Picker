@@ -232,43 +232,55 @@ class LiveScalpRunner:
                 logger.info(f"  SPOT {sym}: NOT IN UNIVERSE")
 
         # Step 2: Compute gaps
+        # Tradier's `last` field = previous session close during premarket (stale).
+        # Use bid/ask midpoint as the live price signal when last==prevclose.
         gappers = []
         zero_prev = 0
         zero_last = 0
         last_eq_prev = 0
+        used_bidask = 0
         over_max_price = 0
         over_max_gap = 0
-        all_gaps = []  # (gap_pct, sym, last, prev_close) for diagnostics
+        all_gaps = []
         positive_gaps = 0
         for sym, q in quotes.items():
-            if q.prev_close <= 0 or q.last <= 0:
-                if q.prev_close <= 0:
-                    zero_prev += 1
-                if q.last <= 0:
-                    zero_last += 1
+            if q.prev_close <= 0:
+                zero_prev += 1
                 continue
-            if q.last == q.prev_close:
+
+            # Choose best available price: live bid/ask midpoint if last is stale
+            price = q.last
+            if q.last <= 0:
+                zero_last += 1
+                continue
+            if q.last == q.prev_close and q.bid > 0 and q.ask > 0:
+                midpoint = (q.bid + q.ask) / 2
+                if abs(midpoint - q.prev_close) / q.prev_close > 0.005:
+                    price = midpoint
+                    used_bidask += 1
+            elif q.last == q.prev_close:
                 last_eq_prev += 1
-            gap_pct = (q.last - q.prev_close) / q.prev_close * 100
+
+            gap_pct = (price - q.prev_close) / q.prev_close * 100
 
             if gap_pct > 0:
                 positive_gaps += 1
             if gap_pct >= 1.0:
-                all_gaps.append((gap_pct, sym, q.last, q.prev_close, q.bid, q.ask, q.volume))
+                all_gaps.append((gap_pct, sym, price, q.prev_close, q.bid, q.ask, q.volume))
 
             if gap_pct < self.config.min_gap_pct:
                 continue
             if gap_pct > MAX_GAP_PCT:
                 over_max_gap += 1
                 continue
-            if q.last > self.config.max_price:
+            if price > self.config.max_price:
                 over_max_price += 1
                 continue
 
             gappers.append({
                 'symbol': sym,
                 'gap_pct': gap_pct,
-                'open_price': q.last,
+                'open_price': price,
                 'prior_close': q.prev_close,
                 'bid': q.bid,
                 'ask': q.ask,
@@ -280,8 +292,10 @@ class LiveScalpRunner:
 
         # Diagnostic: quote staleness check
         total_valid = len(quotes) - zero_prev - zero_last
+        stale_count = last_eq_prev + used_bidask
         logger.info(f"  Quote health: {len(quotes)} returned, {total_valid} valid, "
-                     f"last==prev={last_eq_prev} ({last_eq_prev*100/max(total_valid,1):.0f}%), "
+                     f"stale_last={stale_count} (used_bidask_midpoint={used_bidask}, "
+                     f"no_bidask={last_eq_prev}), "
                      f"positive_gap={positive_gaps}, gaps>=1%={len(all_gaps)}")
         if zero_prev or zero_last or over_max_price or over_max_gap:
             logger.info(f"  Filter stats: zero_prev_close={zero_prev}, zero_last={zero_last}, "
