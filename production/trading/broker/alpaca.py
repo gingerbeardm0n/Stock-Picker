@@ -199,12 +199,13 @@ class AlpacaDataFeed(DataFeedInterface):
                 for sym, q in resp.items():
                     ask = float(q.ask_price or 0)
                     bid = float(q.bid_price or 0)
+                    mid = (bid + ask) / 2 if bid > 0 and ask > 0 else ask or bid
                     results[sym] = QuoteResult(
                         symbol=sym,
                         bid=bid,
                         ask=ask,
-                        last=ask,       # Use ask as proxy for last (no snapshot endpoint here)
-                        prev_close=0.0, # Not available from latest quote; use get_prior_closes()
+                        last=mid,       # midpoint; latest quote has no last-trade field
+                        prev_close=0.0, # not in quote snapshot; caller must get_prior_closes()
                     )
             except Exception as e:
                 logger.warning(f"Alpaca quote batch failed: {e}")

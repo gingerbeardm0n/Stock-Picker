@@ -204,10 +204,23 @@ class LiveScalpRunner:
         logger.info("PHASE 1: Premarket Gapper Scan")
         logger.info("-" * 40)
 
-        # Step 1: Get quotes for all symbols (batched)
+        # Step 1: Prior closes (Alpaca quote snapshots don't include prev_close)
+        prior_closes: dict[str, float] = {}
+        try:
+            prior_closes = self.data_feed.get_prior_closes(self._symbols)
+            logger.info(f"Fetched prior closes for {len(prior_closes):,} symbols")
+        except Exception as e:
+            logger.warning(f"Prior close fetch failed: {e} — gap scan may find 0 gappers")
+
+        # Step 2: Get quotes for all symbols (batched)
         logger.info(f"Fetching quotes for {len(self._symbols):,} symbols...")
         quotes = self.data_feed.get_quotes(self._symbols)
         logger.info(f"Got {len(quotes):,} quotes")
+
+        # Patch prev_close from prior-close fetch (Alpaca returns 0.0 in quote snapshot)
+        for sym, q in quotes.items():
+            if q.prev_close <= 0 and sym in prior_closes:
+                q.prev_close = prior_closes[sym]
 
         # Spot-check: dump raw fields for a few symbols to diagnose stale-quote issues
         spot_check = ['SUGP', 'CRVO', 'PURR', 'HITI', 'ALBT']

@@ -183,9 +183,22 @@ class LiveVwapRunner:
             logger.warning("No symbol universe available.")
             return
 
+        # Prior closes (Alpaca quote snapshots don't include prev_close)
+        prior_closes: dict[str, float] = {}
+        try:
+            prior_closes = self.data_feed.get_prior_closes(symbols)
+            logger.info(f"Fetched prior closes for {len(prior_closes):,} symbols")
+        except Exception as e:
+            logger.warning(f"Prior close fetch failed: {e} — gap scan may find 0 gappers")
+
         logger.info(f"Fetching quotes for {len(symbols):,} symbols...")
         quotes = self.data_feed.get_quotes(symbols)
         logger.info(f"Got {len(quotes):,} quotes")
+
+        # Patch prev_close from prior-close fetch (Alpaca returns 0.0 in quote snapshot)
+        for sym, q in quotes.items():
+            if q.prev_close <= 0 and sym in prior_closes:
+                q.prev_close = prior_closes[sym]
 
         gappers = []
         zero_prev = 0
@@ -200,21 +213,27 @@ class LiveVwapRunner:
                 if q.last <= 0:
                     zero_last += 1
                 continue
-            gap_pct = (q.last - q.prev_close) / q.prev_close * 100
+            # Use midpoint if last is stale (last == prev_close but bid/ask available)
+            price = q.last
+            if q.last == q.prev_close and q.bid > 0 and q.ask > 0:
+                mid = (q.bid + q.ask) / 2
+                if abs(mid - q.prev_close) / q.prev_close > 0.005:
+                    price = mid
+            gap_pct = (price - q.prev_close) / q.prev_close * 100
             if gap_pct >= 5.0:
-                all_gaps.append((gap_pct, sym, q.last, q.prev_close))
+                all_gaps.append((gap_pct, sym, price, q.prev_close))
             if gap_pct < self.config.min_gap_pct:
                 continue
             if gap_pct > MAX_GAP_PCT:
                 over_max_gap += 1
-                continue  # bad quote (sandbox sometimes returns garbage prev_close)
-            if q.last > self.config.max_price:
+                continue
+            if price > self.config.max_price:
                 over_max_price += 1
                 continue
             gappers.append({
                 'symbol': sym,
                 'gap_pct': gap_pct,
-                'open_price': q.last,
+                'open_price': price,
                 'prior_close': q.prev_close,
                 'quote_volume': q.volume,  # today's cumulative volume (rel-vol numerator)
             })
