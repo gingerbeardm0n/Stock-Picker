@@ -85,31 +85,35 @@ jobs:
       - name: Push to data branch
         if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |
-          # Configure git identity for the bot commit
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Use a temporary worktree to commit/push without touching main checkout
           TMPDIR=$(mktemp -d)
-          git worktree add --detach "$TMPDIR/data_wt"
+
+          # Checkout existing data branch (preserves session files etc.)
+          if git show-ref --verify --quiet refs/heads/data; then
+            git worktree add "$TMPDIR/data_wt" data
+          else
+            git worktree add --detach "$TMPDIR/data_wt"
+            cd "$TMPDIR/data_wt"
+            git checkout --orphan data
+            git reset
+            cd "$GITHUB_WORKSPACE"
+          fi
+
+          mkdir -p "$TMPDIR/data_wt/data"
+          cp "$GITHUB_WORKSPACE/data/rel_vol_baseline.json" "$TMPDIR/data_wt/data/rel_vol_baseline.json"
+          cp "$GITHUB_WORKSPACE/data/active_gapper_symbols.json" "$TMPDIR/data_wt/data/active_gapper_symbols.json"
 
           cd "$TMPDIR/data_wt"
-          git checkout --orphan data_new
-          git reset
-
-          mkdir -p data
-          cp "$GITHUB_WORKSPACE/data/rel_vol_baseline.json" data/rel_vol_baseline.json
-          cp "$GITHUB_WORKSPACE/data/active_gapper_symbols.json" data/active_gapper_symbols.json
-
-          # Force-add (these paths are in .gitignore on main; data branch has no .gitignore)
           git add -f data/rel_vol_baseline.json data/active_gapper_symbols.json
 
           TODAY=$(python3 -c "from datetime import date; print(date.today().isoformat())")
           BASELINE_COUNT=$(python3 -c "import json; d=json.load(open('data/rel_vol_baseline.json')); print(len(d['baselines']))")
-          git commit -m "data: rel_vol baseline ${TODAY} (${BASELINE_COUNT} symbols)"
+          git commit -m "data: rel_vol baseline ${TODAY} (${BASELINE_COUNT} symbols)" || { echo "Nothing to commit"; exit 0; }
 
-          git push --force origin HEAD:data
-          echo "Force-pushed both JSON files to origin/data"
+          git push origin data
+          echo "Pushed rel_vol baseline to origin/data"
 
           cd "$GITHUB_WORKSPACE"
           git worktree remove --force "$TMPDIR/data_wt"
