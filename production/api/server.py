@@ -53,14 +53,14 @@ def main():
     args = parser.parse_args()
 
     # Set up APScheduler — run both strategies (scalp then VWAP reclaim)
-    # starting at 8:00 AM ET Mon-Fri (early start = premarket smoke test:
+    # starting at 7:00 AM ET Mon-Fri (early start = premarket smoke test:
     # scanning, quotes, and news all warm up well before the bell)
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         run_daily_sessions,
         CronTrigger(
             day_of_week='mon-fri',
-            hour=8, minute=0,  # 8:00 AM ET
+            hour=7, minute=0,  # 7:00 AM ET
             timezone='US/Eastern',
         ),
         id='daily_sessions',
@@ -68,7 +68,7 @@ def main():
         misfire_grace_time=300,
     )
     scheduler.start()
-    logger.info("Scheduler started — scalp + vwap reclaim run Mon-Fri at 8:00 AM ET")
+    logger.info("Scheduler started — scalp + vwap reclaim run Mon-Fri at 7:00 AM ET")
 
     if args.run_now:
         logger.info("--run-now flag: launching sessions in background thread")
