@@ -70,6 +70,11 @@ class Config:
     ALPACA_PAPER_KEY    = os.getenv('APCA_PAPER_KEY_ID', '') or os.getenv('APCA_API_KEY_ID', '')
     ALPACA_PAPER_SECRET = os.getenv('APCA_PAPER_SECRET_KEY', '') or os.getenv('APCA_API_SECRET_KEY', '')
 
+    # Override account balance used for position sizing in PAPER mode.
+    # Alpaca paper resets to $100k — set this to simulate a smaller account
+    # (e.g. 5000 to match planned live starting capital). Ignored in LIVE mode.
+    PAPER_STARTING_BALANCE = float(os.getenv('PAPER_STARTING_BALANCE', '0') or '0')
+
     # ── Other API keys ─────────────────────────────────────────────────────────
     FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', '')
     MARKETAUX_API_KEY = os.getenv('MARKETAUX_API_KEY', '')

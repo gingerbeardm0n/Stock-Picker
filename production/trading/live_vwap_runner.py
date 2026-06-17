@@ -406,10 +406,13 @@ class LiveVwapRunner:
         account_balance = 5000.0
 
         if not self.dry_run:
-            try:
-                account_balance = self.broker.get_account_balance()
-            except Exception:
-                pass
+            if Config.PAPER_STARTING_BALANCE > 0:
+                account_balance = Config.PAPER_STARTING_BALANCE
+            else:
+                try:
+                    account_balance = self.broker.get_account_balance()
+                except Exception:
+                    pass
 
         risk_per_share = max(entry_price - stop_price, entry_price * 0.005)
         risk_amount = account_balance * (self.config.risk_pct / 100)
