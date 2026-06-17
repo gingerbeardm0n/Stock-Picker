@@ -254,6 +254,9 @@ class LiveScalpRunner:
                 zero_last += 1
                 continue
             if q.last == q.prev_close and q.bid > 0 and q.ask > 0:
+                spread_ratio = q.ask / q.bid if q.bid > 0 else 999
+                if spread_ratio > 3.0:
+                    continue
                 midpoint = (q.bid + q.ask) / 2
                 if abs(midpoint - q.prev_close) / q.prev_close > 0.005:
                     price = midpoint
