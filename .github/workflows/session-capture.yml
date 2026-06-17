@@ -2,8 +2,8 @@ name: Capture Live Session Data
 
 on:
   schedule:
-    # 1:00 PM ET = 17:00 UTC, weekdays (both strategies done by ~11:45 ET)
-    - cron: '0 17 * * 1-5'
+    # 12:00 PM ET = 16:00 UTC, weekdays (both strategies done by ~11:45 ET)
+    - cron: '0 16 * * 1-5'
   workflow_dispatch:
 
 jobs:
