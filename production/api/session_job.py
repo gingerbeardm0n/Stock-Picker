@@ -50,14 +50,17 @@ def _append_trade(trade_data: dict):
 
 
 def run_daily_sessions():
-    """Run scalp then VWAP reclaim; persist state for the dashboard."""
+    """Run scalp, micro-pullback, and VWAP reclaim in coordinated parallel; persist state."""
     from trading.live_scalp_runner import run_scalp_session
     from trading.live_vwap_runner import run_vwap_session
+    from trading.live_micro_pullback_runner import run_micro_pullback_session
+    import threading
 
     scalp_state_data = {}
     vwap_state_data = {}
+    micro_pullback_state_data = {}
 
-    # ── Strategy #1: Opening Bell Scalp ────────────────────────────────────
+    # ── Strategy #1: Opening Bell Scalp (9:30-9:40) ─────────────────────────
     logger.info("=== SCALP SESSION STARTING ===")
     try:
         state = run_scalp_session(dry_run=False, live=False, start_time='8:00')
@@ -96,48 +99,98 @@ def run_daily_sessions():
         }
         (STATE_DIR / "state.json").write_text(json.dumps(scalp_state_data))
 
-    # ── Strategy #2: VWAP Reclaim ──────────────────────────────────────────
-    logger.info("=== VWAP RECLAIM SESSION STARTING ===")
-    try:
-        vstate = run_vwap_session(dry_run=False, live=False)
-        completed = getattr(vstate, 'completed_trades', [])
-        total_pnl = sum(t.get('pnl', 0) for t in completed) if completed else getattr(vstate, 'pnl', None)
-        vwap_state_data = {
-            "last_run": datetime.utcnow().isoformat(),
-            "strategy": "vwap_reclaim",
-            "date": str(datetime.now().date()),
-            "last_result": "trade" if completed or getattr(vstate, 'entry_price', 0) > 0 else "no_trade",
-            "symbol": getattr(vstate, 'symbol', ''),
-            "top_pick": getattr(vstate, 'symbol', '') or None,
-            "entry_price": getattr(vstate, 'entry_price', None),
-            "exit_price": getattr(vstate, 'exit_price', None),
-            "pnl": total_pnl,
-            "shares": getattr(vstate, 'shares', None),
-            "stop_price": getattr(vstate, 'stop_price', None),
-            "bars_held": getattr(vstate, 'bars_held', None),
-            "exit_reason": getattr(vstate, 'exit_reason', ''),
-            "watchlist": _serialize_candidates(getattr(vstate, 'watchlist', [])),
-            "completed_trades": completed,
-            "trade_count": len(completed),
-        }
-        (STATE_DIR / "vwap_state.json").write_text(json.dumps(vwap_state_data, default=str))
-        if vwap_state_data["last_result"] == "trade":
-            _append_trade(vwap_state_data)
-        logger.info(f"=== VWAP RECLAIM COMPLETE: {vwap_state_data['last_result']} ===")
-    except Exception as e:
-        logger.error(f"VWAP session failed: {e}", exc_info=True)
-        vwap_state_data = {
-            "last_run": datetime.utcnow().isoformat(),
-            "strategy": "vwap_reclaim",
-            "last_result": "error",
-            "error": str(e),
-        }
-        (STATE_DIR / "vwap_state.json").write_text(json.dumps(vwap_state_data))
+    # ── Strategy #2 & #3: Micro-Pullback (9:30-11:30) + VWAP (10:00-11:30) ────
+    # Run in parallel threads with active_positions blocking for coordination
+    logger.info("=== MICRO-PULLBACK & VWAP SESSIONS STARTING (parallel) ===")
+
+    vstate = None
+    mpstate = None
+
+    def run_vwap_thread():
+        nonlocal vwap_state_data
+        logger.info("=== VWAP RECLAIM SESSION STARTING ===")
+        try:
+            nonlocal vstate
+            vstate = run_vwap_session(dry_run=False, live=False)
+            completed = getattr(vstate, 'completed_trades', [])
+            total_pnl = sum(t.get('pnl', 0) for t in completed) if completed else getattr(vstate, 'pnl', None)
+            vwap_state_data = {
+                "last_run": datetime.utcnow().isoformat(),
+                "strategy": "vwap_reclaim",
+                "date": str(datetime.now().date()),
+                "last_result": "trade" if completed or getattr(vstate, 'entry_price', 0) > 0 else "no_trade",
+                "symbol": getattr(vstate, 'symbol', ''),
+                "top_pick": getattr(vstate, 'symbol', '') or None,
+                "entry_price": getattr(vstate, 'entry_price', None),
+                "exit_price": getattr(vstate, 'exit_price', None),
+                "pnl": total_pnl,
+                "shares": getattr(vstate, 'shares', None),
+                "stop_price": getattr(vstate, 'stop_price', None),
+                "bars_held": getattr(vstate, 'bars_held', None),
+                "exit_reason": getattr(vstate, 'exit_reason', ''),
+                "watchlist": _serialize_candidates(getattr(vstate, 'watchlist', [])),
+                "completed_trades": completed,
+                "trade_count": len(completed),
+            }
+            (STATE_DIR / "vwap_state.json").write_text(json.dumps(vwap_state_data, default=str))
+            for trade in completed:
+                _append_trade({**vwap_state_data, **trade, "completed_trades": None})
+            logger.info(f"=== VWAP RECLAIM COMPLETE: {vwap_state_data['last_result']} ===")
+        except Exception as e:
+            logger.error(f"VWAP session failed: {e}", exc_info=True)
+            vwap_state_data = {
+                "last_run": datetime.utcnow().isoformat(),
+                "strategy": "vwap_reclaim",
+                "last_result": "error",
+                "error": str(e),
+            }
+            (STATE_DIR / "vwap_state.json").write_text(json.dumps(vwap_state_data))
+
+    def run_micro_pullback_thread():
+        nonlocal micro_pullback_state_data
+        logger.info("=== MICRO-PULLBACK SESSION STARTING ===")
+        try:
+            nonlocal mpstate
+            mpstate = run_micro_pullback_session(dry_run=False, live=False)
+            completed = getattr(mpstate, 'completed_trades', [])
+            micro_pullback_state_data = {
+                "last_run": datetime.utcnow().isoformat(),
+                "strategy": "micro_pullback",
+                "date": str(datetime.now().date()),
+                "last_result": "trade" if completed else "no_trade",
+                "watchlist": _serialize_candidates(getattr(mpstate, 'watchlist', [])),
+                "completed_trades": completed,
+                "trade_count": len(completed),
+                "pnl": sum(t.get('pnl', 0) for t in completed) if completed else 0,
+            }
+            (STATE_DIR / "micro_pullback_state.json").write_text(json.dumps(micro_pullback_state_data, default=str))
+            for trade in completed:
+                _append_trade({**micro_pullback_state_data, **trade, "completed_trades": None})
+            logger.info(f"=== MICRO-PULLBACK COMPLETE: {micro_pullback_state_data['last_result']} ===")
+        except Exception as e:
+            logger.error(f"Micro-Pullback session failed: {e}", exc_info=True)
+            micro_pullback_state_data = {
+                "last_run": datetime.utcnow().isoformat(),
+                "strategy": "micro_pullback",
+                "last_result": "error",
+                "error": str(e),
+            }
+            (STATE_DIR / "micro_pullback_state.json").write_text(json.dumps(micro_pullback_state_data))
+
+    vwap_thread = threading.Thread(target=run_vwap_thread, daemon=False)
+    mp_thread = threading.Thread(target=run_micro_pullback_thread, daemon=False)
+    vwap_thread.start()
+    mp_thread.start()
+    vwap_thread.join()
+    mp_thread.join()
+    logger.info("=== MICRO-PULLBACK & VWAP SESSIONS COMPLETE ===")
 
     # ── Persist everything to TimescaleDB ──────────────────────────────────
     logger.info("=== PERSISTING SESSION TO DB ===")
     try:
         from api.session_persistence import persist_session
+        # persist_session currently takes scalp + vwap; micro-pullback trades
+        # are appended via _append_trade above, so no additional call needed
         persist_session(scalp_state_data, vwap_state_data)
     except Exception as e:
         logger.error(f"Session persistence import/call failed: {e}", exc_info=True)
