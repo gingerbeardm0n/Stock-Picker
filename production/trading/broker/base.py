@@ -140,6 +140,17 @@ class BrokerInterface(ABC):
         ...
 
     @abstractmethod
+    def place_market_buy(
+        self,
+        symbol: str,
+        qty: int,
+    ) -> OrderResult:
+        """
+        Place a DAY market buy order. Used as fallback when limit entry misses fill.
+        """
+        ...
+
+    @abstractmethod
     def place_market_sell(
         self,
         symbol: str,

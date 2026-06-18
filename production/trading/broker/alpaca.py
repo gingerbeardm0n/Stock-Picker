@@ -123,6 +123,19 @@ class AlpacaBroker(BrokerInterface):
             status=_normalize_alpaca_status(order.status),
         )
 
+    def place_market_buy(self, symbol: str, qty: int) -> OrderResult:
+        logger.info(f"MARKET BUY: {qty} {symbol}")
+        order = self._client.submit_order(MarketOrderRequest(
+            symbol=symbol,
+            qty=qty,
+            side=OrderSide.BUY,
+            time_in_force=TimeInForce.DAY,
+        ))
+        return OrderResult(
+            order_id=str(order.id),
+            status=_normalize_alpaca_status(order.status),
+        )
+
     def place_market_sell(self, symbol: str, qty: int) -> OrderResult:
         logger.info(f"MARKET SELL: {qty} {symbol}")
         order = self._client.submit_order(MarketOrderRequest(
