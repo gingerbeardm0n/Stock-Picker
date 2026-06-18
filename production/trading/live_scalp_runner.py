@@ -59,6 +59,11 @@ logger = logging.getLogger(__name__)
 
 # ── Trial 173 config (trained 2021-2022, validated 2023-2025) ────────────────
 
+# ── Multi-candidate config ───────────────────────────────────────────────────
+MAX_ARMED = 10      # candidates to watch simultaneously at open
+MAX_CONCURRENT = 3  # max open positions at one time (skip signal if at limit)
+
+
 TRIAL_173_CONFIG = ScalpConfig(
     min_gap_pct=5.0,
     min_relative_volume=3.61,
@@ -93,25 +98,23 @@ class LiveScalpState:
     candidates: list[dict] = None
     top_pick: dict | None = None
 
-    # Trade execution
-    entry_price: float = 0.0
-    shares: int = 0
-    entry_time: datetime | None = None
-    entry_order_id: str = ''
-    stop_order_id: str = ''
-    highest_since_entry: float = 0.0
-    bars_held: int = 0
-    in_position: bool = False
-    trade_done: bool = False
+    # Multi-position tracking
+    positions: dict = None         # {symbol: position_dict} — currently open
+    completed_trades: list = None  # list of closed trade dicts
 
-    # Results
-    exit_price: float = 0.0
-    exit_reason: str = ''
-    pnl: float = 0.0
+    # Session summary
+    in_position: bool = False      # True if any position open
+    trade_done: bool = False
+    pnl: float = 0.0              # total session P&L
+    trade_count: int = 0
 
     def __post_init__(self):
         if self.candidates is None:
             self.candidates = []
+        if self.positions is None:
+            self.positions = {}
+        if self.completed_trades is None:
+            self.completed_trades = []
 
 
 # ── Main runner ──────────────────────────────────────────────────────────────
@@ -439,27 +442,35 @@ class LiveScalpRunner:
 
     def execute_trade(self):
         """
-        Monitor minute bars for the top pick, enter/exit per scalp_engine.
-        Blocks until trade is done or max_hold_bars reached.
+        Monitor minute bars for up to MAX_ARMED candidates simultaneously.
+        Enters up to MAX_CONCURRENT positions at once; skips signal if at limit.
+        Blocks until all candidates have traded or missed entry window.
         """
-        if self.state.trade_done or not self.state.top_pick:
+        if self.state.trade_done:
             logger.info("No trade to execute today.")
             return
 
-        symbol = self.state.top_pick['symbol']
+        armed = self.state.candidates[:MAX_ARMED]
+        if not armed:
+            logger.info("No candidates to trade.")
+            self.state.trade_done = True
+            return
+
+        symbols = [c['symbol'] for c in armed]
         logger.info("-" * 40)
-        logger.info(f"PHASE 2: Execute trade -- {symbol}")
+        logger.info(f"PHASE 2: Execute trade -- {len(symbols)} candidates armed")
+        logger.info(f"  Watching: {', '.join(symbols)}")
+        logger.info(f"  Max concurrent: {MAX_CONCURRENT}")
         logger.info("-" * 40)
 
-        # Fetch premarket bars to compute premarket high
-        logger.info(f"Fetching premarket bars for {symbol}...")
-        pm_bars_dict = self.data_feed.get_bars_since_4am([symbol])
-        pm_bars = pm_bars_dict.get(symbol, [])
-
-        if pm_bars:
-            # Convert to dict format expected by get_premarket_high
+        # Fetch premarket bars for all armed symbols upfront
+        logger.info(f"Fetching premarket bars for {len(symbols)} symbols...")
+        pm_bars_all = self.data_feed.get_bars_since_4am(symbols)
+        pm_highs = {}
+        for sym in symbols:
+            bars = pm_bars_all.get(sym, [])
             pm_bar_dicts = []
-            for b in pm_bars:
+            for b in bars:
                 bar_et = b.time.astimezone(ET)
                 if bar_et.hour < 9 or (bar_et.hour == 9 and bar_et.minute < 30):
                     pm_bar_dicts.append({
@@ -467,14 +478,25 @@ class LiveScalpRunner:
                         'low': b.low, 'close': b.close,
                         'volume': b.volume,
                     })
-            premarket_high = get_premarket_high(pm_bar_dicts) if pm_bar_dicts else None
-        else:
-            premarket_high = None
+            pm_highs[sym] = get_premarket_high(pm_bar_dicts) if pm_bar_dicts else None
+            h = pm_highs[sym]
+            logger.info(f"  {sym}: PM high = ${h:.2f}" if h else f"  {sym}: PM high = N/A")
 
-        logger.info(f"Premarket high: ${premarket_high:.2f}" if premarket_high else
-                     "Premarket high: N/A")
+        # Per-symbol tracking
+        sym_meta = {
+            c['symbol']: {
+                'candidate': c,
+                'pm_high': pm_highs.get(c['symbol']),
+                'bars_since_open': 0,
+                'done': False,
+            }
+            for c in armed
+        }
 
-        # Start bar poller for this symbol
+        open_positions = {}   # {sym: position_dict}
+        completed_trades = []
+
+        # Start bar poller for all symbols
         from trading.broker.tradier import TradierBarPoller
         poller = TradierBarPoller(
             token=Config.TRADIER_PRODUCTION_TOKEN or Config.TRADIER_PAPER_TOKEN,
@@ -482,94 +504,115 @@ class LiveScalpRunner:
             delay_minutes=0,
             bar_queue=self._bar_queue,
         )
-        poller.set_watchlist([symbol])
+        poller.set_watchlist(symbols)
         poller_thread = threading.Thread(target=poller.start, daemon=True)
         poller_thread.start()
 
         self._wait_for_market_open()
+        logger.info(f"Listening for bars on {len(symbols)} symbols...")
 
-        # Process bars
-        bars_since_open = 0
-        logger.info(f"Listening for {symbol} bars...")
-
-        while not self.state.trade_done:
-            try:
-                bar = self._bar_queue.get(timeout=180)  # 3 min timeout (sandbox bars arrive slowly)
-            except queue.Empty:
-                logger.warning("No bar received in 180s -- timeout")
-                if self.state.in_position:
-                    logger.warning("Timeout while IN POSITION — placing market exit")
-                    self._place_exit(symbol, {'close': self.state.entry_price},
-                                     {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'})
+        while True:
+            if all(m['done'] for m in sym_meta.values()) and not open_positions:
                 break
 
-            if bar.get('symbol') != symbol:
+            try:
+                bar = self._bar_queue.get(timeout=180)
+            except queue.Empty:
+                logger.warning("No bar received in 180s -- timeout")
+                if open_positions:
+                    logger.warning(f"Timeout with {len(open_positions)} open position(s) — emergency exit all")
+                    for sym, pos in list(open_positions.items()):
+                        trade = self._place_exit_multi(
+                            sym, {'close': pos['entry_price']},
+                            {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'}, pos)
+                        completed_trades.append(trade)
+                        self.state.pnl += trade['pnl']
+                        self.state.trade_count += 1
+                    open_positions.clear()
+                break
+
+            sym = bar.get('symbol')
+            if sym not in sym_meta or sym_meta[sym]['done']:
                 continue
 
+            # Skip premarket bars
             bar_time = bar.get('time', datetime.now(ET))
             if isinstance(bar_time, str):
                 bar_time = datetime.fromisoformat(bar_time)
-
-            # Skip premarket bars (poller uses session_filter='all'): they must
-            # not count as bars_since_open or trigger first_green entries.
             bar_et = bar_time.astimezone(ET) if hasattr(bar_time, 'astimezone') else None
             if bar_et is not None and (bar_et.hour < 9 or (bar_et.hour == 9 and bar_et.minute < 30)):
-                logger.info(f"  Premarket bar {bar_et.strftime('%H:%M')} "
-                            f"C={bar['close']:.2f} V={bar.get('volume', 0):,} — data flowing, skipping")
+                logger.info(f"  [{sym}] Premarket {bar_et.strftime('%H:%M')} C={bar['close']:.2f} — skipping")
                 continue
 
-            bars_since_open += 1
+            meta = sym_meta[sym]
+            meta['bars_since_open'] += 1
+            n = meta['bars_since_open']
 
             logger.info(
-                f"  Bar {bars_since_open}: "
+                f"  [{sym}] Bar {n}: "
                 f"O={bar['open']:.2f} H={bar['high']:.2f} "
                 f"L={bar['low']:.2f} C={bar['close']:.2f} "
                 f"V={bar.get('volume', 0):,}"
             )
 
-            if not self.state.in_position:
-                # Try entry
-                entry = evaluate_entry(
-                    candidate=self.state.top_pick,
-                    current_bar=bar,
-                    premarket_high=premarket_high,
-                    bars_since_open=bars_since_open,
-                    config=self.config,
-                )
-                if entry:
-                    self._place_entry(symbol, bar, entry)
-                elif bars_since_open >= self.config.max_entry_bars:
-                    logger.info(f"Max entry bars ({self.config.max_entry_bars}) reached. No entry.")
-                    self.state.trade_done = True
-            else:
-                # Update tracking
-                self.state.bars_held += 1
-                if bar['high'] > self.state.highest_since_entry:
-                    self.state.highest_since_entry = bar['high']
+            if sym in open_positions:
+                pos = open_positions[sym]
+                pos['bars_held'] += 1
+                if bar['high'] > pos['highest_since_entry']:
+                    pos['highest_since_entry'] = bar['high']
 
-                # Check exit
                 exit_signal = evaluate_exit(
-                    entry_price=self.state.entry_price,
-                    highest_since_entry=self.state.highest_since_entry,
+                    entry_price=pos['entry_price'],
+                    highest_since_entry=pos['highest_since_entry'],
                     current_bar=bar,
-                    bars_held=self.state.bars_held,
+                    bars_held=pos['bars_held'],
                     config=self.config,
                 )
                 if exit_signal:
-                    self._place_exit(symbol, bar, exit_signal)
+                    trade = self._place_exit_multi(sym, bar, exit_signal, pos)
+                    completed_trades.append(trade)
+                    del open_positions[sym]
+                    meta['done'] = True
+                    self.state.pnl += trade['pnl']
+                    self.state.trade_count += 1
+                    self.state.in_position = bool(open_positions)
+            else:
+                if len(open_positions) < MAX_CONCURRENT:
+                    entry = evaluate_entry(
+                        candidate=meta['candidate'],
+                        current_bar=bar,
+                        premarket_high=meta['pm_high'],
+                        bars_since_open=n,
+                        config=self.config,
+                    )
+                    if entry:
+                        pos = self._place_entry_multi(sym, bar, entry)
+                        if pos:
+                            open_positions[sym] = pos
+                            self.state.in_position = True
+                elif n == 1:
+                    logger.info(f"  [{sym}] Concurrent limit ({MAX_CONCURRENT}) reached — watching only")
+
+                if n >= self.config.max_entry_bars and sym not in open_positions:
+                    logger.info(f"  [{sym}] Max entry bars ({self.config.max_entry_bars}) reached, no entry")
+                    meta['done'] = True
 
         # Cleanup
         poller.stop()
 
-        # Summary
+        self.state.completed_trades = completed_trades
+        self.state.positions = {}
+        self.state.in_position = False
+        self.state.trade_done = True
+
         self._print_summary()
 
     # ── Order placement ──────────────────────────────────────────────────────
 
-    def _place_entry(self, symbol: str, bar: dict, entry: dict):
-        """Place entry order."""
-        entry_price = bar['close']  # enter at bar close
-        account_balance = 5000.0  # default
+    def _place_entry_multi(self, symbol: str, bar: dict, entry: dict) -> dict | None:
+        """Place entry order. Returns position dict on success, None on failure."""
+        entry_price = bar['close']
+        account_balance = 5000.0
 
         if not self.dry_run:
             if Config.PAPER_STARTING_BALANCE > 0:
@@ -580,30 +623,31 @@ class LiveScalpRunner:
                 except Exception:
                     pass
 
-        # Position sizing (same as sim)
+        # Divide max_position_pct by MAX_CONCURRENT so 3 simultaneous positions
+        # don't exceed available capital (e.g. 48% / 3 = 16% per slot).
         risk_amount = account_balance * (self.config.risk_pct / 100)
         stop_distance = entry_price * (self.config.stop_loss_pct / 100)
         shares_by_risk = int(risk_amount / stop_distance) if stop_distance > 0 else 0
-        max_position_value = account_balance * (self.config.max_position_pct / 100)
+        max_position_value = account_balance * (self.config.max_position_pct / 100) / MAX_CONCURRENT
         shares_by_position = int(max_position_value / entry_price) if entry_price > 0 else 0
         shares = min(shares_by_risk, shares_by_position)
 
         if shares <= 0:
-            logger.warning("Position size = 0 shares. Skipping entry.")
-            self.state.trade_done = True
-            return
+            logger.warning(f"  [{symbol}] Position size = 0 shares. Skipping entry.")
+            return None
 
-        logger.info(f">>> ENTRY: {shares} shares of {symbol} @ ${entry_price:.2f}")
+        logger.info(f">>> ENTRY [{symbol}]: {shares} shares @ ${entry_price:.2f}")
         logger.info(f"    Reason: {entry.get('reason', '?')}")
         logger.info(f"    Risk: ${risk_amount:.2f} | Position: ${shares * entry_price:.2f}")
 
+        entry_order_id = ''
+        stop_order_id = ''
+
         if not self.dry_run:
-            # Place limit buy at ask (aggressive entry)
             result = self.broker.place_limit_buy(symbol, shares, entry_price)
-            self.state.entry_order_id = result.order_id
+            entry_order_id = result.order_id
             logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
 
-            # Wait briefly for fill
             time.sleep(2)
             fill = self.broker.get_order(result.order_id)
             if fill.status == 'filled':
@@ -612,7 +656,6 @@ class LiveScalpRunner:
                 logger.info(f"    FILLED: {shares} @ ${entry_price:.2f}")
             else:
                 logger.info(f"    Order status: {fill.status} -- waiting...")
-                # Wait up to 10s for fill
                 for _ in range(5):
                     time.sleep(2)
                     fill = self.broker.get_order(result.order_id)
@@ -622,83 +665,91 @@ class LiveScalpRunner:
                         logger.info(f"    FILLED: {shares} @ ${entry_price:.2f}")
                         break
                 else:
-                    logger.warning("    Entry not filled after 10s. Cancelling.")
+                    logger.warning(f"    [{symbol}] Entry not filled after 10s. Cancelling.")
                     cancelled = self.broker.cancel_order(result.order_id)
-                    # A cancel can race a fill — a failed cancel usually means
-                    # the order already executed. Verify the order's final
-                    # state; anything filled must be adopted and managed,
-                    # never left as an orphan position with no stop.
+                    # Cancel can race a fill — verify final state before abandoning.
                     time.sleep(2)
                     fill = self.broker.get_order(result.order_id)
                     if fill.status in ('filled', 'partially_filled') and fill.filled_qty > 0:
                         entry_price = fill.filled_price or entry_price
                         shares = fill.filled_qty
                         logger.warning(
-                            f"    Cancel raced a fill ({fill.status}, cancel ok={cancelled}): "
+                            f"    Cancel raced fill ({fill.status}, cancel ok={cancelled}): "
                             f"{shares} @ ${entry_price:.2f} — adopting position."
                         )
                     else:
-                        self.state.trade_done = True
-                        return
+                        return None
 
-            # Place stop loss order
             stop_price = round(entry_price * (1 - self.config.stop_loss_pct / 100), 2)
             stop_result = self.broker.place_stop_sell(symbol, shares, stop_price)
-            self.state.stop_order_id = stop_result.order_id
+            stop_order_id = stop_result.order_id
             logger.info(f"    Stop order: {stop_result.order_id} @ ${stop_price:.2f}")
 
-        self.state.in_position = True
-        self.state.entry_price = entry_price
-        self.state.shares = shares
-        self.state.entry_time = datetime.now(ET)
-        self.state.highest_since_entry = bar['high']
-        self.state.bars_held = 0
+        return {
+            'symbol': symbol,
+            'entry_price': entry_price,
+            'shares': shares,
+            'entry_order_id': entry_order_id,
+            'stop_order_id': stop_order_id,
+            'stop_price': round(entry_price * (1 - self.config.stop_loss_pct / 100), 2),
+            'highest_since_entry': bar['high'],
+            'bars_held': 0,
+            'entry_time': datetime.now(ET).isoformat(),
+        }
 
-    def _place_exit(self, symbol: str, bar: dict, exit_signal: dict):
-        """Place exit order."""
+    def _place_exit_multi(self, symbol: str, bar: dict, exit_signal: dict, pos: dict) -> dict:
+        """Place exit order. Returns completed trade dict."""
         exit_price = exit_signal.get('exit_price', bar['close'])
 
-        logger.info(f">>> EXIT: {self.state.shares} shares of {symbol} @ ${exit_price:.2f}")
+        logger.info(f">>> EXIT [{symbol}]: {pos['shares']} shares @ ${exit_price:.2f}")
         logger.info(f"    Reason: {exit_signal.get('reason', '?')}")
 
         if not self.dry_run:
-            # Cancel existing stop order — if cancel fails, stop may have
-            # already filled server-side. Verify before placing a market sell
-            # to avoid double-selling (which would open a short position).
-            if self.state.stop_order_id:
-                cancelled = self.broker.cancel_order(self.state.stop_order_id)
+            # Cancel stop — if cancel fails, stop may have already filled server-side.
+            # Verify before placing market sell to avoid double-selling (opening a short).
+            if pos.get('stop_order_id'):
+                cancelled = self.broker.cancel_order(pos['stop_order_id'])
                 if not cancelled:
                     time.sleep(1)
-                    stop_status = self.broker.get_order(self.state.stop_order_id)
+                    stop_status = self.broker.get_order(pos['stop_order_id'])
                     if stop_status.status == 'filled':
                         logger.warning(
-                            f"    Stop {self.state.stop_order_id} already filled "
-                            f"@ ${stop_status.filled_price:.2f} — skipping market sell"
+                            f"    Stop {pos['stop_order_id']} already filled "
+                            f"@ ${stop_status.filled_price:.2f} — adopting stop fill"
                         )
                         exit_price = stop_status.filled_price
-                        self.state.exit_price = exit_price
-                        self.state.exit_reason = 'STOP_FILLED_SERVER'
-                        self.state.pnl = (exit_price - self.state.entry_price) * self.state.shares
-                        self.state.in_position = False
-                        self.state.trade_done = True
-                        return
+                        pnl = (exit_price - pos['entry_price']) * pos['shares']
+                        logger.info(f"    P&L: ${pnl:+.2f}")
+                        return {
+                            'symbol': symbol,
+                            'entry_price': pos['entry_price'],
+                            'exit_price': exit_price,
+                            'shares': pos['shares'],
+                            'pnl': pnl,
+                            'exit_reason': 'STOP_FILLED_SERVER',
+                            'bars_held': pos['bars_held'],
+                        }
 
-            # Place market sell
-            result = self.broker.place_market_sell(symbol, self.state.shares)
+            result = self.broker.place_market_sell(symbol, pos['shares'])
             logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
 
-            # Wait for fill
             time.sleep(2)
             fill = self.broker.get_order(result.order_id)
             if fill.status == 'filled':
                 exit_price = fill.filled_price
                 logger.info(f"    FILLED: {fill.filled_qty} @ ${exit_price:.2f}")
 
-        self.state.exit_price = exit_price
-        self.state.exit_reason = exit_signal.get('reason', '?')
-        self.state.pnl = (exit_price - self.state.entry_price) * self.state.shares
-        self.state.in_position = False
-        self.state.trade_done = True
+        pnl = (exit_price - pos['entry_price']) * pos['shares']
+        logger.info(f"    P&L: ${pnl:+.2f}")
+        return {
+            'symbol': symbol,
+            'entry_price': pos['entry_price'],
+            'exit_price': exit_price,
+            'shares': pos['shares'],
+            'pnl': pnl,
+            'exit_reason': exit_signal.get('reason', '?'),
+            'bars_held': pos['bars_held'],
+        }
 
     # ── News enrichment ──────────────────────────────────────────────────────
 
@@ -824,20 +875,20 @@ class LiveScalpRunner:
         logger.info("\n" + "=" * 60)
         logger.info("DAILY SUMMARY")
         logger.info("=" * 60)
+        logger.info(f"Candidates watched: {len(s.candidates)}")
 
-        if s.top_pick:
-            logger.info(f"Symbol:     {s.top_pick['symbol']}")
-            logger.info(f"Gap:        {s.top_pick['gap_pct']:.1f}%")
-            logger.info(f"News:       {s.top_pick.get('news_tier', '?')}")
-
-        if s.entry_price > 0:
-            logger.info(f"Entry:      ${s.entry_price:.2f} ({s.shares} shares)")
-            logger.info(f"Exit:       ${s.exit_price:.2f}")
-            logger.info(f"P&L:        ${s.pnl:+.2f}")
-            logger.info(f"Bars held:  {s.bars_held}")
-            logger.info(f"Reason:     {s.exit_reason}")
+        if not s.completed_trades:
+            logger.info("Result: NO TRADE")
         else:
-            logger.info("Result:     NO TRADE")
+            logger.info(f"Trades: {len(s.completed_trades)}")
+            for t in s.completed_trades:
+                logger.info(
+                    f"  {t['symbol']:6s}  entry=${t['entry_price']:.2f}  "
+                    f"exit=${t['exit_price']:.2f}  "
+                    f"shares={t['shares']}  P&L=${t['pnl']:+.2f}  "
+                    f"bars={t['bars_held']}  ({t['exit_reason']})"
+                )
+            logger.info(f"Total P&L: ${s.pnl:+.2f}")
 
         logger.info("=" * 60)
 

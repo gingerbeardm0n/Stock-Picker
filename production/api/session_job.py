@@ -62,25 +62,29 @@ def run_daily_sessions():
     try:
         state = run_scalp_session(dry_run=False, live=False, start_time='8:00')
 
+        scalp_completed = getattr(state, 'completed_trades', [])
+        first = scalp_completed[0] if scalp_completed else {}
         scalp_state_data = {
             "last_run": datetime.utcnow().isoformat(),
             "strategy": "opening_bell_scalp",
-            "last_result": "trade" if getattr(state, 'entry_price', 0) > 0 else "no_trade",
+            "last_result": "trade" if scalp_completed else "no_trade",
             "date": str(datetime.now().date()),
             "candidates": _serialize_candidates(getattr(state, 'candidates', None)),
             "top_pick": getattr(state, 'top_pick', None),
-            "entry_price": getattr(state, 'entry_price', None),
-            "exit_price": getattr(state, 'exit_price', None),
-            "pnl": getattr(state, 'pnl', None),
-            "shares": getattr(state, 'shares', None),
-            "stop_price": getattr(state, 'stop_price', None),
-            "bars_held": getattr(state, 'bars_held', None),
-            "exit_reason": getattr(state, 'exit_reason', ''),
+            "completed_trades": scalp_completed,
+            "trade_count": len(scalp_completed),
+            "pnl": getattr(state, 'pnl', 0),
             "trade_done": getattr(state, 'trade_done', False),
+            # Legacy compat fields so dashboard _infer_stage still works
+            "entry_price": first.get('entry_price'),
+            "exit_price": first.get('exit_price'),
+            "shares": first.get('shares'),
+            "bars_held": first.get('bars_held'),
+            "exit_reason": first.get('exit_reason', ''),
         }
         (STATE_DIR / "state.json").write_text(json.dumps(scalp_state_data, default=str))
-        if scalp_state_data["last_result"] == "trade":
-            _append_trade(scalp_state_data)
+        for trade in scalp_completed:
+            _append_trade({**scalp_state_data, **trade, "completed_trades": None})
         logger.info(f"=== SCALP SESSION COMPLETE: {scalp_state_data['last_result']} ===")
     except Exception as e:
         logger.error(f"Scalp session failed: {e}", exc_info=True)

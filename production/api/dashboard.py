@@ -35,7 +35,7 @@ from trading.vwap_models import VwapReclaimConfig
 logger = logging.getLogger(__name__)
 
 # In-memory log ring buffer — survives Render's ephemeral log window
-_LOG_BUFFER: deque[dict] = deque(maxlen=2000)
+_LOG_BUFFER: deque[dict] = deque(maxlen=20000)
 
 
 class _BufferHandler(logging.Handler):
@@ -111,9 +111,16 @@ def _read_vwap_state() -> dict:
 def _infer_stage(state_data: dict) -> str:
     if state_data.get("last_result") == "error":
         return "ERROR"
-    if state_data.get("trade_done") or state_data.get("exit_price"):
-        return "EXITED"
+    if state_data.get("trade_done"):
+        if state_data.get("completed_trades") or state_data.get("exit_price"):
+            return "EXITED"
+    # Multi-position: any open positions → ENTERED
+    if state_data.get("positions"):
+        return "ENTERED"
+    # Legacy single-position compat
     if state_data.get("entry_price") and state_data["entry_price"] > 0:
+        if state_data.get("exit_price"):
+            return "EXITED"
         return "ENTERED"
     candidates = state_data.get("candidates") or state_data.get("watchlist") or []
     if not candidates:
@@ -245,7 +252,7 @@ def get_status():
 
 
 @app.get("/logs")
-def get_logs(n: int = Query(default=500, le=2000)):
+def get_logs(n: int = Query(default=500, le=20000)):
     """Return last N log lines from in-memory buffer."""
     entries = list(_LOG_BUFFER)[-n:]
     return {"count": len(entries), "logs": entries}
@@ -312,14 +319,19 @@ def get_dashboard():
         if isinstance(c, dict):
             c["stage"] = _candidate_stage(c, vwap_top, vwap_stage)
 
+    # Multi-position: return completed_trades list + any open positions dict.
+    # Fall back to legacy single-position fields for backward compat.
     scalp_position = None
     if scalp_stage in ("ENTERED", "EXITED"):
         scalp_position = {
+            "completed_trades": scalp_state.get("completed_trades", []),
+            "open_positions": scalp_state.get("positions", {}),
+            "trade_count": scalp_state.get("trade_count", 0),
+            "pnl": scalp_state.get("pnl"),
+            # Legacy compat (first trade) for any older frontend code
             "entry_price": scalp_state.get("entry_price"),
             "exit_price": scalp_state.get("exit_price"),
-            "pnl": scalp_state.get("pnl"),
             "shares": scalp_state.get("shares"),
-            "stop_price": scalp_state.get("stop_price"),
             "bars_held": scalp_state.get("bars_held"),
         }
 
