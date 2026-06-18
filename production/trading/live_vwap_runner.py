@@ -33,8 +33,10 @@ import logging
 import time
 import queue
 import threading
+import json as _json
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytz
 
@@ -651,6 +653,25 @@ def run_vwap_session(dry_run=False, live=False) -> LiveVwapState:
     """
     runner = LiveVwapRunner(dry_run=dry_run, live=live)
     runner.scan_gappers()
+
+    # Write live state so dashboard shows watchlist before trading begins
+    _vwap_state_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "vwap_state.json"
+    _watchlist = []
+    for c in (runner.state.watchlist or []):
+        _watchlist.append({k: c.get(k) for k in (
+            'symbol', 'gap_pct', 'open_price', 'prior_close', 'rel_vol',
+            'float_shares', 'has_news', 'news_tier', 'scalp_score', 'quote_volume',
+        )})
+    _top = runner.state.watchlist[0]['symbol'] if runner.state.watchlist else None
+    _vwap_state_file.write_text(_json.dumps({
+        "last_run": datetime.utcnow().isoformat(),
+        "strategy": "vwap_reclaim",
+        "last_result": "scanning",
+        "date": str(datetime.now(pytz.timezone('America/New_York')).date()),
+        "watchlist": _watchlist,
+        "top_pick": _top,
+    }, default=str))
+
     runner.execute()
     return runner.state
 

@@ -32,6 +32,7 @@ import queue
 import threading
 from datetime import datetime, timedelta
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytz
 
@@ -866,9 +867,30 @@ def run_scalp_session(dry_run=False, live=False, start_time='9:00'):
     # (full scan = quotes for ~8k symbols + news, too heavy to run each minute).
     scan_cutoff = now.replace(hour=9, minute=25, second=0, microsecond=0)
 
+    _state_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "state.json"
+
     while True:
         runner.state.trade_done = False  # reset for rescan
         runner.scan_premarket()
+
+        # Write live state so dashboard shows candidates during premarket scan
+        _candidates = []
+        for c in (runner.state.candidates or []):
+            _candidates.append({k: c.get(k) for k in (
+                'symbol', 'gap_pct', 'open_price', 'prior_close', 'rel_vol',
+                'float_shares', 'has_news', 'news_tier', 'scalp_score', 'quote_volume',
+            )})
+        _top = runner.state.top_pick
+        _top_sym = (_top.get('symbol') if isinstance(_top, dict) else _top) if _top else None
+        import json as _json
+        _state_file.write_text(_json.dumps({
+            "last_run": datetime.utcnow().isoformat(),
+            "strategy": "opening_bell_scalp",
+            "last_result": "scanning",
+            "date": str(datetime.now(ET).date()),
+            "candidates": _candidates,
+            "top_pick": _top_sym,
+        }, default=str))
 
         now = datetime.now(ET)
         if now >= scan_cutoff:
