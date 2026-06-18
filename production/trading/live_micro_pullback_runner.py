@@ -60,24 +60,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ── Micro-Pullback trial (TBD: selected from Optuna walk-forward) ────────────
+# ── Micro-Pullback trial 159 (Optuna walk-forward selected 2024, sealed 2025) ────
+# Train 2021-23: 87.2% WR, PF 8.76, $13.6K P&L / 219 trades
+# Select 2024:  86.1% WR, PF 16.27, $5.9K P&L / 72 trades (OOS validation)
+# Seal 2025:    85.4% WR, PF 9.19, $3.1K P&L / 48 trades (Jan-Jun live)
 
-TRIAL_TBD_CONFIG = MicroPullbackConfig(
-    min_gap_pct=10.0,
-    min_relative_volume=3.0,
-    max_price=20.0,
-    max_float=20_000_000,
+TRIAL_159_CONFIG = MicroPullbackConfig(
+    min_gap_pct=12.792071102054006,
+    min_relative_volume=2.637538384486767,
+    max_price=15.522570939842348,
+    max_float=40_000_000,
     require_news=True,
-    lookback_bars=9,
+    lookback_bars=6,
     max_pullback_bars=3,
-    max_pullback_retrace=5.0,
-    pullback_vol_ratio=0.8,
-    resume_vol_mult=1.2,
-    profit_target_pct=5.0,
-    max_hold_bars=20,
-    trailing_stop_pct=0.0,
-    risk_pct=2.0,
-    max_position_pct=30.0,
+    max_pullback_retrace=8.93636300233037,
+    pullback_vol_ratio=0.7784035538740586,
+    resume_vol_mult=2.1235141212381485,
+    profit_target_pct=9.450601652876058,
+    max_hold_bars=18,
+    trailing_stop_pct=0.0012876813385728353,
+    risk_pct=2.309561396978443,
+    max_position_pct=49.191266155853405,
 )
 
 
@@ -118,7 +121,7 @@ class LiveMicroPullbackRunner:
         dry_run: bool = False,
         live: bool = False,
     ):
-        self.config = config or TRIAL_TBD_CONFIG
+        self.config = config or TRIAL_159_CONFIG
         self.dry_run = dry_run
         self.live = live
         self.state = LiveMicroPullbackState()
