@@ -343,9 +343,14 @@ class LiveScalpRunner:
             return
 
         # Step 5: Rank and pick #1
-        # Add rel_vol placeholder (will refine at 9:25 with volume data)
+        # Compute real rel-vol now using current quote volume vs 30-day baseline.
+        # Volume is low premarket but ratio is still meaningful — a stock at 5x
+        # its normal 9:25 cumulative volume at 8 AM is a genuine mover.
+        # Filter (min_relative_volume) is NOT applied here; that happens at 9:25
+        # refresh so thin candidates are dropped only when volume data is mature.
         for g in filtered:
-            g['rel_vol'] = 10.0  # high default, refined later
+            g['rel_vol'] = compute_rel_vol(
+                g['symbol'], g.get('quote_volume'), self._rel_vol_baselines)
             g['float_shares'] = None  # TODO: fetch from fundamentals
 
         ranked = rank_candidates(filtered)
