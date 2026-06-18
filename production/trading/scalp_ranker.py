@@ -23,7 +23,7 @@ W_FLOAT = 0.10
 # Live runners only enrich the top N gappers by gap%% (news API cost) and
 # drop absurd gaps as bad quotes; sims must apply the SAME cuts or they
 # see candidates live never would (parity gap #2/#4, found 2026-06-12).
-ENRICH_TOP_N = 20
+ENRICH_TOP_N = 50
 MAX_GAP_PCT = 1000.0
 
 
