@@ -60,27 +60,28 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ── Micro-Pullback trial 159 (Optuna walk-forward selected 2024, sealed 2025) ────
-# Train 2021-23: 87.2% WR, PF 8.76, $13.6K P&L / 219 trades
-# Select 2024:  86.1% WR, PF 16.27, $5.9K P&L / 72 trades (OOS validation)
-# Seal 2025:    85.4% WR, PF 9.19, $3.1K P&L / 48 trades (Jan-Jun live)
+# ── Micro-Pullback trial 167 (most trades across all windows — paper trading for data volume) ──
+# Swapped from trial 159 for paper trading: 364 total trades vs 339, loosest pullback_retrace (11.1)
+# Train 2021-23: 85.8% WR, $11,450 / 233 trades
+# Select 2024:   83.0% WR, PF  7.20, $5,321 / 83 trades (OOS validation)
+# Seal 2025:     88.0% WR, PF  8.37, $2,755 / 48 trades (Jan-Jun)
 
-TRIAL_159_CONFIG = MicroPullbackConfig(
-    min_gap_pct=12.792071102054006,
-    min_relative_volume=2.637538384486767,
-    max_price=15.522570939842348,
+TRIAL_167_CONFIG = MicroPullbackConfig(
+    min_gap_pct=14.11983453875954,
+    min_relative_volume=3.88597983541004,
+    max_price=15.217173323934988,
     max_float=40_000_000,
     require_news=True,
     lookback_bars=6,
     max_pullback_bars=3,
-    max_pullback_retrace=8.93636300233037,
-    pullback_vol_ratio=0.7784035538740586,
-    resume_vol_mult=2.1235141212381485,
-    profit_target_pct=9.450601652876058,
-    max_hold_bars=18,
-    trailing_stop_pct=0.0012876813385728353,
-    risk_pct=2.309561396978443,
-    max_position_pct=49.191266155853405,
+    max_pullback_retrace=11.065487667445561,
+    pullback_vol_ratio=0.7625515979776143,
+    resume_vol_mult=1.6836625745936113,
+    profit_target_pct=8.673296419697865,
+    max_hold_bars=14,
+    trailing_stop_pct=0.003027022522226367,
+    risk_pct=2.298919549411626,
+    max_position_pct=49.895184791981684,
 )
 
 
@@ -121,7 +122,7 @@ class LiveMicroPullbackRunner:
         dry_run: bool = False,
         live: bool = False,
     ):
-        self.config = config or TRIAL_159_CONFIG
+        self.config = config or TRIAL_167_CONFIG
         self.dry_run = dry_run
         self.live = live
         self.state = LiveMicroPullbackState()
