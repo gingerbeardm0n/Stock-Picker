@@ -1,7 +1,7 @@
 """
 Live VWAP Reclaim Runner
 =========================
-Paper/live trading for the VWAP Reclaim strategy (vwap_v1 trial 173).
+Paper/live trading for the VWAP Reclaim strategy (vwap_v1 trial 56).
 Designed to run RIGHT AFTER the Opening Bell Scalp session in the same
 scheduled job — scalp owns 9:30-9:40, this owns the 10:00-11:30 window.
 
@@ -63,21 +63,21 @@ logger = logging.getLogger(__name__)
 # ── vwap_v1 trial 173 (train 2021-23, selected 2024, sealed-2025 test:
 #    151 trades, 90.1% WR, +$2,669, PF 4.76) ───────────────────────────────
 
-TRIAL_173_CONFIG = VwapReclaimConfig(
-    min_gap_pct=5.0,
-    min_relative_volume=2.79,
-    max_price=23.27,
+TRIAL_56_CONFIG = VwapReclaimConfig(
+    min_gap_pct=7.67625431374268,
+    min_relative_volume=7.4539522822260995,
+    max_price=19.03592418572809,
     require_news=True,
-    lookback_bars=8,
+    lookback_bars=6,
     min_bars_below=2,
-    reclaim_vol_mult=1.91,
+    reclaim_vol_mult=2.036178582468315,
     entry_mode='reclaim_close',
-    stop_vwap_offset=0.070,
-    profit_target_pct=8.87,
-    max_hold_bars=47,
-    trailing_stop_pct=0.0,
-    risk_pct=2.73,
-    max_position_pct=37.90,
+    stop_vwap_offset=0.08317185478388667,
+    profit_target_pct=5.259036565301703,
+    max_hold_bars=44,
+    trailing_stop_pct=0.001028882565589806,
+    risk_pct=2.3730539057530393,
+    max_position_pct=49.70080747143194,
 )
 
 
@@ -118,7 +118,7 @@ class LiveVwapRunner:
         dry_run: bool = False,
         live: bool = False,
     ):
-        self.config = config or TRIAL_173_CONFIG
+        self.config = config or TRIAL_56_CONFIG
         self.dry_run = dry_run
         self.live = live
         self.state = LiveVwapState()
