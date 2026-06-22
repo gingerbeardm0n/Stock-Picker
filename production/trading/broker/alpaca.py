@@ -240,7 +240,8 @@ class AlpacaDataFeed(DataFeedInterface):
                 start=start_et.astimezone(timezone.utc),
                 end=until_utc or datetime.now(timezone.utc),
             ))
-            for sym, bar_list in resp.items():
+            bars_data = resp.data if hasattr(resp, 'data') else resp
+            for sym, bar_list in bars_data.items():
                 bars = [
                     BarResult(
                         time=b.timestamp.replace(tzinfo=timezone.utc)
@@ -274,7 +275,8 @@ class AlpacaDataFeed(DataFeedInterface):
                 start=datetime(start.year, start.month, start.day, tzinfo=timezone.utc),
                 end=datetime(today.year, today.month, today.day, tzinfo=timezone.utc),
             ))
-            for sym, bar_list in resp.items():
+            bars_data = resp.data if hasattr(resp, 'data') else resp
+            for sym, bar_list in bars_data.items():
                 if bar_list:
                     results[sym] = float(bar_list[-1].close)
         except Exception as e:
