@@ -49,12 +49,26 @@ def _append_trade(trade_data: dict):
     trades_file.write_text(json.dumps(trades, default=str))
 
 
+_SESSION_STARTED_FILE = STATE_DIR / "session_started_date.txt"
+
+
+def is_session_started_today() -> bool:
+    """True if run_daily_sessions() already kicked off today."""
+    try:
+        return _SESSION_STARTED_FILE.read_text().strip() == str(datetime.now().date())
+    except OSError:
+        return False
+
+
 def run_daily_sessions():
     """Run scalp, micro-pullback, and VWAP reclaim in coordinated parallel; persist state."""
     from trading.live_scalp_runner import run_scalp_session
     from trading.live_vwap_runner import run_vwap_session
     from trading.live_micro_pullback_runner import run_micro_pullback_session
     import threading
+
+    # Write start flag immediately — lets /trigger guard against double-fire.
+    _SESSION_STARTED_FILE.write_text(str(datetime.now().date()))
 
     scalp_state_data = {}
     vwap_state_data = {}

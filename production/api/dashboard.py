@@ -290,7 +290,11 @@ def get_news_dump(date: str | None = Query(None, description="YYYY-MM-DD; omit f
 def trigger_session():
     """Manually trigger the daily sessions (scalp + VWAP reclaim) in background."""
     import threading
-    from api.session_job import run_daily_sessions
+    from api.session_job import run_daily_sessions, is_session_started_today
+
+    if is_session_started_today():
+        logger.info("Trigger received but session already started today — skipping")
+        return {"triggered": False, "message": "Session already running today"}
 
     t = threading.Thread(target=run_daily_sessions, daemon=True)
     t.start()

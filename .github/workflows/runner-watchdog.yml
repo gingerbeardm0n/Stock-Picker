@@ -1,0 +1,99 @@
+name: Runner Watchdog
+
+on:
+  schedule:
+    # 6:50 AM ET = 10:50 UTC — fires before APScheduler's 7:00 job, wakes Render
+    - cron: '50 10 * * 1-5'
+    # 7:25 AM ET = 11:25 UTC — backup in case first slot delayed by GitHub queue
+    - cron: '25 11 * * 1-5'
+    # 8:00 AM ET = 12:00 UTC — safety net (market-open premarket scan window)
+    - cron: '0 12 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      force_trigger:
+        description: 'Force trigger even if session already started today'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Wake Render (with retries)
+        id: wake
+        run: |
+          API_URL="https://jtrader-api.onrender.com"
+          echo "Waking Render at $API_URL..."
+          for i in 1 2 3 4 5; do
+            if curl -sf "${API_URL}/health" --max-time 45; then
+              echo ""
+              echo "Render awake (attempt $i)"
+              echo "alive=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "Attempt $i: Render not ready, waiting 30s..."
+            sleep 30
+          done
+          echo "Render unreachable after 5 attempts"
+          echo "alive=false" >> $GITHUB_OUTPUT
+          exit 1
+
+      - name: Trigger runners (idempotent)
+        if: steps.wake.outputs.alive == 'true'
+        env:
+          JTRADER_API_KEY: ${{ secrets.JTRADER_API_KEY }}
+          FORCE_TRIGGER: ${{ github.event.inputs.force_trigger }}
+        run: |
+          API_URL="https://jtrader-api.onrender.com"
+
+          if [ "$FORCE_TRIGGER" = "true" ]; then
+            echo "Force trigger requested — skipping idempotency check"
+          else
+            # Check if already triggered today
+            TODAY=$(date -u +%Y-%m-%d)
+            echo "Checking if session already started today ($TODAY)..."
+            DASHBOARD=$(curl -sf \
+              -H "X-API-Key: ${JTRADER_API_KEY}" \
+              "${API_URL}/dashboard" \
+              --max-time 20 || echo '{}')
+
+            LAST_RUN=$(echo "$DASHBOARD" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          scalp = d.get('scalp') or d.get('status', {})
+          lr = (scalp.get('last_run') or '')[:10]
+          print(lr)
+          " 2>/dev/null || echo '')
+
+            echo "Last run date: '$LAST_RUN'"
+            if [ "$LAST_RUN" = "$TODAY" ]; then
+              echo "Session already completed today — no trigger needed"
+              exit 0
+            fi
+          fi
+
+          echo "Triggering daily sessions..."
+          RESP=$(curl -sf \
+            -X POST \
+            -H "X-API-Key: ${JTRADER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            "${API_URL}/trigger" \
+            --max-time 30)
+          echo "Response: $RESP"
+
+          # Check server-side idempotency response
+          TRIGGERED=$(echo "$RESP" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          print('true' if d.get('triggered') else 'false')
+          " 2>/dev/null || echo 'unknown')
+
+          if [ "$TRIGGERED" = "true" ]; then
+            echo "Runners STARTED successfully"
+          elif [ "$TRIGGERED" = "false" ]; then
+            echo "Server reported session already running — no duplicate start"
+          else
+            echo "Unexpected response — check Render logs"
+          fi
