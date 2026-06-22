@@ -316,10 +316,10 @@ def write_to_neon(
         conn = psycopg2.connect(conn_str)
         cur = conn.cursor()
 
-        # Upsert rel_vol_baselines
+        # Upsert rel_vol_baselines (updated_at defaults to now())
         baseline_rows = [(sym, vol, as_of) for sym, vol in baselines.items()]
         execute_values(cur, """
-            INSERT INTO rel_vol_baselines (symbol, avg_volume, as_of, updated_at)
+            INSERT INTO rel_vol_baselines (symbol, avg_volume, as_of)
             VALUES %s
             ON CONFLICT (symbol) DO UPDATE SET
                 avg_volume = EXCLUDED.avg_volume,
@@ -327,10 +327,10 @@ def write_to_neon(
                 updated_at = now()
         """, baseline_rows)
 
-        # Upsert active_symbols
+        # Upsert active_symbols (updated_at defaults to now())
         symbol_rows = [(sym, as_of) for sym in sorted(set(symbols))]
         execute_values(cur, """
-            INSERT INTO active_symbols (symbol, added_on, updated_at)
+            INSERT INTO active_symbols (symbol, added_on)
             VALUES %s
             ON CONFLICT (symbol) DO UPDATE SET
                 updated_at = now()
