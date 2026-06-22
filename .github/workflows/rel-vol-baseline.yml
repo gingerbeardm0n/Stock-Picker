@@ -35,7 +35,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests psycopg2-binary
 
       - name: Extract active_gapper_symbols.json from data branch
         run: |
@@ -52,6 +52,7 @@ jobs:
         env:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
           APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+          NEON_CONNECTION_STRING: ${{ secrets.NEON_CONNECTION_STRING }}
         run: |
           python production/data/live_capture/build_baseline_cloud.py \
             --output-dir data/

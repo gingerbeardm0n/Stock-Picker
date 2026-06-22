@@ -1,11 +1,16 @@
 """
-build_baseline_cloud.py — Cloud-native rel-vol baseline builder (no DB required).
+build_baseline_cloud.py — Cloud-native rel-vol baseline builder.
 
-Writes two files to --output-dir (default: data/):
-  rel_vol_baseline.json        — 30-day avg cumulative premarket vol at 9:25 ET per symbol
-  active_gapper_symbols.json   — running symbol universe (grows via gapper detection)
+Primary output: Neon PostgreSQL (NEON_CONNECTION_STRING env var)
+  - rel_vol_baselines table  — 30-day avg cumulative premarket vol at 9:25 ET per symbol
+  - active_symbols table     — running symbol universe (grows via gapper detection)
+  - pipeline_runs table      — audit log of each run
 
-Runs in GitHub Actions daily at 4:30 PM ET. No DB dependency — pure Alpaca API.
+Fallback output: JSON files in --output-dir (data/ branch, backup only)
+  rel_vol_baseline.json        — same data as DB for runners without DB access
+  active_gapper_symbols.json   — symbol universe snapshot
+
+Runs in GitHub Actions daily at 4:30 PM ET. Pure Alpaca API for bar data.
 Alpaca free tier: iex feed, same-day bars blocked, 200 req/min.
 """
 
@@ -20,6 +25,13 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import requests
+
+try:
+    import psycopg2
+    from psycopg2.extras import execute_values
+    _PSYCOPG2_AVAILABLE = True
+except ImportError:
+    _PSYCOPG2_AVAILABLE = False
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -237,7 +249,12 @@ def detect_new_gappers(existing_symbols: set[str], yesterday: date) -> list[str]
 # ---------------------------------------------------------------------------
 
 def load_active_symbols(output_dir: str) -> list[str]:
-    """Load symbols from active_gapper_symbols.json → seed file → empty."""
+    """Load symbols: Neon → active_gapper_symbols.json → seed file → empty."""
+    # Try Neon first
+    neon_symbols = load_active_symbols_from_neon()
+    if neon_symbols:
+        return neon_symbols
+    # Fall back to JSON file (data branch)
     active_path = os.path.join(output_dir, "active_gapper_symbols.json")
     if os.path.exists(active_path):
         data = json.load(open(active_path))
@@ -249,7 +266,7 @@ def load_active_symbols(output_dir: str) -> list[str]:
         symbols = seed if isinstance(seed, list) else seed.get("symbols", [])
         print(f"Loaded {len(symbols)} symbols from seed file {SEED_SYMBOLS_PATH}")
         return symbols
-    print("WARNING: No active_gapper_symbols.json and no seed file found — starting empty.")
+    print("WARNING: No Neon, no JSON, no seed file — starting empty.")
     return []
 
 
@@ -274,6 +291,98 @@ def write_active_symbols(output_dir: str, symbols: list[str], added: list[str], 
                    "added": added, "total": len(deduped)}, f, separators=(",", ":"), indent=2)
     print(f"Wrote {path}: {len(deduped)} symbols (+{len(added)} new)")
     return path
+
+
+# ---------------------------------------------------------------------------
+# Neon DB write
+# ---------------------------------------------------------------------------
+
+def write_to_neon(
+    baselines: dict[str, float],
+    symbols: list[str],
+    new_gappers: list[str],
+    as_of: date,
+) -> bool:
+    """Upsert baselines + symbols into Neon. Returns True on success."""
+    conn_str = os.environ.get("NEON_CONNECTION_STRING", "")
+    if not conn_str:
+        print("  NEON_CONNECTION_STRING not set — skipping Neon write")
+        return False
+    if not _PSYCOPG2_AVAILABLE:
+        print("  psycopg2 not installed — skipping Neon write")
+        return False
+
+    try:
+        conn = psycopg2.connect(conn_str)
+        cur = conn.cursor()
+
+        # Upsert rel_vol_baselines
+        baseline_rows = [(sym, vol, as_of) for sym, vol in baselines.items()]
+        execute_values(cur, """
+            INSERT INTO rel_vol_baselines (symbol, avg_volume, as_of, updated_at)
+            VALUES %s
+            ON CONFLICT (symbol) DO UPDATE SET
+                avg_volume = EXCLUDED.avg_volume,
+                as_of      = EXCLUDED.as_of,
+                updated_at = now()
+        """, baseline_rows)
+
+        # Upsert active_symbols
+        symbol_rows = [(sym, as_of) for sym in sorted(set(symbols))]
+        execute_values(cur, """
+            INSERT INTO active_symbols (symbol, added_on, updated_at)
+            VALUES %s
+            ON CONFLICT (symbol) DO UPDATE SET
+                updated_at = now()
+        """, symbol_rows)
+
+        # Log the run
+        cur.execute("""
+            INSERT INTO pipeline_runs
+                (run_date, symbol_count, baseline_count, new_symbols, status)
+            VALUES (%s, %s, %s, %s, 'ok')
+        """, (as_of, len(symbols), len(baselines), len(new_gappers)))
+
+        conn.commit()
+        conn.close()
+        print(f"  Neon write OK: {len(baselines):,} baselines, {len(symbols):,} symbols")
+        return True
+
+    except Exception as e:
+        print(f"  Neon write FAILED: {e}")
+        # Log failure if we can
+        try:
+            conn2 = psycopg2.connect(conn_str)
+            cur2 = conn2.cursor()
+            cur2.execute("""
+                INSERT INTO pipeline_runs
+                    (run_date, symbol_count, baseline_count, new_symbols, status, error_msg)
+                VALUES (%s, %s, %s, %s, 'error', %s)
+            """, (as_of, len(symbols), len(baselines), len(new_gappers), str(e)))
+            conn2.commit()
+            conn2.close()
+        except Exception:
+            pass
+        return False
+
+
+def load_active_symbols_from_neon() -> list[str]:
+    """Load symbol universe from Neon. Returns empty list on failure."""
+    conn_str = os.environ.get("NEON_CONNECTION_STRING", "")
+    if not conn_str or not _PSYCOPG2_AVAILABLE:
+        return []
+    try:
+        conn = psycopg2.connect(conn_str)
+        cur = conn.cursor()
+        cur.execute("SELECT symbol FROM active_symbols ORDER BY symbol")
+        symbols = [r[0] for r in cur.fetchall()]
+        conn.close()
+        if symbols:
+            print(f"Loaded {len(symbols)} symbols from Neon active_symbols")
+        return symbols
+    except Exception as e:
+        print(f"  Neon symbol load failed ({e}) — falling back to JSON")
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -353,7 +462,14 @@ def main() -> None:
     )
 
     # ---- 6. Write outputs ----
-    print("\nWriting output files...")
+    print("\nWriting outputs...")
+
+    # Primary: Neon DB
+    neon_ok = write_to_neon(baselines, symbols, new_gappers, today)
+    if not neon_ok:
+        print("  WARNING: Neon write failed — runners will fall back to JSON or rv=10.0")
+
+    # Backup: JSON files to data branch (kept for backward compat + manual recovery)
     write_baseline(output_dir, baselines, today)
     write_active_symbols(output_dir, symbols, new_gappers, today)
 

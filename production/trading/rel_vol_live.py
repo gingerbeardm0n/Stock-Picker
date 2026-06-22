@@ -3,14 +3,15 @@ rel_vol_live.py — live relative-volume parity helper (Gap #1).
 
 The simulators compute relative volume from the `rel_vol_cum_cache` table
 (today's cumulative volume at 9:25 ET ÷ 30-day average at the same minute) and
-enforce `min_relative_volume`. The live runners run on Render with no DB access,
-so they fetch a precomputed baseline (the denominator, per symbol) from a raw
-file on the dedicated `data` branch and divide live quote volume by it.
+enforce `min_relative_volume`. The live runners fetch a precomputed baseline
+(the denominator, per symbol) and divide live quote volume by it.
 
-This module holds the pure pieces so both runners share identical semantics and
-they can be unit-tested without a network or DB:
+Source priority:
+  1. Neon PostgreSQL (NEON_CONNECTION_STRING env var) — primary, always fresh
+  2. GitHub data branch JSON (GITHUB_TOKEN env var)  — backup
+  3. DEFAULT_REL_VOL=10.0 fallback                   — filter becomes no-op
 
-    fetch_rel_vol_baseline()  — GET the baseline JSON, graceful fallback to None
+    fetch_rel_vol_baseline()  — loads from Neon → JSON → fallback None
     compute_rel_vol()         — quote_volume / baseline[symbol], sim fallback 10.0
 
 See docs/REL_VOL_LIVE_PARITY_DESIGN.md.
@@ -25,9 +26,6 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# Sim semantics: a symbol with no 30-day history (recent IPO, ticker change)
-# defaults to 10.0 rel-vol so the filter never blocks it. The live fallback
-# (no baseline file, or symbol missing from the baseline) matches this exactly.
 DEFAULT_REL_VOL = 10.0
 
 BASELINE_URL = (
@@ -37,16 +35,36 @@ BASELINE_URL = (
 FETCH_TIMEOUT_S = 5
 
 
-def fetch_rel_vol_baseline(url: str = BASELINE_URL) -> dict | None:
-    """Fetch the rel-vol baseline JSON from the data branch.
-
-    Returns the parsed dict ({"as_of", "minute_of_day", "baselines": {...}}) on
-    success, or None on any failure (network, timeout, bad JSON). Callers treat
-    None as "no baseline available" → DEFAULT_REL_VOL for every symbol.
-    """
+def _fetch_from_neon() -> dict | None:
+    """Load rel_vol baselines from Neon PostgreSQL. Returns dict or None."""
+    conn_str = os.getenv("NEON_CONNECTION_STRING", "")
+    if not conn_str:
+        return None
     try:
-        # Repo is PRIVATE: raw.githubusercontent.com requires a token.
-        # Set GITHUB_TOKEN on Render (fine-grained PAT, contents:read on this repo).
+        import psycopg2
+        conn = psycopg2.connect(conn_str, connect_timeout=5)
+        cur = conn.cursor()
+        cur.execute("SELECT symbol, avg_volume, as_of FROM rel_vol_baselines")
+        rows = cur.fetchall()
+        conn.close()
+        if not rows:
+            logger.warning("Neon rel_vol_baselines table is empty")
+            return None
+        baselines = {sym: avg_vol for sym, avg_vol, _ in rows}
+        as_of = rows[0][2].isoformat() if rows else "unknown"
+        logger.info(
+            "Rel-vol baseline loaded from Neon: %d symbols, as_of=%s",
+            len(baselines), as_of,
+        )
+        return {"as_of": as_of, "minute_of_day": 565, "baselines": baselines, "floats": {}}
+    except Exception as e:
+        logger.warning("Neon rel_vol fetch FAILED (%s) — trying JSON fallback", e)
+        return None
+
+
+def _fetch_from_github(url: str) -> dict | None:
+    """Load rel_vol baseline JSON from GitHub data branch. Returns dict or None."""
+    try:
         headers = {}
         token = os.getenv("GITHUB_TOKEN", "")
         if token:
@@ -56,20 +74,41 @@ def fetch_rel_vol_baseline(url: str = BASELINE_URL) -> dict | None:
         data = r.json()
         baselines = data.get("baselines")
         if not isinstance(baselines, dict):
-            logger.warning("Rel-vol baseline fetched but has no 'baselines' dict — ignoring.")
+            logger.warning("Rel-vol JSON fetched but has no 'baselines' dict — ignoring.")
             return None
         logger.info(
-            "Rel-vol baseline loaded: %d symbols, as_of=%s, minute_of_day=%s",
-            len(baselines), data.get("as_of", "?"), data.get("minute_of_day", "?"),
+            "Rel-vol baseline loaded from GitHub JSON: %d symbols, as_of=%s",
+            len(baselines), data.get("as_of", "?"),
         )
         return data
-    except Exception as e:  # noqa: BLE001 — any failure → fallback, never crash the session
-        logger.warning(
-            "Rel-vol baseline fetch FAILED (%s) — falling back to rel_vol=%.1f for "
-            "ALL symbols; the min_relative_volume filter will be a no-op this session.",
-            e, DEFAULT_REL_VOL,
-        )
+    except Exception as e:
+        logger.warning("Rel-vol GitHub JSON fetch FAILED (%s)", e)
         return None
+
+
+def fetch_rel_vol_baseline(url: str = BASELINE_URL) -> dict | None:
+    """Fetch rel-vol baseline: Neon → GitHub JSON → None (no-op fallback).
+
+    Returns {"as_of", "minute_of_day", "baselines": {sym: avg_vol}, "floats": {}}
+    or None if all sources fail (callers fall back to DEFAULT_REL_VOL=10.0).
+    """
+    # 1. Try Neon (primary)
+    data = _fetch_from_neon()
+    if data:
+        return data
+
+    # 2. Try GitHub JSON (backup)
+    data = _fetch_from_github(url)
+    if data:
+        return data
+
+    # 3. Full fallback
+    logger.warning(
+        "Rel-vol baseline unavailable from ALL sources — falling back to rel_vol=%.1f "
+        "for ALL symbols; the min_relative_volume filter will be a no-op this session.",
+        DEFAULT_REL_VOL,
+    )
+    return None
 
 
 def compute_rel_vol(
