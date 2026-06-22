@@ -44,19 +44,22 @@ def _fetch_from_neon() -> dict | None:
         import psycopg2
         conn = psycopg2.connect(conn_str, connect_timeout=5)
         cur = conn.cursor()
-        cur.execute("SELECT symbol, avg_volume, as_of FROM rel_vol_baselines")
+        cur.execute(
+            "SELECT symbol, avg_volume, as_of, float_shares FROM rel_vol_baselines"
+        )
         rows = cur.fetchall()
         conn.close()
         if not rows:
             logger.warning("Neon rel_vol_baselines table is empty")
             return None
-        baselines = {sym: avg_vol for sym, avg_vol, _ in rows}
+        baselines = {sym: avg_vol for sym, avg_vol, _d, _fs in rows}
+        floats = {sym: int(fs) for sym, _v, _d, fs in rows if fs is not None}
         as_of = rows[0][2].isoformat() if rows else "unknown"
         logger.info(
-            "Rel-vol baseline loaded from Neon: %d symbols, as_of=%s",
-            len(baselines), as_of,
+            "Rel-vol baseline loaded from Neon: %d symbols, %d floats, as_of=%s",
+            len(baselines), len(floats), as_of,
         )
-        return {"as_of": as_of, "minute_of_day": 565, "baselines": baselines, "floats": {}}
+        return {"as_of": as_of, "minute_of_day": 565, "baselines": baselines, "floats": floats}
     except Exception as e:
         logger.warning("Neon rel_vol fetch FAILED (%s) — trying JSON fallback", e)
         return None

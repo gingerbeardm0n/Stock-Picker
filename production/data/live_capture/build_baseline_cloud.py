@@ -33,6 +33,12 @@ try:
 except ImportError:
     _PSYCOPG2_AVAILABLE = False
 
+try:
+    import yfinance as yf
+    _YFINANCE_AVAILABLE = True
+except ImportError:
+    _YFINANCE_AVAILABLE = False
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -49,6 +55,9 @@ GAP_THRESHOLD = 0.05   # 5% gap to qualify as gapper
 REQ_DELAY_S = 0.35     # ~2.8 req/s → under 200 req/min free tier
 MAX_RETRIES = 3
 RETRY_BACKOFF_S = 5
+
+FLOAT_STALE_DAYS = 7   # refresh float data this often
+FLOAT_MAX_PER_RUN = 100  # cap per daily run (~2 min at 1.2s/ticker)
 
 
 # ---------------------------------------------------------------------------
@@ -270,14 +279,20 @@ def load_active_symbols(output_dir: str) -> list[str]:
     return []
 
 
-def write_baseline(output_dir: str, baselines: dict[str, float], as_of: date) -> str:
+def write_baseline(
+    output_dir: str,
+    baselines: dict[str, float],
+    as_of: date,
+    floats: dict[str, int] | None = None,
+) -> str:
     """Write rel_vol_baseline.json. Returns the file path."""
     path = os.path.join(output_dir, "rel_vol_baseline.json")
     os.makedirs(output_dir, exist_ok=True)
     with open(path, "w") as f:
         json.dump({"as_of": as_of.isoformat(), "minute_of_day": MINUTE_OF_DAY,
-                   "baselines": baselines, "floats": {}}, f, separators=(",", ":"))
-    print(f"Wrote {path}: {len(baselines):,} symbols, as_of={as_of.isoformat()}")
+                   "baselines": baselines, "floats": floats or {}}, f, separators=(",", ":"))
+    float_count = len(floats) if floats else 0
+    print(f"Wrote {path}: {len(baselines):,} baselines, {float_count:,} floats, as_of={as_of.isoformat()}")
     return path
 
 
@@ -386,6 +401,95 @@ def load_active_symbols_from_neon() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Float data (yfinance — first-seen + weekly refresh)
+# ---------------------------------------------------------------------------
+
+def fetch_and_update_floats(conn_str: str, max_symbols: int = FLOAT_MAX_PER_RUN) -> int:
+    """Fetch float_shares for new/stale symbols via yfinance; upsert to Neon.
+
+    Prioritises symbols with float_fetched_at IS NULL (never fetched), then
+    oldest fetched first. Caps at max_symbols per run to stay within ~2 min.
+    Returns count of symbols where float_shares was successfully written.
+    """
+    if not _YFINANCE_AVAILABLE:
+        print("  Float update skipped — yfinance not installed")
+        return 0
+    if not _PSYCOPG2_AVAILABLE or not conn_str:
+        print("  Float update skipped — no Neon connection")
+        return 0
+
+    conn = psycopg2.connect(conn_str)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT symbol FROM rel_vol_baselines
+        WHERE float_fetched_at IS NULL
+           OR float_fetched_at < NOW() - (%s || ' days')::INTERVAL
+        ORDER BY float_fetched_at NULLS FIRST
+        LIMIT %s
+    """, (str(FLOAT_STALE_DAYS), max_symbols))
+    symbols = [r[0] for r in cur.fetchall()]
+    conn.close()
+
+    if not symbols:
+        print("  Floats: all symbols up to date")
+        return 0
+
+    print(f"  Fetching floats for {len(symbols)} symbols via yfinance...")
+
+    updated = 0
+    conn = psycopg2.connect(conn_str)
+    cur = conn.cursor()
+
+    for i, sym in enumerate(symbols, 1):
+        float_shares = None
+        try:
+            info = yf.Ticker(sym).info
+            raw = info.get("floatShares")
+            if raw and raw > 0:
+                float_shares = int(raw)
+        except Exception as e:
+            pass  # mark as fetched anyway so we don't retry endlessly
+
+        cur.execute("""
+            UPDATE rel_vol_baselines
+            SET float_shares = %s, float_fetched_at = now()
+            WHERE symbol = %s
+        """, (float_shares, sym))
+
+        if float_shares:
+            updated += 1
+
+        if i % 10 == 0:
+            conn.commit()
+            print(f"    {i}/{len(symbols)} done ({updated} with float data)...")
+
+        time.sleep(1.2)  # yfinance rate limit — ~50 req/min
+
+    conn.commit()
+    conn.close()
+    print(f"  Floats: updated {updated}/{len(symbols)} symbols with float data")
+    return updated
+
+
+def load_floats_from_neon(conn_str: str) -> dict[str, int]:
+    """Load all non-null float_shares from Neon. Returns {symbol: float_shares}."""
+    if not _PSYCOPG2_AVAILABLE or not conn_str:
+        return {}
+    try:
+        conn = psycopg2.connect(conn_str)
+        cur = conn.cursor()
+        cur.execute("SELECT symbol, float_shares FROM rel_vol_baselines WHERE float_shares IS NOT NULL")
+        rows = cur.fetchall()
+        conn.close()
+        result = {sym: int(fs) for sym, fs in rows}
+        print(f"  Loaded {len(result):,} float values from Neon")
+        return result
+    except Exception as e:
+        print(f"  WARNING: float load from Neon failed ({e})")
+        return {}
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -464,13 +568,20 @@ def main() -> None:
     # ---- 6. Write outputs ----
     print("\nWriting outputs...")
 
-    # Primary: Neon DB
+    # Primary: Neon DB (baselines + symbols)
+    conn_str = os.environ.get("NEON_CONNECTION_STRING", "")
     neon_ok = write_to_neon(baselines, symbols, new_gappers, today)
     if not neon_ok:
         print("  WARNING: Neon write failed — runners will fall back to JSON or rv=10.0")
 
-    # Backup: JSON files to data branch (kept for backward compat + manual recovery)
-    write_baseline(output_dir, baselines, today)
+    # ---- 7. Float data (first-seen + weekly refresh) ----
+    print("\nUpdating float data...")
+    fetch_and_update_floats(conn_str)
+    floats = load_floats_from_neon(conn_str)
+
+    # Backup: JSON files to data branch (backward compat + manual recovery)
+    # Include floats so the JSON fallback path also has float data.
+    write_baseline(output_dir, baselines, today, floats=floats)
     write_active_symbols(output_dir, symbols, new_gappers, today)
 
     print("\nDone.")
