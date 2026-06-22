@@ -48,6 +48,7 @@ from trading.vwap_engine import VwapAccumulator, evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_bar, record_news
 from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol
+from trading._positions_lock import try_claim as _claim_position, release as _release_position
 from backend.news_fetcher import has_news_catalyst
 
 ET = pytz.timezone('America/New_York')
@@ -426,6 +427,11 @@ class LiveVwapRunner:
     # ── Order placement (same pattern as scalp runner) ────────────────────────
 
     def _place_entry(self, symbol: str, bar: dict, signal: dict):
+        # Atomic cross-strategy claim — must succeed before any order is placed.
+        if not _claim_position(symbol, "vwap_reclaim"):
+            logger.info(f"[{symbol}] Already claimed by another strategy — skipping entry")
+            return
+
         entry_price = signal['entry_price']
         stop_price = signal['stop_price']
         account_balance = 5000.0
@@ -448,6 +454,7 @@ class LiveVwapRunner:
         if shares <= 0:
             logger.warning(f"Position size = 0 shares for {symbol}. Skipping.")
             self.state.traded_symbols.append(symbol)
+            _release_position(symbol)
             return
 
         logger.info(f">>> ENTRY: {shares} shares of {symbol} @ ${entry_price:.2f}")
@@ -503,6 +510,7 @@ class LiveVwapRunner:
                             f"past limit (ask=${current_ask:.2f} > cap=${slippage_cap:.2f}) — skipping."
                         )
                         self.state.traded_symbols.append(symbol)
+                        _release_position(symbol)
                         return
 
                     logger.info(
@@ -519,6 +527,7 @@ class LiveVwapRunner:
                     else:
                         logger.warning(f"    [{symbol}] Market order also failed. Skipping.")
                         self.state.traded_symbols.append(symbol)
+                        _release_position(symbol)
                         return
 
             stop_result = self.broker.place_stop_sell(symbol, shares, round(stop_price, 2))
@@ -533,9 +542,7 @@ class LiveVwapRunner:
         self.state.entry_time = datetime.now(ET)
         self.state.highest_since_entry = float(bar['high'])
         self.state.bars_held = 0
-
-        # Record active position so other strategies skip this symbol
-        self._record_active_position(symbol)
+        # Position already claimed atomically at top of _place_entry via _claim_position.
 
     def _place_exit(self, symbol: str, bar: dict, exit_signal: dict):
         exit_price = exit_signal.get('exit_price', float(bar['close']))
@@ -609,46 +616,13 @@ class LiveVwapRunner:
     # ── Active Position Blocking (coordinate with other strategies) ──────────
 
     def _can_enter_symbol(self, symbol: str) -> bool:
-        """Check active_positions — return False if another strategy has this symbol."""
-        try:
-            pos_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "active_positions.json"
-            if pos_file.exists():
-                active = _json.loads(pos_file.read_text())
-                if symbol in active:
-                    return False
-        except Exception:
-            pass
-        return True
-
-    def _record_active_position(self, symbol: str):
-        """Add this symbol to active_positions."""
-        try:
-            pos_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "active_positions.json"
-            active = {}
-            if pos_file.exists():
-                try:
-                    active = _json.loads(pos_file.read_text())
-                except (json.JSONDecodeError, OSError):
-                    active = {}
-            active[symbol] = {"strategy": "vwap_reclaim", "entry_time": datetime.utcnow().isoformat()}
-            pos_file.write_text(_json.dumps(active))
-        except Exception as e:
-            logger.warning(f"Failed to record active position: {e}")
+        """Fast pre-check (not authoritative — use as hint only)."""
+        from trading._positions_lock import is_claimed
+        return not is_claimed(symbol)
 
     def _clear_active_position(self, symbol: str):
-        """Remove this symbol from active_positions."""
-        try:
-            pos_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "active_positions.json"
-            if pos_file.exists():
-                try:
-                    active = _json.loads(pos_file.read_text())
-                    if symbol in active:
-                        del active[symbol]
-                    pos_file.write_text(_json.dumps(active))
-                except (json.JSONDecodeError, OSError):
-                    pass
-        except Exception as e:
-            logger.warning(f"Failed to clear active position: {e}")
+        """Remove symbol from active_positions."""
+        _release_position(symbol)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

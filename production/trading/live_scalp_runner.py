@@ -173,9 +173,13 @@ class LiveScalpRunner:
         # from the data branch. None → rel_vol=10.0 fallback (filter no-op).
         baseline = fetch_rel_vol_baseline()
         self._rel_vol_baselines = baseline.get('baselines') if baseline else None
-        # Float baseline (Gap #2): shipped alongside rel-vol on the data branch
-        # so the live float filter matches the sim's stock_fundamentals gate.
+        # Float baseline (Gap #2): floats are not yet populated in the baseline
+        # (build_baseline_cloud.py ships floats={} always). self._floats will be
+        # an empty dict → falsy → float filter is INACTIVE this session. This is
+        # a known parity gap: live allows any float, sim enforces max_float.
         self._floats = baseline.get('floats') if baseline else None
+        if not self._floats:
+            logger.warning("Float baseline empty — max_float filter INACTIVE this session (parity gap)")
 
         # Symbol list for scanning
         self._symbols = self._load_symbols()
