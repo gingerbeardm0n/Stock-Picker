@@ -64,6 +64,22 @@ jobs:
             echo "  $(basename $f): ${SIZE} bytes"
           done
 
+      - name: Set up Python for journal generation
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate trade journal
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          echo "Generating trade journal for ${TODAY}..."
+          python production/data/live_capture/generate_journal.py \
+            --date "${TODAY}" \
+            --session-dir data/sessions/
+          echo ""
+          echo "=== Journal preview ==="
+          head -30 data/sessions/${TODAY}_journal.md || true
+
       - name: Push to data branch
         run: |
           git config user.name "github-actions[bot]"
@@ -82,14 +98,15 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           fi
 
-          # Copy session files into the data branch worktree
+          # Copy session files (JSON + journal markdown) into the data branch worktree
           mkdir -p "$TMPDIR/data_wt/data/sessions"
           cp "$GITHUB_WORKSPACE"/data/sessions/*.json "$TMPDIR/data_wt/data/sessions/"
+          cp "$GITHUB_WORKSPACE"/data/sessions/*.md   "$TMPDIR/data_wt/data/sessions/" 2>/dev/null || true
 
           cd "$TMPDIR/data_wt"
           git add -f data/sessions/
           TODAY=$(date -u +%Y-%m-%d)
-          git commit -m "data: session capture ${TODAY}" || { echo "Nothing to commit"; exit 0; }
+          git commit -m "data: session capture + journal ${TODAY}" || { echo "Nothing to commit"; exit 0; }
 
           git push origin data
           echo "Pushed session data to origin/data"
