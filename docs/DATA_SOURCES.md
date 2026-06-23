@@ -76,6 +76,28 @@
 - **Returns**: ~7,200 non-ETF stocks with ticker <= 5 chars
 - **Used by**: `live_scalp_runner.py` `_fetch_nasdaq_symbols()` for daily universe refresh
 
+### Neon PostgreSQL (Rel-Vol Baseline + Float Data — primary live store)
+- **Account**: Free tier (neondb_owner)
+- **Env vars**: `NEON_CONNECTION_STRING` in `.env` (local) and Render dashboard
+- **Tables**:
+  - `rel_vol_baselines` — 235 symbols, `as_of=2026-06-22`; `float_shares` column added 2026-06-23
+  - `active_symbols` — 2,306 symbols accumulated from live sessions
+  - `pipeline_runs` — 3 runs logged, latest 2026-06-22
+- **Populated by**: `production/data/live_capture/build_baseline_cloud.py` via GitHub Actions (`rel-vol-baseline.yml`, daily 4:30 PM ET)
+- **Used by**: `production/trading/rel_vol_live.py` `_fetch_from_neon()` — primary source on Render
+- **Last verified working**: 2026-06-23 (235 rows, Render env var confirmed set)
+- **Notes**: Float data (yfinance) fetched on first-seen + weekly refresh. `NEON_CONNECTION_STRING` must be set on Render for primary source to activate; falls back to GitHub JSON (also 235 symbols) if absent.
+
+### Finnhub (News — primary)
+- **Account**: Free tier
+- **Env vars**: `FINNHUB_API_KEY` in `.env`
+- **Provides**: Real-time news for live runners
+- **Last verified working**: 2026-06-23 (primary waterfall slot)
+
+### Marketaux (News — REMOVED 2026-06-23)
+- **Status**: ⚫ REMOVED from `news_fetcher.py` waterfall. Rate limit was always exhausted; each timeout = 5s × 50 symbols = 4+ min wasted per scan cycle.
+- **Commit**: `0efa80a`
+
 ## DB Coverage (as of 2026-06-09)
 
 | Table | Latest Data | Notes |
@@ -118,3 +140,9 @@
 6. **Alpaca paper reset button is gone** (removed 2023-2025). `POST /v2/account` returns 404. All new paper accounts start at $100k. Use `PAPER_STARTING_BALANCE=5000` in env for realistic position sizing. Contact Alpaca support if you need the actual balance changed.
 
 7. **Alpaca live + paper accounts can run simultaneously.** Each `TradingClient` is independent. Use live keys (`APCA_API_KEY_ID`) for data API; separate paper keys (`APCA_PAPER_KEY_ID`) for `TradingClient(paper=True)`. Regenerating one set does NOT affect the other.
+
+8. **Tradier sub-penny rejection (error 42210000).** Limit prices must be rounded to exactly 2 decimal places before calling `place_limit_buy()`. Floating-point arithmetic (e.g. `2.7478999...`) is silently truncated by the broker and rejected. Fix: `entry_price = round(entry_price, 2)` in all 3 runners (added 2026-06-23, commit `0efa80a`).
+
+9. **Render uses `production/requirements-deploy.txt`, not root `requirements.txt`.** Any new Python dependency needed on Render (psycopg2, yfinance, etc.) must be added to `production/requirements-deploy.txt`. The root file is for local dev only. This caused psycopg2 + yfinance to silently fail on Render for weeks.
+
+10. **Render ephemeral disk wipes on every deploy.** Session state JSON, bar captures, and logs are lost. Always run `session_report.py` and pull bars BEFORE any deploy. The `session-capture.yml` GitHub Action (12 PM ET daily) mitigates this but only captures one snapshot per day.

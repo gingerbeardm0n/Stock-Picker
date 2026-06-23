@@ -4,7 +4,7 @@ Living record of what was built, when, why — plus a component index and file-h
 Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pass written manually
 2026-05-31 from git history + session context; incremental passes append from `git log`.
 
-**History watermark (last commit folded in):** `26d10ec` (2026-06-17)
+**History watermark (last commit folded in):** `32a5777` (2026-06-23)
 
 ---
 
@@ -135,6 +135,38 @@ Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pa
 - `395a05d` 06-17 — **fix rel-vol CI**: force-push on orphan branch was wiping session files; now mirrors session-capture pattern (checkout existing data branch, normal push).
 - `26d10ec` 06-17 — **critical scanner fix**: `AlpacaDataFeed.get_quotes()` returned `prev_close=0.0` → all symbols skipped → 0 gappers; both runners now call `get_prior_closes()` first and patch; `last=midpoint` not `ask`; VWAP scanner gains midpoint fallback.
 
+### Phase 14 — Production hardening + all 3 runners live (2026-06-17 → 06-23)
+
+**2026-06-17**
+- `f8439ff` — fix(dashboard): persist shares/stop/bars_held + VWAP multi-trade P&L in state.json
+- `9066e1e` — chore: daily session start moved 8:00 AM → 7:00 AM ET (premarket scan now starts 7 AM)
+
+**2026-06-18**
+- `6edb58b` — feat(scanner): news enrichment expanded top-20 → top-50 gappers
+- `0e2a6d1` — fix(dashboard): write state.json during premarket scan loop (not just post-session)
+- `8e9addf` — feat(scalp): multi-candidate entry — watch top 10, enter up to 3 concurrent positions
+- `3b694cc` — fix(rel-vol): `compute_rel_vol()` called during `scan_premarket()` (was hardcoded 10.0)
+- `413227d` — fix(vwap): entry retry with market-order fallback on missed limit fill (2% slippage cap)
+- `00ea1fd` — feat: **Strategy #3 live micro-pullback runner** (`live_micro_pullback_runner.py`), 9:30-11:30 window, active-position blocking via `_positions_lock.py`
+- `2de16ba` — feat(micro-pullback): trial #159 locked for paper trading
+
+**2026-06-19**
+- `9d01ea4` — feat(micro-pullback): swap live config trial 159→167
+
+**2026-06-22**
+- `858bd5d` — fix: handle `BarSet` response from Alpaca SDK in `get_bars_since_4am` + `get_prior_closes`
+- `9e030b0` — feat(vwap): deploy trial 56 config live (97% WR, 12× PF on 2025 sealed set)
+- `0556574` — feat(infra): Neon PostgreSQL as primary rel_vol baseline store (`_fetch_from_neon` added to `rel_vol_live.py`)
+- `51b02b1` — fix: drop `updated_at` from Neon INSERT (let DB default handle it)
+- `85cfdfa` — feat(automation): GitHub Actions runner watchdog (`runner-watchdog.yml`) — POST /trigger at 6:50 AM ET if APScheduler misses
+- `9fc3c70` — fix(runners): 3 bugs — JSON crash on non-dict candidate, float-bypass log warning, `_positions_lock` race on startup
+- `94db5c3` — feat(floats): yfinance float data pipeline — first-seen + weekly refresh, stored in Neon `rel_vol_baselines.float_shares`
+- `95d3ebd` — feat(journal): daily markdown trade journal (`generate_journal.py`) from session JSON
+
+**2026-06-23**
+- `0efa80a` — fix(runners): 4 bugs — dashboard 500 (wrong import alias), sub-penny Tradier rejection (`round(entry_price,2)` in all 3 runners), Marketaux removed from news waterfall, `psycopg2-binary`/`yfinance` added to `requirements-deploy.txt`
+- `32a5777` — feat(runners): multi-position VWAP refactor (`positions: dict` replaces single-pos fields); premarket hybrid scan (60s watchlist re-quote + 5-min full scan); dashboard updated for multi-position state
+
 ---
 
 ## Component Index
@@ -227,6 +259,25 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 | `data_backfill/backfill_daily_history.py` | full-universe daily-bar backfill (pass 1 of mover pipeline) | 🟢 | bef4123 |
 | `data_backfill/backfill_gappers_v2.py` | mover minute bars + premarket 1h rollup (pass 2) | 🟢 | bef4123 |
 
+### New in Phase 14
+| File | Purpose | Status | Since |
+|---|---|---|---|
+| `production/trading/live_micro_pullback_runner.py` | Live runner for Strategy #3 Micro-Pullback (9:30-11:30); trial 167; round(entry_price,2) sub-penny fix | 🟢 | 00ea1fd |
+| `production/trading/_positions_lock.py` | Thread-safe cross-strategy position lock — prevents VWAP + micro-pullback double-entering same symbol | 🟢 | 00ea1fd |
+| `production/data/live_capture/generate_journal.py` | Generates daily markdown trade journal from session JSON | 🟢 | 95d3ebd |
+| `.github/workflows/runner-watchdog.yml` | GitHub Actions watchdog: POST /trigger at 6:50 AM ET if Render APScheduler missed the 7 AM job | 🟢 | 85cfdfa |
+
+**Phase 14 updates to existing components:**
+- `live_vwap_runner.py` — major refactor: `positions: dict` (multi-position), per-symbol entry/exit, `completed_trades` list; trial 56 config deployed
+- `live_scalp_runner.py` — hybrid premarket scan (60s watchlist + 5min full); multi-candidate up to 3 concurrent; `round(entry_price,2)` sub-penny fix
+- `live_micro_pullback_runner.py` — `round(entry_price,2)` sub-penny fix
+- `rel_vol_live.py` — Neon primary source `_fetch_from_neon()`; `float_shares` column added to query
+- `build_baseline_cloud.py` — Neon upsert; yfinance float data fetch
+- `news_fetcher.py` — Marketaux removed (rate limit always exhausted); waterfall now Finnhub → Alpaca only
+- `dashboard.py` — fixed `TRIAL_173_CONFIG` import → `TRIAL_56_CONFIG`; multi-position `vwap_position` block; Decision Transparency dashboard fully wired
+- `session_job.py` — parallel micro-pullback thread; `positions` field in VWAP state write; `_serialize_candidates()` saves full candidate dicts (not symbol strings)
+- `requirements-deploy.txt` — `psycopg2-binary>=2.9` + `yfinance>=0.2` added (Render uses this file, not root `requirements.txt`)
+
 ### New in Phase 13
 | File | Purpose | Status | Since |
 |---|---|---|---|
@@ -264,6 +315,18 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
   `_use_orchestrator` defaults True; still the live path today. Remove after the flip is verified live.
 
 ---
+
+## Hygiene flags — custodian pass 2026-06-23
+- 🚩 **`research/maintenance/cleanup.log`** — log file committed to git; should be gitignored (`.log` pattern already in `.gitignore` but file may be tracked). Verify with `git ls-files research/maintenance/cleanup.log`.
+- 🚩 **`research/maintenance/backfill_daily_gappers_cache.py`** — untracked file (shows in `git status ??`). Needs to be committed or added to `.gitignore` depending on whether it's active tooling or a scratch script.
+- 🚩 **`bash.exe.stackdump`** — untracked root-level crash dump from git-bash. Safe to delete / gitignore.
+- 🚩 **`production/trading/micro_pullback_engine.py` + `micro_pullback_models.py`** — marked 🟡 research in Phase 13. Now that `live_micro_pullback_runner.py` is deployed live, verify these are the canonical engine files (not duplicates of what the runner imports).
+- 🚩 **Monolith path** (`run_trading.py`, `live_scanner.py` with `_use_orchestrator=False`) — with 3 standalone strategy runners live, the old `run_trading.py` entry point is likely dead. Verify nothing calls it before removing.
+- 🚩 **`production/api/server.py`** — may duplicate endpoint logic with `dashboard.py`. The `/dashboard` endpoint was built in `dashboard.py`; confirm `server.py` doesn't have a stale `/dashboard` route.
+- ✅ **RESOLVED — root-level `.py`:** moved `cancel_stop_and_sell`, `compare_entry_logic`, `compare_signals`, `connect_alpaca`, `diagnostic_march6`, `manual_sell_breakeven` → `research/maintenance/diagnostics/` (`f41cf86`). Root now = `config.py` + `run_trading.py` only.
+- ✅ **RESOLVED — data/binaries out of git:** untracked ~62MB (`archive/optunaDBfiles/*.db`, `*_progress.json`, `database/*.log`, `optimizer/pillar23_results.db`, `analysis/gapper_universe.csv`) + added `.gitignore` patterns (`c977030`). Kept local; no history rewrite.
+- ✅ **RESOLVED — dead sim methods:** deleted `_process_minute`/`_scan_for_entry`/`_cushion_size_multiplier` (`7f0c244`). golden + parity still green.
+- ✅ **RESOLVED — stale docs:** `LIVE_SIM_PARITY_SPEC.md` marked DONE, `PROJECT_STATUS_AND_PLAN.md` marked SUPERSEDED (`6a329e3`). Kept for history.
 
 ## Hygiene flags — custodian pass 2026-05-31
 - ✅ **RESOLVED — root-level `.py`:** moved `cancel_stop_and_sell`, `compare_entry_logic`, `compare_signals`,
