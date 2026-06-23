@@ -460,7 +460,7 @@ class LiveVwapRunner:
         logger.info(f">>> ENTRY: {shares} shares of {symbol} @ ${entry_price:.2f}")
         logger.info(f"    Reason: {signal.get('reason', '?')}")
         logger.info(f"    Stop: ${stop_price:.2f} (VWAP {signal.get('vwap', 0):.2f} - {self.config.stop_vwap_offset:.2f})")
-
+        entry_price = round(entry_price, 2)
         if not self.dry_run:
             result = self.broker.place_limit_buy(symbol, shares, entry_price)
             self.state.entry_order_id = result.order_id

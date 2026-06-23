@@ -651,7 +651,7 @@ class LiveScalpRunner:
 
         entry_order_id = ''
         stop_order_id = ''
-
+        entry_price = round(entry_price, 2)
         if not self.dry_run:
             result = self.broker.place_limit_buy(symbol, shares, entry_price)
             entry_order_id = result.order_id

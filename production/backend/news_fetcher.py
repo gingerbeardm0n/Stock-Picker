@@ -240,14 +240,14 @@ class AlpacaNewsFetcher:
 # ── Waterfall aggregator ─────────────────────────────────────────────────────
 
 class NewsFetcher:
-    """Multi-source news fetcher. Waterfall: Finnhub → Marketaux → Alpaca.
+    """Multi-source news fetcher. Waterfall: Finnhub → Alpaca.
     Stops at first source that returns articles."""
 
     def __init__(self):
         self._sources = []
         self._source_names = []
 
-        # Order: Finnhub first (best small-cap), Marketaux second, Alpaca last
+        # Order: Finnhub first (best small-cap coverage), Alpaca fallback
         try:
             f = FinnhubNewsFetcher()
             if f._enabled:
@@ -255,14 +255,6 @@ class NewsFetcher:
                 self._source_names.append('finnhub')
         except Exception as e:
             logger.warning(f"Failed to init Finnhub: {e}")
-
-        try:
-            m = MarketauxNewsFetcher()
-            if m._enabled:
-                self._sources.append(m)
-                self._source_names.append('marketaux')
-        except Exception as e:
-            logger.warning(f"Failed to init Marketaux: {e}")
 
         try:
             a = AlpacaNewsFetcher()

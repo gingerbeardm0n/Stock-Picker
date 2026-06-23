@@ -356,7 +356,7 @@ def get_dashboard():
     trade_count = scalp_trades + vwap_trades
 
     from trading.live_scalp_runner import TRIAL_173_CONFIG as SCALP_CONFIG
-    from trading.live_vwap_runner import TRIAL_173_CONFIG as VWAP_CONFIG
+    from trading.live_vwap_runner import TRIAL_56_CONFIG as VWAP_CONFIG
 
     return {
         "server_time": datetime.utcnow().isoformat(),
