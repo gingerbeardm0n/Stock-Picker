@@ -521,9 +521,10 @@ class LiveVwapRunner:
                     if current_ask > slippage_cap:
                         logger.warning(
                             f"    [{symbol}] Moved {(current_ask / entry_price - 1) * 100:.1f}% "
-                            f"past limit (ask=${current_ask:.2f} > cap=${slippage_cap:.2f}) — skipping."
+                            f"past limit (ask=${current_ask:.2f} > cap=${slippage_cap:.2f}) — releasing, will re-eval next bar."
                         )
-                        self.state.traded_symbols.append(symbol)
+                        # Do NOT add to traded_symbols — if VWAP reclaim signal is
+                        # still valid next bar (stock came back), we want to retry.
                         _release_position(symbol)
                         return
 
