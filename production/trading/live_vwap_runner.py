@@ -87,27 +87,28 @@ class LiveVwapState:
     """Mutable state for one trading day."""
     watchlist: list[dict] = field(default_factory=list)
 
-    # Trade execution (current trade)
-    symbol: str = ''
-    entry_price: float = 0.0
-    stop_price: float = 0.0
-    shares: int = 0
-    entry_time: datetime | None = None
-    entry_order_id: str = ''
-    stop_order_id: str = ''
-    highest_since_entry: float = 0.0
-    bars_held: int = 0
-    in_position: bool = False
+    # Multi-position tracking: symbol -> {entry_price, stop_price, shares,
+    #   entry_order_id, stop_order_id, highest_since_entry, bars_held, entry_time}
+    positions: dict = field(default_factory=dict)
+
     trade_done: bool = False
     traded_symbols: list[str] = field(default_factory=list)
 
-    # Results (current/last trade for backward compat)
+    # Results
+    completed_trades: list[dict] = field(default_factory=list)
+
+    # Backward-compat single-trade fields (last completed trade)
+    symbol: str = ''
+    entry_price: float = 0.0
     exit_price: float = 0.0
     exit_reason: str = ''
     pnl: float = 0.0
+    shares: int = 0
+    bars_held: int = 0
 
-    # Multi-trade tracking
-    completed_trades: list[dict] = field(default_factory=list)
+    @property
+    def in_position(self) -> bool:
+        return bool(self.positions)
 
 
 class LiveVwapRunner:
@@ -356,6 +357,7 @@ class LiveVwapRunner:
                         f"VWAP={v:.2f}" if v else f"  {sym}: no session bars yet")
 
         window_end_min = ENTRY_WINDOW_END[0] * 60 + ENTRY_WINDOW_END[1]
+        max_concurrent = len(symbols)  # enter up to all watchlist symbols simultaneously
 
         while not self.state.trade_done:
             try:
@@ -363,10 +365,11 @@ class LiveVwapRunner:
             except queue.Empty:
                 logger.warning("No bar received in 300s -- ending session")
                 if self.state.in_position:
-                    logger.warning("Timeout while IN POSITION — placing market exit")
-                    self._place_exit(self.state.symbol,
-                                     {'close': self.state.entry_price},
-                                     {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'})
+                    logger.warning("Timeout with open positions — placing market exits")
+                    for open_sym in list(self.state.positions):
+                        self._place_exit(open_sym,
+                                         {'close': self.state.positions[open_sym]['entry_price']},
+                                         {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'})
                 break
 
             sym = bar.get('symbol')
@@ -387,46 +390,56 @@ class LiveVwapRunner:
             accs[sym].update(bar)
             bars_hist[sym].append(bar)
 
-            if not self.state.in_position:
-                # Skip symbols we already traded
-                if sym in self.state.traded_symbols:
+            bar_min = bar_et.hour * 60 + bar_et.minute if bar_et else 0
+
+            # ── Manage open position for this symbol ──────────────────────────
+            if sym in self.state.positions:
+                pos = self.state.positions[sym]
+                pos['bars_held'] += 1
+                if float(bar['high']) > pos['highest_since_entry']:
+                    pos['highest_since_entry'] = float(bar['high'])
+
+                exit_signal = evaluate_exit(
+                    entry_price=pos['entry_price'],
+                    stop_price=pos['stop_price'],
+                    highest_since_entry=pos['highest_since_entry'],
+                    current_bar=bar,
+                    bars_held=pos['bars_held'],
+                    config=self.config,
+                )
+                if exit_signal:
+                    self._place_exit(sym, bar, exit_signal)
+                elif bar_min > window_end_min:
+                    # Force exit at window close
+                    self._place_exit(sym, bar, {'exit_price': float(bar['close']),
+                                                 'reason': 'WINDOW_CLOSE'})
+
+            # ── Check for new entry on this symbol ────────────────────────────
+            elif sym not in self.state.traded_symbols:
+                if bar_min > window_end_min:
+                    # Window closed — if no open positions, we're done
+                    if not self.state.positions:
+                        logger.info(f"Bar time {bar_et.strftime('%H:%M')} past window end. Done.")
+                        self.state.trade_done = True
+                        break
                     continue
 
-                bar_min = bar_et.hour * 60 + bar_et.minute if bar_et else 0
-                if bar_min > window_end_min:
-                    logger.info(f"Bar time {bar_et.strftime('%H:%M')} past window end. Done.")
-                    self.state.trade_done = True
-                    break
+                if len(self.state.positions) >= max_concurrent:
+                    continue
 
-                # Skip if another strategy is already in this symbol (active_positions blocking)
                 if not self._can_enter_symbol(sym):
                     continue
 
                 signal = evaluate_entry(by_symbol[sym], bars_hist[sym], accs[sym].value, self.config)
                 if signal:
-                    self._place_entry(sym, bar, signal)
-            elif sym == self.state.symbol:
-                self.state.bars_held += 1
-                if float(bar['high']) > self.state.highest_since_entry:
-                    self.state.highest_since_entry = float(bar['high'])
-
-                exit_signal = evaluate_exit(
-                    entry_price=self.state.entry_price,
-                    stop_price=self.state.stop_price,
-                    highest_since_entry=self.state.highest_since_entry,
-                    current_bar=bar,
-                    bars_held=self.state.bars_held,
-                    config=self.config,
-                )
-                if exit_signal:
-                    self._place_exit(sym, bar, exit_signal)
+                    self._place_entry(sym, bar, signal, max_concurrent)
 
         poller.stop()
         self._print_summary()
 
     # ── Order placement (same pattern as scalp runner) ────────────────────────
 
-    def _place_entry(self, symbol: str, bar: dict, signal: dict):
+    def _place_entry(self, symbol: str, bar: dict, signal: dict, max_concurrent: int = 1):
         # Atomic cross-strategy claim — must succeed before any order is placed.
         if not _claim_position(symbol, "vwap_reclaim"):
             logger.info(f"[{symbol}] Already claimed by another strategy — skipping entry")
@@ -447,7 +460,9 @@ class LiveVwapRunner:
 
         risk_per_share = max(entry_price - stop_price, entry_price * 0.005)
         risk_amount = account_balance * (self.config.risk_pct / 100)
-        max_position_value = account_balance * (self.config.max_position_pct / 100)
+        # Divide max_position_pct by max_concurrent so N simultaneous positions
+        # use the same total capital as a single position would.
+        max_position_value = account_balance * (self.config.max_position_pct / 100) / max_concurrent
         shares = min(int(risk_amount / risk_per_share),
                      int(max_position_value / entry_price))
 
@@ -463,7 +478,6 @@ class LiveVwapRunner:
         entry_price = round(entry_price, 2)
         if not self.dry_run:
             result = self.broker.place_limit_buy(symbol, shares, entry_price)
-            self.state.entry_order_id = result.order_id
             logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
 
             time.sleep(2)
@@ -531,41 +545,50 @@ class LiveVwapRunner:
                         return
 
             stop_result = self.broker.place_stop_sell(symbol, shares, round(stop_price, 2))
-            self.state.stop_order_id = stop_result.order_id
+            stop_order_id = stop_result.order_id
             logger.info(f"    Stop order: {stop_result.order_id} @ ${stop_price:.2f}")
+        else:
+            stop_order_id = ''
 
-        self.state.in_position = True
+        self.state.positions[symbol] = {
+            'entry_price': entry_price,
+            'stop_price': stop_price,
+            'shares': shares,
+            'entry_time': datetime.now(ET),
+            'stop_order_id': stop_order_id,
+            'highest_since_entry': float(bar['high']),
+            'bars_held': 0,
+        }
+        # Backward-compat single-trade fields (most recent entry)
         self.state.symbol = symbol
         self.state.entry_price = entry_price
-        self.state.stop_price = stop_price
-        self.state.shares = shares
-        self.state.entry_time = datetime.now(ET)
-        self.state.highest_since_entry = float(bar['high'])
-        self.state.bars_held = 0
-        # Position already claimed atomically at top of _place_entry via _claim_position.
 
     def _place_exit(self, symbol: str, bar: dict, exit_signal: dict):
+        pos = self.state.positions.get(symbol)
+        if not pos:
+            return
         exit_price = exit_signal.get('exit_price', float(bar['close']))
 
-        logger.info(f">>> EXIT: {self.state.shares} shares of {symbol} @ ${exit_price:.2f}")
+        logger.info(f">>> EXIT: {pos['shares']} shares of {symbol} @ ${exit_price:.2f}")
         logger.info(f"    Reason: {exit_signal.get('reason', '?')}")
 
         if not self.dry_run:
-            if self.state.stop_order_id:
-                cancelled = self.broker.cancel_order(self.state.stop_order_id)
+            stop_order_id = pos.get('stop_order_id', '')
+            if stop_order_id:
+                cancelled = self.broker.cancel_order(stop_order_id)
                 if not cancelled:
                     time.sleep(1)
-                    stop_status = self.broker.get_order(self.state.stop_order_id)
+                    stop_status = self.broker.get_order(stop_order_id)
                     if stop_status.status == 'filled':
                         logger.warning(
-                            f"    Stop {self.state.stop_order_id} already filled "
+                            f"    Stop {stop_order_id} already filled "
                             f"@ ${stop_status.filled_price:.2f} — skipping market sell"
                         )
                         exit_price = stop_status.filled_price
-                        self._record_trade(exit_price, 'STOP_FILLED_SERVER')
+                        self._record_trade(symbol, exit_price, 'STOP_FILLED_SERVER')
                         return
 
-            result = self.broker.place_market_sell(symbol, self.state.shares)
+            result = self.broker.place_market_sell(symbol, pos['shares'])
             logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
             time.sleep(2)
             fill = self.broker.get_order(result.order_id)
@@ -573,45 +596,39 @@ class LiveVwapRunner:
                 exit_price = fill.filled_price
                 logger.info(f"    FILLED: {fill.filled_qty} @ ${exit_price:.2f}")
 
-        self._record_trade(exit_price, exit_signal.get('reason', '?'))
+        self._record_trade(symbol, exit_price, exit_signal.get('reason', '?'))
 
-    def _record_trade(self, exit_price: float, reason: str):
-        """Record completed trade, reset position state for next trade."""
-        pnl = (exit_price - self.state.entry_price) * self.state.shares
-        sym = self.state.symbol
+    def _record_trade(self, symbol: str, exit_price: float, reason: str):
+        """Record completed trade, remove from positions dict."""
+        pos = self.state.positions.pop(symbol, None)
+        if not pos:
+            return
+        pnl = (exit_price - pos['entry_price']) * pos['shares']
         trade = {
-            'symbol': sym,
-            'entry_price': self.state.entry_price,
+            'symbol': symbol,
+            'entry_price': pos['entry_price'],
             'exit_price': exit_price,
-            'shares': self.state.shares,
+            'shares': pos['shares'],
             'pnl': pnl,
-            'bars_held': self.state.bars_held,
+            'bars_held': pos['bars_held'],
             'reason': reason,
+            'strategy': 'vwap_reclaim',
         }
         self.state.completed_trades.append(trade)
-        self.state.traded_symbols.append(sym)
+        self.state.traded_symbols.append(symbol)
         logger.info(f"    Trade #{len(self.state.completed_trades)}: "
-                     f"{trade['symbol']} P&L ${pnl:+.2f} ({reason})")
+                     f"{symbol} P&L ${pnl:+.2f} ({reason})")
 
-        # Keep last trade in top-level fields for backward compat
+        # Backward-compat: keep last-trade fields for session_job.py
+        self.state.symbol = symbol
         self.state.exit_price = exit_price
         self.state.exit_reason = reason
-        self.state.pnl = pnl
+        self.state.pnl = sum(t['pnl'] for t in self.state.completed_trades)
+        self.state.shares = pos['shares']
+        self.state.bars_held = pos['bars_held']
 
-        # Reset position for next trade
-        self.state.in_position = False
-        self.state.symbol = ''
-        self.state.entry_price = 0.0
-        self.state.stop_price = 0.0
-        self.state.shares = 0
-        self.state.entry_time = None
-        self.state.entry_order_id = ''
-        self.state.stop_order_id = ''
-        self.state.highest_since_entry = 0.0
-        self.state.bars_held = 0
-
-        # Clear active position so other strategies can enter this symbol
-        self._clear_active_position(sym)
+        # Release cross-strategy claim
+        self._clear_active_position(symbol)
 
     # ── Active Position Blocking (coordinate with other strategies) ──────────
 

@@ -959,10 +959,46 @@ def run_scalp_session(dry_run=False, live=False, start_time='9:00'):
                 runner.state.trade_done = True
             break
 
-        scan_interval = 300 if runner.state.candidates else 60
-        next_scan = min(scan_interval, (scan_cutoff - now).total_seconds())
-        logger.info(f"Rescanning in {next_scan:.0f}s...")
-        time.sleep(next_scan)
+        if not runner.state.candidates:
+            # No candidates yet — full rescan in 60s
+            next_scan = min(60, (scan_cutoff - now).total_seconds())
+            logger.info(f"Rescanning in {next_scan:.0f}s...")
+            time.sleep(next_scan)
+        else:
+            # Hybrid: fast 60s re-quote of watchlist candidates between 5-min full scans
+            full_scan_interval = 300
+            fast_interval = 60
+            elapsed = 0
+            while elapsed < full_scan_interval:
+                remaining_to_cutoff = (scan_cutoff - datetime.now(ET)).total_seconds()
+                if remaining_to_cutoff <= 0:
+                    break
+                sleep_secs = min(fast_interval, remaining_to_cutoff, full_scan_interval - elapsed)
+                time.sleep(sleep_secs)
+                elapsed += sleep_secs
+                if elapsed >= full_scan_interval or (scan_cutoff - datetime.now(ET)).total_seconds() <= 0:
+                    break
+                # Fast re-quote: update price/volume on known candidates only
+                logger.info("Fast watchlist refresh (price/volume update)...")
+                runner.refresh_top_pick()
+                # Re-write state file with updated metrics
+                _candidates = []
+                for c in (runner.state.candidates or []):
+                    _candidates.append({k: c.get(k) for k in (
+                        'symbol', 'gap_pct', 'open_price', 'prior_close', 'rel_vol',
+                        'float_shares', 'has_news', 'news_tier', 'scalp_score', 'quote_volume',
+                    )})
+                _top = runner.state.top_pick
+                _top_sym = (_top.get('symbol') if isinstance(_top, dict) else _top) if _top else None
+                import json as _json2
+                _state_file.write_text(_json2.dumps({
+                    "last_run": datetime.utcnow().isoformat(),
+                    "strategy": "opening_bell_scalp",
+                    "last_result": "scanning",
+                    "date": str(datetime.now(ET).date()),
+                    "candidates": _candidates,
+                    "top_pick": _top_sym,
+                }, default=str))
 
     if not runner.state.trade_done:
         # Refresh at 9:25

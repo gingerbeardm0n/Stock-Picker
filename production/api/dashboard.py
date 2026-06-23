@@ -342,9 +342,13 @@ def get_dashboard():
     vwap_position = None
     if vwap_stage in ("ENTERED", "EXITED"):
         vwap_position = {
+            "open_positions": vwap_state.get("positions", {}),
+            "completed_trades": vwap_state.get("completed_trades", []),
+            "trade_count": vwap_state.get("trade_count", 0),
+            "pnl": vwap_state.get("pnl"),
+            # Legacy compat
             "entry_price": vwap_state.get("entry_price"),
             "exit_price": vwap_state.get("exit_price"),
-            "pnl": vwap_state.get("pnl"),
             "exit_reason": vwap_state.get("exit_reason"),
         }
 
