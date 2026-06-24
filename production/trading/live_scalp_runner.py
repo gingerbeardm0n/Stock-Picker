@@ -241,9 +241,12 @@ class LiveScalpRunner:
         quotes = self.data_feed.get_quotes(self._symbols)
         logger.info(f"Got {len(quotes):,} quotes")
 
-        # Patch prev_close from prior-close fetch (Alpaca returns 0.0 in quote snapshot)
+        # Always overwrite prev_close with get_prior_closes() result when available.
+        # Alpaca's quote snapshot prev_close is unreliable — can be 0.0 early premarket,
+        # then flip to a wrong non-zero value (e.g. today's open) mid-session, causing
+        # gap to oscillate between correct and 0 across successive full rescans.
         for sym, q in quotes.items():
-            if q.prev_close <= 0 and sym in prior_closes:
+            if sym in prior_closes:
                 q.prev_close = prior_closes[sym]
 
         # Spot-check: dump raw fields for a few symbols to diagnose stale-quote issues
