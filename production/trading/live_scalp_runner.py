@@ -44,7 +44,7 @@ from trading.scalp_engine import evaluate_entry, evaluate_exit, get_premarket_hi
 from trading.scalp_ranker import rank_candidates, get_top_candidate, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_news
 from trading.broker.base import OrderResult
-from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol
+from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol, RealtimeRelVolCache, DEFAULT_REL_VOL
 from backend.news_fetcher import has_news_catalyst
 
 ET = pytz.timezone('America/New_York')
@@ -180,6 +180,22 @@ class LiveScalpRunner:
         self._floats = baseline.get('floats') if baseline else None
         if not self._floats:
             logger.warning("Float baseline empty — max_float filter INACTIVE this session (parity gap)")
+
+        # Real-time rel-vol for unknown symbols (not yet in Neon baseline).
+        # Uses Alpaca historical bars to compute per-symbol 30-day cumulative avg.
+        self._realtime_rv_cache = RealtimeRelVolCache()
+        self._alpaca_hist_feed = None
+        if Config.ALPACA_API_KEY and Config.ALPACA_SECRET_KEY:
+            try:
+                from trading.broker.alpaca import AlpacaDataFeed
+                self._alpaca_hist_feed = AlpacaDataFeed(
+                    api_key=Config.ALPACA_API_KEY,
+                    secret_key=Config.ALPACA_SECRET_KEY,
+                )
+                logger.info("Alpaca historical feed ready (real-time rel-vol for new symbols)")
+            except Exception as e:
+                logger.warning(
+                    f"Alpaca historical feed unavailable: {e} — new symbols use 10.0 fallback")
 
         # Symbol list for scanning
         self._symbols = self._load_symbols()
@@ -357,6 +373,20 @@ class LiveScalpRunner:
                 g['symbol'], g.get('quote_volume'), self._rel_vol_baselines)
             g['float_shares'] = None  # TODO: fetch from fundamentals
 
+        # For symbols that got the 10.0 fallback (not in Neon baseline),
+        # compute a real-time baseline from Alpaca 30-day minute bars.
+        if self._alpaca_hist_feed:
+            unknown = [g['symbol'] for g in filtered if g.get('rel_vol') == DEFAULT_REL_VOL]
+            if unknown:
+                self._realtime_rv_cache.enrich_missing(
+                    unknown, datetime.now(ET), self._alpaca_hist_feed)
+                for g in filtered:
+                    if g.get('rel_vol') == DEFAULT_REL_VOL:
+                        rv = self._realtime_rv_cache.compute_rel_vol(
+                            g['symbol'], g.get('quote_volume'))
+                        if rv is not None:
+                            g['rel_vol'] = rv
+
         ranked = rank_candidates(filtered)
         self.state.candidates = ranked
 
@@ -407,12 +437,28 @@ class LiveScalpRunner:
 
         # Live rel-vol (Gap #1): now that 9:25 quote volume is fresh, compute the
         # real rel-vol (quote_volume / 30-day baseline, 10.0 fallback) and apply
-        # the SAME min_relative_volume filter the sim applies. Thin-volume
-        # candidates the optimizer's config would reject are dropped here.
-        survivors = []
+        # the SAME min_relative_volume filter the sim applies.
         for c in self.state.candidates:
             c['rel_vol'] = compute_rel_vol(
                 c['symbol'], c.get('quote_volume'), self._rel_vol_baselines)
+
+        # Enrich symbols not in Neon baseline with real-time Alpaca history.
+        # Must happen BEFORE the filter so accurate rv can drop thin-volume tickers.
+        if self._alpaca_hist_feed:
+            unknown = [c['symbol'] for c in self.state.candidates
+                       if c.get('rel_vol') == DEFAULT_REL_VOL]
+            if unknown:
+                self._realtime_rv_cache.enrich_missing(
+                    unknown, datetime.now(ET), self._alpaca_hist_feed)
+                for c in self.state.candidates:
+                    if c.get('rel_vol') == DEFAULT_REL_VOL:
+                        rv = self._realtime_rv_cache.compute_rel_vol(
+                            c['symbol'], c.get('quote_volume'))
+                        if rv is not None:
+                            c['rel_vol'] = rv
+
+        survivors = []
+        for c in self.state.candidates:
             if c['rel_vol'] < self.config.min_relative_volume:
                 logger.info(f"  SKIP {c['symbol']} gap={c['gap_pct']:.1f}% "
                             f"rel_vol={c['rel_vol']:.2f} < {self.config.min_relative_volume:.2f}")

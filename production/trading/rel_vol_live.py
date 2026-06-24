@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
+from collections import defaultdict
 
 import requests
 
@@ -112,6 +114,100 @@ def fetch_rel_vol_baseline(url: str = BASELINE_URL) -> dict | None:
         DEFAULT_REL_VOL,
     )
     return None
+
+
+class RealtimeRelVolCache:
+    """
+    Session-level cache: compute real-time rel-vol baseline for gapper symbols
+    absent from the Neon/GitHub baseline (new tickers not yet accumulated).
+
+    For each unknown symbol, fetches lookback_days of 4am-12pm minute bars via
+    Alpaca and computes avg cumulative volume up to the current time-of-day.
+    Cache persists for the full session — safe to call on every scan cycle.
+
+    Usage:
+        cache = RealtimeRelVolCache()
+        cache.enrich_missing(unknown_symbols, datetime.now(ET), alpaca_feed)
+        rv = cache.compute_rel_vol(symbol, quote_volume)  # None if still missing
+    """
+
+    def __init__(self):
+        self._baselines: dict[str, float] = {}   # symbol -> avg_cumvol
+        self._lock = threading.Lock()
+
+    def enrich_missing(
+        self,
+        symbols: list[str],
+        current_time,             # timezone-aware datetime (ET preferred)
+        alpaca_feed,              # AlpacaDataFeed instance
+        lookback_days: int = 30,
+    ) -> None:
+        """
+        Blocking. Fetches 30-day historical bars and computes baselines for all
+        `symbols` not yet cached. Logs one line per symbol with result.
+        """
+        import pytz
+        ET_tz = pytz.timezone('America/New_York')
+
+        missing = [s for s in symbols if s not in self._baselines]
+        if not missing:
+            return
+
+        logger.info(
+            "Real-time rel-vol: fetching %d-day history for %d new symbol(s): %s",
+            lookback_days, len(missing), missing,
+        )
+        bars_by_sym = alpaca_feed.get_historical_minute_bars(
+            missing, lookback_days=lookback_days)
+
+        # Count bars up to current time-of-day (match what quote_volume covers)
+        tod = current_time.astimezone(ET_tz).time()
+
+        for sym in missing:
+            bars = bars_by_sym.get(sym)
+            if not bars:
+                logger.warning(
+                    "  %s: no historical bars returned — keeping 10.0 fallback", sym)
+                continue
+
+            # Sum cumulative volume per calendar day up to tod
+            day_vols: dict = defaultdict(int)
+            for bar in bars:
+                bar_et = bar.time.astimezone(ET_tz)
+                if bar_et.time() <= tod:
+                    day_vols[bar_et.date()] += bar.volume
+
+            if not day_vols:
+                logger.warning(
+                    "  %s: no bars before %s — keeping 10.0 fallback", sym, tod)
+                continue
+
+            recent = sorted(day_vols.keys(), reverse=True)[:lookback_days]
+            avg_vol = sum(day_vols[d] for d in recent) / len(recent)
+
+            with self._lock:
+                self._baselines[sym] = avg_vol
+
+            logger.info(
+                "  %s: realtime baseline=%.0f avg_vol (%d days, cutoff %s)",
+                sym, avg_vol, len(recent), tod.strftime("%H:%M"),
+            )
+
+    def compute_rel_vol(
+        self,
+        symbol: str,
+        quote_volume: float | None,
+    ) -> float | None:
+        """
+        Returns rel_vol if this symbol's baseline is cached, else None.
+        Caller should fall back to DEFAULT_REL_VOL=10.0 on None.
+        """
+        base = self._baselines.get(symbol)
+        if base is None or base <= 0:
+            return None
+        if quote_volume is None or quote_volume <= 0:
+            return DEFAULT_REL_VOL
+        return quote_volume / base
 
 
 def compute_rel_vol(

@@ -262,6 +262,61 @@ class AlpacaDataFeed(DataFeedInterface):
             logger.error(f"Alpaca bars fetch failed: {e}")
         return results
 
+    def get_historical_minute_bars(
+        self,
+        symbols: list[str],
+        lookback_days: int = 30,
+    ) -> dict[str, list[BarResult]]:
+        """
+        Fetch minute bars from 4am-12pm ET for the last `lookback_days` trading days.
+        Used to build per-symbol cumulative-volume baselines for unknown gappers.
+        Returns all days concatenated; caller groups by date.
+
+        NOTE: Alpaca free-tier SIP clamp means today's intraday bars are not
+        available. This is fine — we only need the historical avg denominator.
+        """
+        from datetime import date, timedelta as td
+        today = date.today()
+        # 2× calendar buffer to clear weekends/holidays
+        start_date = today - td(days=lookback_days * 2)
+        end_date   = today - td(days=1)   # exclude today (SIP clamp)
+
+        start_et = ET.localize(
+            datetime(start_date.year, start_date.month, start_date.day, 4, 0))
+        end_et   = ET.localize(
+            datetime(end_date.year,   end_date.month,   end_date.day,  12, 0))
+
+        results: dict[str, list[BarResult]] = {}
+        BATCH = 5   # small batches — large date range, avoid response-size timeouts
+        for i in range(0, len(symbols), BATCH):
+            batch = symbols[i : i + BATCH]
+            try:
+                resp = self._client.get_stock_bars(StockBarsRequest(
+                    symbol_or_symbols=batch,
+                    timeframe=TimeFrame.Minute,
+                    start=start_et.astimezone(timezone.utc),
+                    end=end_et.astimezone(timezone.utc),
+                ))
+                bars_data = resp.data if hasattr(resp, 'data') else resp
+                for sym, bar_list in bars_data.items():
+                    results[sym] = [
+                        BarResult(
+                            time=(b.timestamp.replace(tzinfo=timezone.utc)
+                                  if b.timestamp.tzinfo is None
+                                  else b.timestamp.astimezone(timezone.utc)),
+                            open=float(b.open),
+                            high=float(b.high),
+                            low=float(b.low),
+                            close=float(b.close),
+                            volume=int(b.volume),
+                            vwap=float(b.vwap or 0),
+                        )
+                        for b in bar_list
+                    ]
+            except Exception as e:
+                logger.warning(f"Historical bar fetch failed for {batch}: {e}")
+        return results
+
     def get_prior_closes(self, symbols: list[str]) -> dict[str, float]:
         """Prior day's close via daily bars (last bar in a 5-day window)."""
         from datetime import date, timedelta as td
