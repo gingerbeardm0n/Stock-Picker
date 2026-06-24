@@ -151,6 +151,20 @@ class BrokerInterface(ABC):
         ...
 
     @abstractmethod
+    def place_limit_sell(
+        self,
+        symbol: str,
+        qty: int,
+        limit_price: float,
+    ) -> OrderResult:
+        """
+        Place a DAY limit sell order.
+        limit_price: min price willing to accept. Used for trailing-stop exits to
+        match sim fill price and avoid market-order slippage on tiny pullbacks.
+        """
+        ...
+
+    @abstractmethod
     def place_market_sell(
         self,
         symbol: str,

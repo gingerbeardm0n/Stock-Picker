@@ -136,6 +136,21 @@ class AlpacaBroker(BrokerInterface):
             status=_normalize_alpaca_status(order.status),
         )
 
+    def place_limit_sell(self, symbol: str, qty: int, limit_price: float) -> OrderResult:
+        logger.info(f"LIMIT SELL: {qty} {symbol} @ ${limit_price:.2f}")
+        order = self._client.submit_order(LimitOrderRequest(
+            symbol=symbol,
+            qty=qty,
+            side=OrderSide.SELL,
+            type=OrderType.LIMIT,
+            time_in_force=TimeInForce.DAY,
+            limit_price=limit_price,
+        ))
+        return OrderResult(
+            order_id=str(order.id),
+            status=_normalize_alpaca_status(order.status),
+        )
+
     def place_market_sell(self, symbol: str, qty: int) -> OrderResult:
         logger.info(f"MARKET SELL: {qty} {symbol}")
         order = self._client.submit_order(MarketOrderRequest(

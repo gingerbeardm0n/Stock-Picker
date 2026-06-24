@@ -8,6 +8,10 @@ on:
     - cron: '25 11 * * 1-5'
     # 8:00 AM ET = 12:00 UTC — safety net (market-open premarket scan window)
     - cron: '0 12 * * 1-5'
+    # 9:05 AM ET = 13:05 UTC — post-deploy recovery: re-triggers if deploy wiped runner
+    - cron: '5 13 * * 1-5'
+    # 9:10 AM ET = 13:10 UTC — final safety net before 9:25 refresh window
+    - cron: '10 13 * * 1-5'
   workflow_dispatch:
     inputs:
       force_trigger:

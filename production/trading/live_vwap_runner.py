@@ -231,6 +231,8 @@ class LiveVwapRunner:
             if gap_pct > MAX_GAP_PCT:
                 over_max_gap += 1
                 continue
+            if price < 1.00:
+                continue  # sub-$1 warrants/shells — too illiquid, wide spreads
             if price > self.config.max_price:
                 over_max_price += 1
                 continue
@@ -589,13 +591,38 @@ class LiveVwapRunner:
                         self._record_trade(symbol, exit_price, 'STOP_FILLED_SERVER')
                         return
 
-            result = self.broker.place_market_sell(symbol, pos['shares'])
-            logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
-            time.sleep(2)
-            fill = self.broker.get_order(result.order_id)
-            if fill.status == 'filled':
-                exit_price = fill.filled_price
-                logger.info(f"    FILLED: {fill.filled_qty} @ ${exit_price:.2f}")
+            exit_type = exit_signal.get('exit_type', '')
+            if exit_type == 'trailing_stop':
+                # Sim assumes fill at trail_price. Use limit sell to match — avoids
+                # market-order slippage when 0.001% trail fires on a tiny pullback.
+                # Fall back to market if limit unfilled after 5s (stock dropped fast).
+                result = self.broker.place_limit_sell(
+                    symbol, pos['shares'], round(exit_price, 2))
+                logger.info(f"    Limit sell order: {result.order_id} Status: {result.status}")
+                time.sleep(5)
+                fill = self.broker.get_order(result.order_id)
+                if fill.status == 'filled':
+                    exit_price = fill.filled_price
+                    logger.info(f"    FILLED: {fill.filled_qty} @ ${exit_price:.2f}")
+                else:
+                    logger.warning(
+                        f"    Limit sell unfilled after 5s (status={fill.status}) — "
+                        f"cancelling, market fallback")
+                    self.broker.cancel_order(result.order_id)
+                    result2 = self.broker.place_market_sell(symbol, pos['shares'])
+                    time.sleep(2)
+                    fill2 = self.broker.get_order(result2.order_id)
+                    if fill2.status == 'filled':
+                        exit_price = fill2.filled_price
+                        logger.info(f"    Market fallback FILLED: {fill2.filled_qty} @ ${exit_price:.2f}")
+            else:
+                result = self.broker.place_market_sell(symbol, pos['shares'])
+                logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
+                time.sleep(2)
+                fill = self.broker.get_order(result.order_id)
+                if fill.status == 'filled':
+                    exit_price = fill.filled_price
+                    logger.info(f"    FILLED: {fill.filled_qty} @ ${exit_price:.2f}")
 
         self._record_trade(symbol, exit_price, exit_signal.get('reason', '?'))
 

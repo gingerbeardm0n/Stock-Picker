@@ -1,8 +1,14 @@
 import requests
+import time as _time
 from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Process-level news cache — shared across all runners in the same Render instance.
+# Prevents Finnhub 429s when scalp + VWAP + micro-pullback all scan simultaneously.
+_NEWS_CACHE: dict = {}   # symbol -> (articles: list, fetched_at: float)
+_CACHE_TTL_S = 600       # 10 minutes — covers the full scan + 9:25 refresh cycle
 
 MAX_SYMBOLS_FOR_SPECIFIC_NEWS = 5
 
@@ -267,18 +273,29 @@ class NewsFetcher:
         logger.info(f"NewsFetcher waterfall: {' → '.join(self._source_names) or 'NO SOURCES'}")
 
     def get_news_for_symbol(self, symbol, as_of_date=None, hours_back=48):
+        # Check process-level cache first — all three runners share this dict,
+        # so parallel scans never double-hit Finnhub for the same symbol.
+        cached = _NEWS_CACHE.get(symbol)
+        if cached:
+            articles, fetched_at = cached
+            if _time.time() - fetched_at < _CACHE_TTL_S:
+                logger.debug(f"{symbol}: news from cache ({len(articles)} articles)")
+                return articles
+
         for name, source in zip(self._source_names, self._sources):
             try:
                 articles = source.get_news_for_symbol(symbol, as_of_date=as_of_date, hours_back=hours_back)
                 specific = [a for a in articles if a.get('is_specific', True)]
                 if specific:
                     logger.debug(f"{symbol}: news found via {name} ({len(specific)} specific articles)")
+                    _NEWS_CACHE[symbol] = (articles, _time.time())
                     return articles
             except Exception as e:
                 logger.warning(f"{symbol}: {name} failed: {e}")
                 continue
 
         logger.debug(f"{symbol}: no news from any source")
+        _NEWS_CACHE[symbol] = ([], _time.time())
         return []
 
     def has_catalyst(self, symbol, as_of_date=None, hours_back=48):

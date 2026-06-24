@@ -306,6 +306,8 @@ class LiveScalpRunner:
             if gap_pct > MAX_GAP_PCT:
                 over_max_gap += 1
                 continue
+            if price < 1.00:
+                continue  # sub-$1 warrants/shells — too illiquid, wide spreads
             if price > self.config.max_price:
                 over_max_price += 1
                 continue
