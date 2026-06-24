@@ -399,9 +399,11 @@ class LiveScalpRunner:
             if q:
                 c['open_price'] = q.last
                 c['quote_volume'] = q.volume
-                # Recalculate gap with latest price
-                if q.prev_close > 0:
-                    c['gap_pct'] = (q.last - q.prev_close) / q.prev_close * 100
+                # Recalculate gap using stored prior_close (from get_prior_closes() in scan_premarket),
+                # NOT q.prev_close — Alpaca snapshot may return wrong/stale prev_close after market opens.
+                stored_prior = c.get('prior_close', 0)
+                if stored_prior > 0:
+                    c['gap_pct'] = (q.last - stored_prior) / stored_prior * 100
 
         # Live rel-vol (Gap #1): now that 9:25 quote volume is fresh, compute the
         # real rel-vol (quote_volume / 30-day baseline, 10.0 fallback) and apply
