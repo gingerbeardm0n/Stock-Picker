@@ -313,15 +313,35 @@ def get_dashboard():
 
     scalp_candidates = scalp_state.get("candidates", [])
     scalp_top = scalp_state.get("top_pick")
+    scalp_open_syms = set((scalp_state.get("positions") or {}).keys())
+    scalp_done_syms = {t.get("symbol") for t in (scalp_state.get("completed_trades") or [])}
     for c in scalp_candidates:
         if isinstance(c, dict):
-            c["stage"] = _candidate_stage(c, scalp_top, scalp_stage)
+            sym = c.get("symbol", "")
+            if scalp_stage in ("IDLE", "SCANNING"):
+                c["stage"] = "WATCHING"
+            elif sym in scalp_open_syms:
+                c["stage"] = "ENTERED"
+            elif sym in scalp_done_syms:
+                c["stage"] = "EXITED"
+            else:
+                c["stage"] = "ARMED"
 
     vwap_candidates = vwap_state.get("watchlist", [])
     vwap_top = vwap_state.get("top_pick") or vwap_state.get("symbol")
+    vwap_open_syms = set((vwap_state.get("positions") or {}).keys())
+    vwap_done_syms = {t.get("symbol") for t in (vwap_state.get("completed_trades") or [])}
     for c in vwap_candidates:
         if isinstance(c, dict):
-            c["stage"] = _candidate_stage(c, vwap_top, vwap_stage)
+            sym = c.get("symbol", "")
+            if vwap_stage in ("IDLE", "SCANNING"):
+                c["stage"] = "WATCHING"
+            elif sym in vwap_open_syms:
+                c["stage"] = "ENTERED"
+            elif sym in vwap_done_syms:
+                c["stage"] = "EXITED"
+            else:
+                c["stage"] = "ARMED"
 
     # Multi-position: return completed_trades list + any open positions dict.
     # Fall back to legacy single-position fields for backward compat.
