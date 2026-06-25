@@ -369,9 +369,12 @@ class LiveVwapRunner:
                 if self.state.in_position:
                     logger.warning("Timeout with open positions — placing market exits")
                     for open_sym in list(self.state.positions):
-                        self._place_exit(open_sym,
-                                         {'close': self.state.positions[open_sym]['entry_price']},
-                                         {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'})
+                        try:
+                            self._place_exit(open_sym,
+                                             {'close': self.state.positions[open_sym]['entry_price']},
+                                             {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'})
+                        except Exception as e:
+                            logger.error(f"  [{open_sym}] Emergency exit failed: {e}", exc_info=True)
                 break
 
             sym = bar.get('symbol')
@@ -409,12 +412,17 @@ class LiveVwapRunner:
                     bars_held=pos['bars_held'],
                     config=self.config,
                 )
-                if exit_signal:
-                    self._place_exit(sym, bar, exit_signal)
-                elif bar_min > window_end_min:
-                    # Force exit at window close
-                    self._place_exit(sym, bar, {'exit_price': float(bar['close']),
-                                                 'reason': 'WINDOW_CLOSE'})
+                if exit_signal or bar_min > window_end_min:
+                    sig = exit_signal or {'exit_price': float(bar['close']),
+                                          'reason': 'WINDOW_CLOSE'}
+                    try:
+                        self._place_exit(sym, bar, sig)
+                    except Exception as e:
+                        # One symbol's exit failure must NOT crash the loop and orphan
+                        # the other open positions. Keep it; retry exit next bar.
+                        logger.error(
+                            f"  [{sym}] EXIT FAILED: {e} — keeping position, "
+                            f"retry next bar", exc_info=True)
 
             # ── Check for new entry on this symbol ────────────────────────────
             elif sym not in self.state.traded_symbols:
@@ -578,18 +586,18 @@ class LiveVwapRunner:
         if not self.dry_run:
             stop_order_id = pos.get('stop_order_id', '')
             if stop_order_id:
-                cancelled = self.broker.cancel_order(stop_order_id)
-                if not cancelled:
-                    time.sleep(1)
-                    stop_status = self.broker.get_order(stop_order_id)
-                    if stop_status.status == 'filled':
-                        logger.warning(
-                            f"    Stop {stop_order_id} already filled "
-                            f"@ ${stop_status.filled_price:.2f} — skipping market sell"
-                        )
-                        exit_price = stop_status.filled_price
-                        self._record_trade(symbol, exit_price, 'STOP_FILLED_SERVER')
-                        return
+                # Cancel the protective stop and WAIT until it settles — the broker
+                # only releases the held shares once the cancel is terminal. Selling
+                # before that races 'insufficient qty available'.
+                final = self.broker.cancel_order_and_wait(stop_order_id)
+                if final.status == 'filled':
+                    logger.warning(
+                        f"    Stop {stop_order_id} filled @ ${final.filled_price:.2f} "
+                        f"during cancel — adopting stop fill"
+                    )
+                    exit_price = final.filled_price
+                    self._record_trade(symbol, exit_price, 'STOP_FILLED_SERVER')
+                    return
 
             exit_type = exit_signal.get('exit_type', '')
             if exit_type == 'trailing_stop':

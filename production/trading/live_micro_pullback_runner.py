@@ -214,6 +214,10 @@ class LiveMicroPullbackRunner:
                 continue
             if gap_pct > MAX_GAP_PCT:
                 continue
+            if price < 1.00:
+                continue  # sub-$1 warrants/shells (e.g. EVGOW $0.01) — too illiquid,
+                          # wide spreads. This runner scans the raw NASDAQ universe
+                          # (no $0.50-$30 prefilter), so the floor must live here too.
             if price > self.config.max_price:
                 continue
             gappers.append({
@@ -323,9 +327,12 @@ class LiveMicroPullbackRunner:
                 logger.warning("No bar received in 300s -- ending session")
                 if self.state.in_position:
                     logger.warning("Timeout while IN POSITION — placing market exit")
-                    self._place_exit(self.state.symbol,
-                                     {'close': self.state.entry_price},
-                                     {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'})
+                    try:
+                        self._place_exit(self.state.symbol,
+                                         {'close': self.state.entry_price},
+                                         {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'})
+                    except Exception as e:
+                        logger.error(f"  Emergency exit failed: {e}", exc_info=True)
                 break
 
             sym = bar.get('symbol')
@@ -379,7 +386,14 @@ class LiveMicroPullbackRunner:
                     config=self.config,
                 )
                 if exit_signal:
-                    self._place_exit(sym, bar, exit_signal)
+                    try:
+                        self._place_exit(sym, bar, exit_signal)
+                    except Exception as e:
+                        # Don't crash the session on an exit failure — keep the
+                        # position and retry the exit on the next bar.
+                        logger.error(
+                            f"  [{sym}] EXIT FAILED: {e} — keeping position, "
+                            f"retry next bar", exc_info=True)
 
         poller.stop()
         self._print_summary()
@@ -485,19 +499,19 @@ class LiveMicroPullbackRunner:
 
         if not self.dry_run:
             if self.state.stop_order_id:
-                cancelled = self.broker.cancel_order(self.state.stop_order_id)
-                if not cancelled:
-                    time.sleep(1)
-                    stop_status = self.broker.get_order(self.state.stop_order_id)
-                    if stop_status.status == 'filled':
-                        logger.warning(
-                            f"    Stop {self.state.stop_order_id} already filled "
-                            f"@ ${stop_status.filled_price:.2f} — skipping market sell"
-                        )
-                        exit_price = stop_status.filled_price
-                        self._record_trade(exit_price, 'STOP_FILLED_SERVER')
-                        self._clear_active_position(symbol)
-                        return
+                # Cancel the protective stop and WAIT until it settles — the broker
+                # only releases the held shares once the cancel is terminal. Selling
+                # before that races 'insufficient qty available'.
+                final = self.broker.cancel_order_and_wait(self.state.stop_order_id)
+                if final.status == 'filled':
+                    logger.warning(
+                        f"    Stop {self.state.stop_order_id} filled "
+                        f"@ ${final.filled_price:.2f} during cancel — adopting stop fill"
+                    )
+                    exit_price = final.filled_price
+                    self._record_trade(exit_price, 'STOP_FILLED_SERVER')
+                    self._clear_active_position(symbol)
+                    return
 
             result = self.broker.place_market_sell(symbol, self.state.shares)
             logger.info(f"    Sell order: {result.order_id} Status: {result.status}")

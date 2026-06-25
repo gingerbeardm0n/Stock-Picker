@@ -428,18 +428,11 @@ class LiveScalpRunner:
         for c in self.state.candidates:
             q = quotes.get(c['symbol'])
             if q:
-                # Same stale-last logic as scan_premarket: Tradier returns last=prev_close
-                # in premarket when no trades yet. Fall back to bid/ask midpoint.
-                stored_prior = c.get('prior_close', 0)
-                price = q.last
-                if stored_prior > 0 and q.last == stored_prior and q.bid > 0 and q.ask > 0:
-                    midpoint = (q.bid + q.ask) / 2
-                    if abs(midpoint - stored_prior) / stored_prior > 0.005:
-                        price = midpoint
-                c['open_price'] = price
+                # Only update volume — open_price and gap_pct are set correctly by
+                # scan_premarket() (which runs every 30 min with full bid/ask data).
+                # Tradier returns last=prev_close for small quote batches in premarket
+                # when no trades have printed yet, corrupting gap_pct to 0% here.
                 c['quote_volume'] = q.volume
-                if stored_prior > 0:
-                    c['gap_pct'] = (price - stored_prior) / stored_prior * 100
 
         # Live rel-vol (Gap #1): now that 9:25 quote volume is fresh, compute the
         # real rel-vol (quote_volume / 30-day baseline, 10.0 fallback) and apply
@@ -585,13 +578,17 @@ class LiveScalpRunner:
                 if open_positions:
                     logger.warning(f"Timeout with {len(open_positions)} open position(s) — emergency exit all")
                     for sym, pos in list(open_positions.items()):
-                        trade = self._place_exit_multi(
-                            sym, {'close': pos['entry_price']},
-                            {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'}, pos)
-                        completed_trades.append(trade)
-                        self.state.pnl += trade['pnl']
-                        self.state.trade_count += 1
-                    open_positions.clear()
+                        try:
+                            trade = self._place_exit_multi(
+                                sym, {'close': pos['entry_price']},
+                                {'reason': 'BAR_TIMEOUT_SAFETY_EXIT'}, pos)
+                            completed_trades.append(trade)
+                            self.state.pnl += trade['pnl']
+                            self.state.trade_count += 1
+                            del open_positions[sym]
+                        except Exception as e:
+                            # Don't let one symbol's failure skip the rest.
+                            logger.error(f"  [{sym}] Emergency exit failed: {e}", exc_info=True)
                 break
 
             sym = bar.get('symbol')
@@ -632,13 +629,22 @@ class LiveScalpRunner:
                     config=self.config,
                 )
                 if exit_signal:
-                    trade = self._place_exit_multi(sym, bar, exit_signal, pos)
-                    completed_trades.append(trade)
-                    del open_positions[sym]
-                    meta['done'] = True
-                    self.state.pnl += trade['pnl']
-                    self.state.trade_count += 1
-                    self.state.in_position = bool(open_positions)
+                    try:
+                        trade = self._place_exit_multi(sym, bar, exit_signal, pos)
+                        completed_trades.append(trade)
+                        del open_positions[sym]
+                        meta['done'] = True
+                        self.state.pnl += trade['pnl']
+                        self.state.trade_count += 1
+                        self.state.in_position = bool(open_positions)
+                    except Exception as e:
+                        # A single symbol's exit failure must NOT crash the monitor
+                        # loop and orphan the other open positions (root cause of the
+                        # 2026-06-25 multi-orphan). Keep the position and retry the
+                        # exit on the next bar.
+                        logger.error(
+                            f"  [{sym}] EXIT FAILED: {e} — keeping position, "
+                            f"retry next bar", exc_info=True)
             else:
                 if len(open_positions) < MAX_CONCURRENT:
                     entry = evaluate_entry(
@@ -768,30 +774,31 @@ class LiveScalpRunner:
         logger.info(f"    Reason: {exit_signal.get('reason', '?')}")
 
         if not self.dry_run:
-            # Cancel stop — if cancel fails, stop may have already filled server-side.
-            # Verify before placing market sell to avoid double-selling (opening a short).
+            # Cancel the protective stop and WAIT until the cancel settles — the
+            # broker only releases the held shares once the stop is terminal. Selling
+            # before that races 'insufficient qty available' (the order error that
+            # crashed the 2026-06-25 session and orphaned the other open positions).
             if pos.get('stop_order_id'):
-                cancelled = self.broker.cancel_order(pos['stop_order_id'])
-                if not cancelled:
-                    time.sleep(1)
-                    stop_status = self.broker.get_order(pos['stop_order_id'])
-                    if stop_status.status == 'filled':
-                        logger.warning(
-                            f"    Stop {pos['stop_order_id']} already filled "
-                            f"@ ${stop_status.filled_price:.2f} — adopting stop fill"
-                        )
-                        exit_price = stop_status.filled_price
-                        pnl = (exit_price - pos['entry_price']) * pos['shares']
-                        logger.info(f"    P&L: ${pnl:+.2f}")
-                        return {
-                            'symbol': symbol,
-                            'entry_price': pos['entry_price'],
-                            'exit_price': exit_price,
-                            'shares': pos['shares'],
-                            'pnl': pnl,
-                            'exit_reason': 'STOP_FILLED_SERVER',
-                            'bars_held': pos['bars_held'],
-                        }
+                final = self.broker.cancel_order_and_wait(pos['stop_order_id'])
+                if final.status == 'filled':
+                    # Price fell through the stop during the exit — adopt that fill
+                    # instead of double-selling (which would open a short).
+                    exit_price = final.filled_price
+                    logger.warning(
+                        f"    Stop {pos['stop_order_id']} filled @ ${exit_price:.2f} "
+                        f"during cancel — adopting stop fill"
+                    )
+                    pnl = (exit_price - pos['entry_price']) * pos['shares']
+                    logger.info(f"    P&L: ${pnl:+.2f}")
+                    return {
+                        'symbol': symbol,
+                        'entry_price': pos['entry_price'],
+                        'exit_price': exit_price,
+                        'shares': pos['shares'],
+                        'pnl': pnl,
+                        'exit_reason': 'STOP_FILLED_SERVER',
+                        'bars_held': pos['bars_held'],
+                    }
 
             result = self.broker.place_market_sell(symbol, pos['shares'])
             logger.info(f"    Sell order: {result.order_id} Status: {result.status}")

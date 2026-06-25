@@ -199,6 +199,38 @@ class BrokerInterface(ABC):
         """Return current open position for symbol, or None if not held."""
         ...
 
+    # ── Shared helpers (concrete — built on the abstract methods above) ──────────
+
+    def cancel_order_and_wait(
+        self,
+        order_id: str,
+        timeout: float = 5.0,
+        poll_interval: float = 0.5,
+    ) -> OrderResult:
+        """Cancel an order and block until it reaches a terminal state.
+
+        Returns the final OrderResult. A broker only releases the shares a resting
+        order holds (held_for_orders) once the cancel actually settles. Alpaca's
+        cancel is asynchronous (new → pending_cancel → canceled), so placing a sell
+        immediately after cancel_order() returns races 'insufficient qty available'
+        (the bug that crashed the 2026-06-25 scalp session and orphaned every other
+        open position). Polling until the order is terminal guarantees the shares
+        are free before re-selling.
+
+        If the order filled during the cancel race, the returned status is 'filled'
+        with filled_qty/filled_price set — callers must adopt that fill instead of
+        placing a second sell (which would open a short).
+        """
+        import time as _t
+        terminal = ('cancelled', 'filled', 'rejected', 'expired')
+        self.cancel_order(order_id)
+        deadline = _t.time() + timeout
+        order = self.get_order(order_id)
+        while order.status not in terminal and _t.time() < deadline:
+            _t.sleep(poll_interval)
+            order = self.get_order(order_id)
+        return order
+
 
 class DataFeedInterface(ABC):
     """
