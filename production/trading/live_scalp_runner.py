@@ -428,13 +428,18 @@ class LiveScalpRunner:
         for c in self.state.candidates:
             q = quotes.get(c['symbol'])
             if q:
-                c['open_price'] = q.last
-                c['quote_volume'] = q.volume
-                # Recalculate gap using stored prior_close (from get_prior_closes() in scan_premarket),
-                # NOT q.prev_close — Alpaca snapshot may return wrong/stale prev_close after market opens.
+                # Same stale-last logic as scan_premarket: Tradier returns last=prev_close
+                # in premarket when no trades yet. Fall back to bid/ask midpoint.
                 stored_prior = c.get('prior_close', 0)
+                price = q.last
+                if stored_prior > 0 and q.last == stored_prior and q.bid > 0 and q.ask > 0:
+                    midpoint = (q.bid + q.ask) / 2
+                    if abs(midpoint - stored_prior) / stored_prior > 0.005:
+                        price = midpoint
+                c['open_price'] = price
+                c['quote_volume'] = q.volume
                 if stored_prior > 0:
-                    c['gap_pct'] = (q.last - stored_prior) / stored_prior * 100
+                    c['gap_pct'] = (price - stored_prior) / stored_prior * 100
 
         # Live rel-vol (Gap #1): now that 9:25 quote volume is fresh, compute the
         # real rel-vol (quote_volume / 30-day baseline, 10.0 fallback) and apply
