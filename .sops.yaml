@@ -1,0 +1,3 @@
+creation_rules:
+  - path_regex: \.env\.render
+    age: age1a2cvfktgl9zkq3m96d5j3s38ql5vlj9dpv8vzgw7shl0vs4t29ksdrudfu

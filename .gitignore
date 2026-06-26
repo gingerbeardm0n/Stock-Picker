@@ -138,6 +138,7 @@ celerybeat.pid
 .env
 .env.paper
 .env.live
+.env.render.dec
 .envrc
 .venv
 env/
