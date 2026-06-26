@@ -170,8 +170,11 @@ class LiveMicroPullbackRunner:
                     f"profit={self.config.profit_target_pct:.1f}%")
 
         if not dry_run:
-            balance = self.broker.get_account_balance()
-            logger.info(f"Account balance: ${balance:,.2f}")
+            try:
+                balance = self.broker.get_account_balance()
+                logger.info(f"Account balance: ${balance:,.2f}")
+            except Exception as e:
+                logger.warning(f"Could not fetch account balance: {e}")
 
     def scan_gappers(self):
         """Scan for gap-ups, enrich with news, rank, keep top-N watchlist."""
@@ -193,7 +196,11 @@ class LiveMicroPullbackRunner:
             logger.warning(f"Prior close fetch failed: {e}")
 
         logger.info(f"Fetching quotes for {len(symbols):,} symbols...")
-        quotes = self.data_feed.get_quotes(symbols)
+        try:
+            quotes = self.data_feed.get_quotes(symbols)
+        except Exception as e:
+            logger.error(f"Quote fetch failed: {e} — no candidates this scan")
+            return
         logger.info(f"Got {len(quotes):,} quotes")
 
         for sym, q in quotes.items():
@@ -371,7 +378,13 @@ class LiveMicroPullbackRunner:
                 # Evaluate entry
                 signal = evaluate_entry(by_symbol[sym], bars_hist[sym], self.config)
                 if signal:
-                    self._place_entry(sym, bar, signal)
+                    try:
+                        self._place_entry(sym, bar, signal)
+                    except Exception as e:
+                        logger.error(
+                            f"  [{sym}] ENTRY FAILED: {e} — skipping symbol",
+                            exc_info=True)
+                        self.state.traded_symbols.append(sym)
             elif sym == self.state.symbol:
                 self.state.bars_held += 1
                 if float(bar['high']) > self.state.highest_since_entry:
@@ -477,9 +490,12 @@ class LiveMicroPullbackRunner:
                     _release_position(symbol)
                     return
 
-            stop_result = self.broker.place_stop_sell(symbol, shares, round(stop_price, 2))
-            self.state.stop_order_id = stop_result.order_id
-            logger.info(f"    Stop order: {stop_result.order_id} @ ${stop_price:.2f}")
+            try:
+                stop_result = self.broker.place_stop_sell(symbol, shares, round(stop_price, 2))
+                self.state.stop_order_id = stop_result.order_id
+                logger.info(f"    Stop order: {stop_result.order_id} @ ${stop_price:.2f}")
+            except Exception as e:
+                logger.error(f"    [{symbol}] STOP ORDER FAILED: {e} — position UNHEDGED")
 
         self.state.in_position = True
         self.state.symbol = symbol

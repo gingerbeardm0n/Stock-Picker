@@ -19,8 +19,9 @@ from psycopg2.extras import execute_values
 
 logger = logging.getLogger(__name__)
 
-DB_CONN = os.getenv('TIMESCALE_CONNECTION_STRING',
-                     'postgresql://postgres:changeme123@localhost:5432/stockdata')
+DB_CONN = os.getenv('NEON_CONNECTION_STRING',
+                     os.getenv('TIMESCALE_CONNECTION_STRING',
+                               'postgresql://postgres:changeme123@localhost:5432/stockdata'))
 STATE_DIR = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader"))
 
 _SCHEMA_SQL = """

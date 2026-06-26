@@ -210,8 +210,11 @@ class LiveScalpRunner:
                      f"target={self.config.profit_target_pct:.1f}%")
 
         if not dry_run:
-            balance = self.broker.get_account_balance()
-            logger.info(f"Account balance: ${balance:,.2f}")
+            try:
+                balance = self.broker.get_account_balance()
+                logger.info(f"Account balance: ${balance:,.2f}")
+            except Exception as e:
+                logger.warning(f"Could not fetch account balance: {e}")
 
     # ── Phase 1: Premarket scan (9:00 - 9:25) ───────────────────────────────
 
@@ -234,7 +237,11 @@ class LiveScalpRunner:
 
         # Step 2: Get quotes for all symbols (batched)
         logger.info(f"Fetching quotes for {len(self._symbols):,} symbols...")
-        quotes = self.data_feed.get_quotes(self._symbols)
+        try:
+            quotes = self.data_feed.get_quotes(self._symbols)
+        except Exception as e:
+            logger.error(f"Quote fetch failed: {e} — no candidates this scan")
+            return
         logger.info(f"Got {len(quotes):,} quotes")
 
         # Always overwrite prev_close with get_prior_closes() result when available.
@@ -423,7 +430,11 @@ class LiveScalpRunner:
 
         # Re-fetch quotes for candidates only
         symbols = [c['symbol'] for c in self.state.candidates]
-        quotes = self.data_feed.get_quotes(symbols)
+        try:
+            quotes = self.data_feed.get_quotes(symbols)
+        except Exception as e:
+            logger.warning(f"Quote refresh failed: {e} — using stale data")
+            return
 
         for c in self.state.candidates:
             q = quotes.get(c['symbol'])
@@ -521,7 +532,11 @@ class LiveScalpRunner:
 
         # Fetch premarket bars for all armed symbols upfront
         logger.info(f"Fetching premarket bars for {len(symbols)} symbols...")
-        pm_bars_all = self.data_feed.get_bars_since_4am(symbols)
+        try:
+            pm_bars_all = self.data_feed.get_bars_since_4am(symbols)
+        except Exception as e:
+            logger.warning(f"Premarket bar fetch failed: {e} — PM highs unavailable")
+            pm_bars_all = {}
         pm_highs = {}
         for sym in symbols:
             bars = pm_bars_all.get(sym, [])
@@ -655,7 +670,14 @@ class LiveScalpRunner:
                         config=self.config,
                     )
                     if entry:
-                        pos = self._place_entry_multi(sym, bar, entry)
+                        try:
+                            pos = self._place_entry_multi(sym, bar, entry)
+                        except Exception as e:
+                            logger.error(
+                                f"  [{sym}] ENTRY FAILED: {e} — skipping symbol",
+                                exc_info=True)
+                            meta['done'] = True
+                            pos = None
                         if pos:
                             open_positions[sym] = pos
                             self.state.in_position = True
@@ -750,9 +772,12 @@ class LiveScalpRunner:
                         return None
 
             stop_price = round(entry_price * (1 - self.config.stop_loss_pct / 100), 2)
-            stop_result = self.broker.place_stop_sell(symbol, shares, stop_price)
-            stop_order_id = stop_result.order_id
-            logger.info(f"    Stop order: {stop_result.order_id} @ ${stop_price:.2f}")
+            try:
+                stop_result = self.broker.place_stop_sell(symbol, shares, stop_price)
+                stop_order_id = stop_result.order_id
+                logger.info(f"    Stop order: {stop_result.order_id} @ ${stop_price:.2f}")
+            except Exception as e:
+                logger.error(f"    [{symbol}] STOP ORDER FAILED: {e} — position UNHEDGED")
 
         return {
             'symbol': symbol,
@@ -888,7 +913,11 @@ class LiveScalpRunner:
         # Live-filter: keep only symbols with price $0.50-$30
         if self.data_feed:
             logger.info(f"Fetching live quotes for {len(symbols):,} symbols to filter by price...")
-            quotes = self.data_feed.get_quotes(symbols)
+            try:
+                quotes = self.data_feed.get_quotes(symbols)
+            except Exception as e:
+                logger.warning(f"Universe quote fetch failed: {e} — using unfiltered list")
+                return symbols
             no_quote = len(symbols) - len(quotes)
             zero_last = sum(1 for q in quotes.values() if q.last <= 0)
             alive = [s for s, q in quotes.items() if 0.50 <= q.last <= 30.0]

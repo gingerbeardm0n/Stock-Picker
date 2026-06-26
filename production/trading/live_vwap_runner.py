@@ -170,8 +170,11 @@ class LiveVwapRunner:
                     f"hold<={self.config.max_hold_bars} bars")
 
         if not dry_run:
-            balance = self.broker.get_account_balance()
-            logger.info(f"Account balance: ${balance:,.2f}")
+            try:
+                balance = self.broker.get_account_balance()
+                logger.info(f"Account balance: ${balance:,.2f}")
+            except Exception as e:
+                logger.warning(f"Could not fetch account balance: {e}")
 
     # ── Phase 1: Gapper scan + watchlist ─────────────────────────────────────
 
@@ -196,7 +199,11 @@ class LiveVwapRunner:
             logger.warning(f"Prior close fetch failed: {e} — gap scan may find 0 gappers")
 
         logger.info(f"Fetching quotes for {len(symbols):,} symbols...")
-        quotes = self.data_feed.get_quotes(symbols)
+        try:
+            quotes = self.data_feed.get_quotes(symbols)
+        except Exception as e:
+            logger.error(f"Quote fetch failed: {e} — no candidates this scan")
+            return
         logger.info(f"Got {len(quotes):,} quotes")
 
         # Patch prev_close from prior-close fetch (Alpaca returns 0.0 in quote snapshot)
@@ -442,7 +449,13 @@ class LiveVwapRunner:
 
                 signal = evaluate_entry(by_symbol[sym], bars_hist[sym], accs[sym].value, self.config)
                 if signal:
-                    self._place_entry(sym, bar, signal, max_concurrent)
+                    try:
+                        self._place_entry(sym, bar, signal, max_concurrent)
+                    except Exception as e:
+                        logger.error(
+                            f"  [{sym}] ENTRY FAILED: {e} — skipping symbol",
+                            exc_info=True)
+                        self.state.traded_symbols.append(sym)
 
         poller.stop()
         self._print_summary()
@@ -555,9 +568,12 @@ class LiveVwapRunner:
                         _release_position(symbol)
                         return
 
-            stop_result = self.broker.place_stop_sell(symbol, shares, round(stop_price, 2))
-            stop_order_id = stop_result.order_id
-            logger.info(f"    Stop order: {stop_result.order_id} @ ${stop_price:.2f}")
+            try:
+                stop_result = self.broker.place_stop_sell(symbol, shares, round(stop_price, 2))
+                stop_order_id = stop_result.order_id
+                logger.info(f"    Stop order: {stop_result.order_id} @ ${stop_price:.2f}")
+            except Exception as e:
+                logger.error(f"    [{symbol}] STOP ORDER FAILED: {e} — position UNHEDGED")
         else:
             stop_order_id = ''
 

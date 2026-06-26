@@ -2,7 +2,9 @@ name: Capture Live Session Data
 
 on:
   schedule:
-    # 12:00 PM ET = 16:00 UTC, weekdays (both strategies done by ~11:45 ET)
+    # 10:00 AM ET = 14:00 UTC — early capture (scalp logs before any mid-day deploy)
+    - cron: '0 14 * * 1-5'
+    # 12:00 PM ET = 16:00 UTC — full capture (both strategies done by ~11:45 ET)
     - cron: '0 16 * * 1-5'
   workflow_dispatch:
 
@@ -56,7 +58,7 @@ jobs:
           curl -sf "${HEADERS[@]}" "${API_URL}/trades" -o data/sessions/${TODAY}_trades.json
 
           echo "  Pulling /logs..."
-          curl -sf "${HEADERS[@]}" "${API_URL}/logs?n=500" -o data/sessions/${TODAY}_logs.json
+          curl -sf "${HEADERS[@]}" "${API_URL}/logs?n=20000" -o data/sessions/${TODAY}_logs.json
 
           # Summary
           for f in data/sessions/${TODAY}_*.json; do

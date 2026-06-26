@@ -37,14 +37,89 @@ logger = logging.getLogger(__name__)
 # In-memory log ring buffer — survives Render's ephemeral log window
 _LOG_BUFFER: deque[dict] = deque(maxlen=20000)
 
+# ── Real-time log persistence to Neon ─────────────────────────────────────
+# Background thread flushes new log entries to Neon every 30s so logs
+# survive Render redeploys without waiting for end-of-session batch.
+
+import threading
+import queue as _queue_mod
+
+_LOG_PERSIST_QUEUE: _queue_mod.Queue = _queue_mod.Queue(maxsize=50000)
+_NEON_DSN = os.getenv('NEON_CONNECTION_STRING', '')
+
+_SESSION_LOGS_DDL = """
+CREATE TABLE IF NOT EXISTS session_logs (
+    id          SERIAL PRIMARY KEY,
+    run_date    DATE NOT NULL,
+    logged_at   TEXT,
+    level       TEXT,
+    message     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_session_logs_date
+    ON session_logs (run_date DESC);
+"""
+
+
+def _log_flusher():
+    """Background daemon: batch-insert queued log entries to Neon every 30s."""
+    import psycopg2
+    from psycopg2.extras import execute_values
+
+    if not _NEON_DSN:
+        return
+
+    tables_created = False
+    while True:
+        threading.Event().wait(30)
+        batch = []
+        while not _LOG_PERSIST_QUEUE.empty() and len(batch) < 5000:
+            try:
+                batch.append(_LOG_PERSIST_QUEUE.get_nowait())
+            except _queue_mod.Empty:
+                break
+        if not batch:
+            continue
+        try:
+            conn = psycopg2.connect(_NEON_DSN, connect_timeout=10)
+            try:
+                with conn.cursor() as cur:
+                    if not tables_created:
+                        cur.execute(_SESSION_LOGS_DDL)
+                        tables_created = True
+                    execute_values(cur, """
+                        INSERT INTO session_logs (run_date, logged_at, level, message)
+                        VALUES %s
+                    """, batch)
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception:
+            for row in batch:
+                try:
+                    _LOG_PERSIST_QUEUE.put_nowait(row)
+                except _queue_mod.Full:
+                    break
+
+
+_flusher_thread = threading.Thread(target=_log_flusher, daemon=True)
+_flusher_thread.start()
+
 
 class _BufferHandler(logging.Handler):
     def emit(self, record):
-        _LOG_BUFFER.append({
+        entry = {
             "t": self.format(record)[:19],
             "level": record.levelname,
             "msg": record.getMessage(),
-        })
+        }
+        _LOG_BUFFER.append(entry)
+        run_date = str(date.today())
+        try:
+            _LOG_PERSIST_QUEUE.put_nowait(
+                (run_date, entry["t"], entry["level"], entry["msg"])
+            )
+        except _queue_mod.Full:
+            pass
 
 
 _handler = _BufferHandler()
