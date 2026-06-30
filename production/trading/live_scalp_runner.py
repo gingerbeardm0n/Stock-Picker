@@ -443,11 +443,28 @@ class LiveScalpRunner:
         for c in self.state.candidates:
             q = quotes.get(c['symbol'])
             if q:
-                # Only update volume — open_price and gap_pct are set correctly by
-                # scan_premarket() (which runs every 30 min with full bid/ask data).
-                # Tradier returns last=prev_close for small quote batches in premarket
-                # when no trades have printed yet, corrupting gap_pct to 0% here.
                 c['quote_volume'] = q.volume
+
+                # Fix 1: re-evaluate gap from current bid/ask midpoint.
+                # Initial scan may lock in a stale/erroneous early premarket print;
+                # refresh with latest price so collapsed gaps get dropped.
+                if q.bid > 0 and q.ask > 0:
+                    spread_ratio = q.ask / q.bid
+                    if spread_ratio <= 3.0:
+                        mid = (q.bid + q.ask) / 2
+                        prev = c.get('prior_close', 0)
+                        if prev > 0:
+                            new_gap = (mid - prev) / prev * 100
+                            # Fix 2: sanity-check stored open_price — if current
+                            # midpoint is >3x away AND open was the outlier (open >
+                            # 2x midpoint or < 0.5x midpoint), replace open_price.
+                            old_open = c.get('open_price', mid)
+                            if old_open > 0 and (old_open > mid * 2 or old_open < mid * 0.5):
+                                logger.info(
+                                    f"  {c['symbol']}: open_price ${old_open:.2f} looks "
+                                    f"erroneous vs current mid ${mid:.2f} — replacing")
+                                c['open_price'] = mid
+                            c['gap_pct'] = new_gap
 
         # Live rel-vol (Gap #1): recompute now that we're at 9:25 (numerator captures more
         # of the premarket session), then apply the SAME min_relative_volume filter the sim
@@ -456,6 +473,10 @@ class LiveScalpRunner:
 
         survivors = []
         for c in self.state.candidates:
+            if c['gap_pct'] < self.config.min_gap_pct:
+                logger.info(f"  DROP {c['symbol']} gap collapsed to {c['gap_pct']:.1f}% "
+                            f"< {self.config.min_gap_pct:.1f}% — erroneous early print")
+                continue
             if c['rel_vol'] < self.config.min_relative_volume:
                 logger.info(f"  SKIP {c['symbol']} gap={c['gap_pct']:.1f}% "
                             f"rel_vol={c['rel_vol']:.2f} < {self.config.min_relative_volume:.2f}")

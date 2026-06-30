@@ -33,7 +33,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from api.dashboard import app
-from api.session_job import run_daily_sessions
+from api.session_job import run_daily_sessions, is_session_started_today
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,6 +69,18 @@ def main():
     )
     scheduler.start()
     logger.info("Scheduler started — scalp + vwap reclaim run Mon-Fri at 7:00 AM ET")
+
+    # Auto-resume after mid-session redeploy: if server boots during trading
+    # hours on a weekday and no session has started today, kick one off.
+    import pytz
+    from datetime import datetime as _dt
+    now_et = _dt.now(pytz.timezone('US/Eastern'))
+    if (now_et.weekday() < 5
+            and 7 <= now_et.hour < 12
+            and not is_session_started_today()):
+        logger.info("Startup during trading hours with no session today — auto-triggering")
+        t = threading.Thread(target=run_daily_sessions, daemon=True)
+        t.start()
 
     if args.run_now:
         logger.info("--run-now flag: launching sessions in background thread")
