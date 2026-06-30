@@ -210,6 +210,108 @@ class RealtimeRelVolCache:
         return quote_volume / base
 
 
+class TradierRelVol:
+    """Single-feed rel-vol: numerator AND denominator both from Tradier timesales.
+
+    rel_vol = (today's cumulative premarket volume 4am→now)
+              / (avg of the same cumulative-at-this-minute over the last N trading days)
+
+    Both sides come from Tradier consolidated 1-min timesales, so they measure the same
+    fraction of the market at the same time-of-day cut — the ratio actually means "trading
+    above its own typical pace by now." Self-heals for any new gapper (no prebuilt baseline).
+
+    N defaults to 5 because Tradier free-tier 1-min timesales only reaches ~6 trading days
+    back (see memory rel-vol-lookback-research — revisit once Ross Cameron's true lookback
+    is confirmed).
+
+    One timesales range-fetch per symbol (whole window in a single call), cached per session.
+    """
+
+    def __init__(self, tradier_feed, lookback_days: int = 5):
+        self._feed = tradier_feed
+        self._lookback = lookback_days
+        self._cache: dict[str, float] = {}   # symbol -> rel_vol (computed this session)
+        self._lock = threading.Lock()
+
+    def compute(
+        self, symbol: str, now_et, cutoff_minute: int | None = None
+    ) -> float | None:
+        """Return rel_vol for `symbol` at `now_et` (tz-aware ET), or None if no history.
+
+        cutoff_minute: minute-of-day ET to measure cumulative volume through, on BOTH
+        today and every prior day (so they compare apples-to-apples). Default = now's
+        minute (scalp premarket scan). VWAP pins this to 565 (9:25 ET) to match its
+        9:25 baseline basis regardless of the actual scan clock. Never measures past
+        the current wall-clock minute (can't see the future).
+
+        None → caller falls back to DEFAULT_REL_VOL=10.0. Cached per symbol per session.
+        """
+        import pytz
+        ET = pytz.timezone('America/New_York')
+        now_et = now_et.astimezone(ET)
+
+        with self._lock:
+            if symbol in self._cache:
+                return self._cache[symbol]
+
+        now_minute = now_et.hour * 60 + now_et.minute
+        if cutoff_minute is None:
+            cutoff_minute = now_minute
+        else:
+            cutoff_minute = min(cutoff_minute, now_minute)  # don't measure the future
+        if cutoff_minute < 240:          # before 4am ET — nothing to measure
+            return None
+
+        # Fetch one wide window (2x lookback calendar days to clear weekends/holidays).
+        from datetime import timedelta as _td
+        start_et = (now_et - _td(days=self._lookback * 2)).replace(
+            hour=4, minute=0, second=0, microsecond=0)
+        try:
+            bars = self._feed._fetch_timesales(
+                symbol,
+                start_et.strftime('%Y-%m-%d %H:%M'),
+                now_et.strftime('%Y-%m-%d %H:%M'),
+            )
+        except Exception as e:
+            logger.debug("TradierRelVol fetch failed for %s: %s", symbol, e)
+            return None
+        if not bars:
+            return None
+
+        # Bucket per ET date, summing only minutes in [4am, cutoff_minute] (same time-of-day
+        # window every day) so today and history are compared apples-to-apples.
+        from collections import defaultdict
+        by_day: dict = defaultdict(int)
+        for b in bars:
+            et = b.time.astimezone(ET)
+            mod = et.hour * 60 + et.minute
+            if 240 <= mod <= cutoff_minute:
+                by_day[et.date()] += b.volume
+
+        today = now_et.date()
+        numerator = by_day.get(today, 0)
+        prior_days = sorted(d for d in by_day if d < today)[-self._lookback:]
+        prior_vols = [by_day[d] for d in prior_days if by_day[d] > 0]
+        if not prior_vols:
+            return None
+        denominator = sum(prior_vols) / len(prior_vols)
+        if denominator <= 0:
+            return None
+
+        rel_vol = numerator / denominator
+        with self._lock:
+            self._cache[symbol] = rel_vol
+        return rel_vol
+
+    def invalidate(self, symbol: str | None = None) -> None:
+        """Drop cached value(s) so the next compute() re-fetches (numerator grows intraday)."""
+        with self._lock:
+            if symbol is None:
+                self._cache.clear()
+            else:
+                self._cache.pop(symbol, None)
+
+
 def compute_rel_vol(
     symbol: str,
     quote_volume: float | None,

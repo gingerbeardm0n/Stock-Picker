@@ -47,7 +47,7 @@ from trading.vwap_models import VwapReclaimConfig, ENTRY_WINDOW_END, WATCH_TOP_N
 from trading.vwap_engine import VwapAccumulator, evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_bar, record_news
-from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol
+from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol, DEFAULT_REL_VOL
 from trading._positions_lock import try_claim as _claim_position, release as _release_position
 from backend.news_fetcher import has_news_catalyst
 
@@ -151,10 +151,18 @@ class LiveVwapRunner:
         self.news_fetcher = NewsFetcher()
         self.classify_news_tier = classify_news_tier
 
-        # Live rel-vol parity (Gap #1): fetch the 30-day-avg denominator baseline
-        # from the data branch. None → rel_vol=10.0 fallback (filter no-op).
-        baseline = fetch_rel_vol_baseline()
-        self._rel_vol_baselines = baseline.get('baselines') if baseline else None
+        # Live rel-vol: single-feed Tradier (numerator + 5-day denominator both from
+        # Tradier timesales, pinned to the 9:25 ET cutoff to match the sim basis). Replaces
+        # the broken Alpaca path (quote_volume was always 0 → rel_vol always 10.0). See
+        # rel_vol_live.TradierRelVol and memory rel-vol-live-fix.
+        from trading.rel_vol_live import TradierRelVol
+        self._relvol = None
+        try:
+            self._relvol = TradierRelVol(
+                Config._make_tradier_data_feed(), lookback_days=5)
+            logger.info("Rel-vol: Tradier single-feed (5-day premarket denominator, 9:25 cutoff)")
+        except Exception as e:
+            logger.warning(f"TradierRelVol unavailable: {e} — rel_vol falls back to 10.0")
 
         self._bar_queue = queue.Queue(maxsize=1000)
 
@@ -270,24 +278,23 @@ class LiveVwapRunner:
         logger.info(f"Enriching top {len(top_gappers)} gappers with news...")
         self._enrich_with_news(top_gappers)
 
-        # Rel-vol numerator parity (Gap #3): the 30-day baseline denominator is
-        # cumulative volume THROUGH 9:25 ET (rel_vol_cum_cache minute_of_day=565,
-        # premarket-inclusive). The instantaneous quote volume at this ~9:45 scan
-        # is 2-3x larger (volume piles up after the 9:30 open), which would make
-        # min_relative_volume a no-op live. Reconstruct the SAME basis: sum each
-        # candidate's session-bar volume up to 9:25 from the data feed.
-        vol_through_925 = self._cumulative_volume_through_925(
-            [g['symbol'] for g in top_gappers])
-
+        # Rel-vol (Gap #1 + #3): single-feed Tradier, both numerator and 5-day denominator
+        # pinned to the 9:25 ET cutoff (minute 565) so today and history share the same
+        # premarket-cumulative basis the sim uses. None → 10.0 fallback.
+        now = datetime.now(ET)
         filtered = []
         for g in top_gappers:
             if self.config.require_news and not g.get('has_news', False):
                 logger.info(f"  SKIP {g['symbol']} gap={g['gap_pct']:.1f}% -- no news")
                 continue
-            # Live rel-vol (Gap #1 + #3): cumulative-through-9:25 / 30-day baseline,
-            # with sim-matching 10.0 fallback when the baseline/numerator is missing.
-            g['rel_vol'] = compute_rel_vol(
-                g['symbol'], vol_through_925.get(g['symbol']), self._rel_vol_baselines)
+            rv = None
+            if self._relvol is not None:
+                try:
+                    self._relvol.invalidate(g['symbol'])
+                    rv = self._relvol.compute(g['symbol'], now, cutoff_minute=565)
+                except Exception as e:
+                    logger.debug(f"  rel-vol compute failed for {g['symbol']}: {e}")
+            g['rel_vol'] = rv if rv is not None else DEFAULT_REL_VOL
             g['float_shares'] = None
             # Same filter the sim applies — skip thin-volume candidates.
             if g['rel_vol'] < self.config.min_relative_volume:

@@ -177,21 +177,23 @@ class LiveScalpRunner:
         if not self._floats:
             logger.warning("Float baseline empty — max_float filter INACTIVE this session (parity gap)")
 
-        # Real-time rel-vol for unknown symbols (not yet in Neon baseline).
-        # Uses Alpaca historical bars to compute per-symbol 30-day cumulative avg.
+        # Live rel-vol: single-feed Tradier (numerator AND denominator from Tradier
+        # timesales). This replaces the broken Alpaca path — Alpaca quote snapshots carry
+        # NO volume (quote_volume was always 0 → rel_vol always 10.0). See rel_vol_live.py
+        # TradierRelVol and memory rel-vol-live-fix.
+        from trading.rel_vol_live import TradierRelVol
+        self._relvol = None
+        try:
+            self._relvol = TradierRelVol(
+                Config._make_tradier_data_feed(), lookback_days=5)
+            logger.info("Rel-vol: Tradier single-feed (5-day premarket denominator)")
+        except Exception as e:
+            logger.warning(
+                f"TradierRelVol unavailable: {e} — rel_vol falls back to 10.0")
+
+        # Legacy Alpaca rel-vol path (kept only as a fallback denominator source).
         self._realtime_rv_cache = RealtimeRelVolCache()
         self._alpaca_hist_feed = None
-        if Config.ALPACA_API_KEY and Config.ALPACA_SECRET_KEY:
-            try:
-                from trading.broker.alpaca import AlpacaDataFeed
-                self._alpaca_hist_feed = AlpacaDataFeed(
-                    api_key=Config.ALPACA_API_KEY,
-                    secret_key=Config.ALPACA_SECRET_KEY,
-                )
-                logger.info("Alpaca historical feed ready (real-time rel-vol for new symbols)")
-            except Exception as e:
-                logger.warning(
-                    f"Alpaca historical feed unavailable: {e} — new symbols use 10.0 fallback")
 
         # Symbol list for scanning
         self._symbols = self._load_symbols()
@@ -217,6 +219,23 @@ class LiveScalpRunner:
                 logger.warning(f"Could not fetch account balance: {e}")
 
     # ── Phase 1: Premarket scan (9:00 - 9:25) ───────────────────────────────
+
+    def _assign_rel_vol(self, candidates: list[dict]) -> None:
+        """Set c['rel_vol'] for each candidate via Tradier single-feed rel-vol.
+
+        Tradier (numerator = today cumulative premarket vol, denominator = 5-day avg at
+        same minute). None → DEFAULT_REL_VOL=10.0 fallback. Mutates in place.
+        """
+        now = datetime.now(ET)
+        for c in candidates:
+            rv = None
+            if self._relvol is not None:
+                try:
+                    self._relvol.invalidate(c['symbol'])  # numerator grows intraday
+                    rv = self._relvol.compute(c['symbol'], now)
+                except Exception as e:
+                    logger.debug(f"  rel-vol compute failed for {c['symbol']}: {e}")
+            c['rel_vol'] = rv if rv is not None else DEFAULT_REL_VOL
 
     def scan_premarket(self):
         """
@@ -376,24 +395,9 @@ class LiveScalpRunner:
         # its normal 9:25 cumulative volume at 8 AM is a genuine mover.
         # Filter (min_relative_volume) is NOT applied here; that happens at 9:25
         # refresh so thin candidates are dropped only when volume data is mature.
+        self._assign_rel_vol(filtered)
         for g in filtered:
-            g['rel_vol'] = compute_rel_vol(
-                g['symbol'], g.get('quote_volume'), self._rel_vol_baselines)
             g['float_shares'] = None  # TODO: fetch from fundamentals
-
-        # For symbols that got the 10.0 fallback (not in Neon baseline),
-        # compute a real-time baseline from Alpaca 30-day minute bars.
-        if self._alpaca_hist_feed:
-            unknown = [g['symbol'] for g in filtered if g.get('rel_vol') == DEFAULT_REL_VOL]
-            if unknown:
-                self._realtime_rv_cache.enrich_missing(
-                    unknown, datetime.now(ET), self._alpaca_hist_feed)
-                for g in filtered:
-                    if g.get('rel_vol') == DEFAULT_REL_VOL:
-                        rv = self._realtime_rv_cache.compute_rel_vol(
-                            g['symbol'], g.get('quote_volume'))
-                        if rv is not None:
-                            g['rel_vol'] = rv
 
         ranked = rank_candidates(filtered)
         self.state.candidates = ranked
@@ -445,27 +449,10 @@ class LiveScalpRunner:
                 # when no trades have printed yet, corrupting gap_pct to 0% here.
                 c['quote_volume'] = q.volume
 
-        # Live rel-vol (Gap #1): now that 9:25 quote volume is fresh, compute the
-        # real rel-vol (quote_volume / 30-day baseline, 10.0 fallback) and apply
-        # the SAME min_relative_volume filter the sim applies.
-        for c in self.state.candidates:
-            c['rel_vol'] = compute_rel_vol(
-                c['symbol'], c.get('quote_volume'), self._rel_vol_baselines)
-
-        # Enrich symbols not in Neon baseline with real-time Alpaca history.
-        # Must happen BEFORE the filter so accurate rv can drop thin-volume tickers.
-        if self._alpaca_hist_feed:
-            unknown = [c['symbol'] for c in self.state.candidates
-                       if c.get('rel_vol') == DEFAULT_REL_VOL]
-            if unknown:
-                self._realtime_rv_cache.enrich_missing(
-                    unknown, datetime.now(ET), self._alpaca_hist_feed)
-                for c in self.state.candidates:
-                    if c.get('rel_vol') == DEFAULT_REL_VOL:
-                        rv = self._realtime_rv_cache.compute_rel_vol(
-                            c['symbol'], c.get('quote_volume'))
-                        if rv is not None:
-                            c['rel_vol'] = rv
+        # Live rel-vol (Gap #1): recompute now that we're at 9:25 (numerator captures more
+        # of the premarket session), then apply the SAME min_relative_volume filter the sim
+        # applies. Tradier single-feed — see _assign_rel_vol.
+        self._assign_rel_vol(self.state.candidates)
 
         survivors = []
         for c in self.state.candidates:

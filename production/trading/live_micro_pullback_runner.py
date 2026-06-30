@@ -47,7 +47,7 @@ from trading.micro_pullback_models import MicroPullbackConfig, ENTRY_WINDOW_END,
 from trading.micro_pullback_engine import evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_bar, record_news
-from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol
+from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol, DEFAULT_REL_VOL
 from trading._positions_lock import try_claim as _claim_position, release as _release_position
 from backend.news_fetcher import has_news_catalyst
 
@@ -157,6 +157,18 @@ class LiveMicroPullbackRunner:
         if not self._floats:
             logger.warning("Float baseline empty — max_float filter INACTIVE this session (parity gap)")
 
+        # Live rel-vol: single-feed Tradier (numerator + 5-day denominator). Replaces the
+        # broken Alpaca path (quote_volume always 0 → rel_vol always 10.0). See
+        # rel_vol_live.TradierRelVol and memory rel-vol-live-fix.
+        from trading.rel_vol_live import TradierRelVol
+        self._relvol = None
+        try:
+            self._relvol = TradierRelVol(
+                Config._make_tradier_data_feed(), lookback_days=5)
+            logger.info("Rel-vol: Tradier single-feed (5-day premarket denominator)")
+        except Exception as e:
+            logger.warning(f"TradierRelVol unavailable: {e} — rel_vol falls back to 10.0")
+
         self._bar_queue = queue.Queue(maxsize=1000)
 
         logger.info("=" * 60)
@@ -245,13 +257,20 @@ class LiveMicroPullbackRunner:
         logger.info(f"Enriching top {len(top_gappers)} gappers with news...")
         self._enrich_with_news(top_gappers)
 
+        now = datetime.now(ET)
         filtered = []
         for g in top_gappers:
             if self.config.require_news and not g.get('has_news', False):
                 logger.info(f"  SKIP {g['symbol']} gap={g['gap_pct']:.1f}% -- no news")
                 continue
-            g['rel_vol'] = compute_rel_vol(
-                g['symbol'], g.get('quote_volume'), self._rel_vol_baselines)
+            rv = None
+            if self._relvol is not None:
+                try:
+                    self._relvol.invalidate(g['symbol'])
+                    rv = self._relvol.compute(g['symbol'], now)
+                except Exception as e:
+                    logger.debug(f"  rel-vol compute failed for {g['symbol']}: {e}")
+            g['rel_vol'] = rv if rv is not None else DEFAULT_REL_VOL
             if g['rel_vol'] < self.config.min_relative_volume:
                 logger.info(f"  SKIP {g['symbol']} gap={g['gap_pct']:.1f}% "
                             f"rel_vol={g['rel_vol']:.2f} < {self.config.min_relative_volume:.2f}")
