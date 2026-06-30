@@ -37,11 +37,12 @@ import psycopg2.extras
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env.paper'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env.render.dec'))
 
 DASHBOARD = os.getenv('JTRADER_DASHBOARD_URL', 'https://jtrader-api.onrender.com')
 API_KEY = os.getenv('JTRADER_API_KEY', '')
 PROD_TOKEN = os.getenv('TRADIER_PRODUCTION_TOKEN', '')
-DB_DSN = os.getenv('DB_DSN') or os.getenv('OPTUNA_STORAGE')
+DB_DSN = os.getenv('DB_DSN') or os.getenv('OPTUNA_STORAGE') or os.getenv('NEON_CONNECTION_STRING')
 
 
 # ── live_trades table ──────────────────────────────────────────────────────
@@ -217,7 +218,7 @@ def replay_counterfactual(trade: dict, tape: list[dict]) -> dict | None:
     """
     if trade['strategy'] == 'vwap':
         from trading.vwap_engine import evaluate_exit
-        from trading.live_vwap_runner import TRIAL_173_CONFIG as cfg
+        from trading.live_vwap_runner import TRIAL_56_CONFIG as cfg
         # VWAP-anchored stop: reconstruct from decision price the same way the
         # runner did (it logged stop = VWAP - offset; approximate VWAP from the
         # decision log is overkill — use decision_price-relative replay with

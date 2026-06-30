@@ -28,11 +28,15 @@ import requests
 from dotenv import load_dotenv
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-load_dotenv(os.path.join(REPO_ROOT, '.env.paper'))
+load_dotenv(os.path.join(REPO_ROOT, 'production', '.env.paper'))
+load_dotenv(os.path.join(REPO_ROOT, 'production', '.env.render.dec'))
 
-DB_DSN = os.getenv('DB_DSN') or os.getenv('OPTUNA_STORAGE')
+DB_DSN = os.getenv('DB_DSN') or os.getenv('OPTUNA_STORAGE') or os.getenv('NEON_CONNECTION_STRING')
 if not DB_DSN:
-    sys.exit("Set DB_DSN (postgresql://user:pass@host:5432/stockdata) in env or .env.paper")
+    sys.exit(
+        "Set DB_DSN (or NEON_CONNECTION_STRING) in env, .env.paper, or "
+        "production/.env.render.dec — run production/scripts/decrypt-local.sh first"
+    )
 
 CREATE_NEWS_SQL = """
 CREATE TABLE IF NOT EXISTS stock_news_live (
