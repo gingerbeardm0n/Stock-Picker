@@ -687,7 +687,13 @@ class LiveScalpRunner:
                                 exc_info=True)
                             meta['done'] = True
                             pos = None
-                        if pos:
+                        if pos and pos.get('_already_exited'):
+                            trade = pos['trade']
+                            completed_trades.append(trade)
+                            self.state.pnl += trade['pnl']
+                            self.state.trade_count += 1
+                            meta['done'] = True
+                        elif pos:
                             open_positions[sym] = pos
                             self.state.in_position = True
                 elif n == 1:
@@ -786,7 +792,40 @@ class LiveScalpRunner:
                 stop_order_id = stop_result.order_id
                 logger.info(f"    Stop order: {stop_result.order_id} @ ${stop_price:.2f}")
             except Exception as e:
-                logger.error(f"    [{symbol}] STOP ORDER FAILED: {e} — position UNHEDGED")
+                # Broker rejects a stop whose trigger price is already past current
+                # market (price crashed between fill and stop placement) — that means
+                # the position should already be exiting. Flatten immediately at market
+                # instead of leaving it open with no protection at all.
+                logger.error(
+                    f"    [{symbol}] STOP ORDER FAILED: {e} — attempting emergency market exit")
+                try:
+                    mkt_result = self.broker.place_market_sell(symbol, shares)
+                    time.sleep(2)
+                    mkt_fill = self.broker.get_order(mkt_result.order_id)
+                    if mkt_fill.status == 'filled':
+                        exit_price = mkt_fill.filled_price
+                        pnl = (exit_price - entry_price) * shares
+                        logger.warning(
+                            f"    [{symbol}] Emergency market exit FILLED: "
+                            f"{mkt_fill.filled_qty} @ ${exit_price:.2f} (P&L ${pnl:+.2f})")
+                        return {
+                            '_already_exited': True,
+                            'trade': {
+                                'symbol': symbol,
+                                'entry_price': entry_price,
+                                'exit_price': exit_price,
+                                'shares': shares,
+                                'pnl': pnl,
+                                'bars_held': 0,
+                                'reason': 'STOP_REJECTED_MARKET_EXIT',
+                            },
+                        }
+                    logger.error(
+                        f"    [{symbol}] Emergency market exit NOT FILLED "
+                        f"(status={mkt_fill.status}) — position UNHEDGED")
+                except Exception as e2:
+                    logger.error(
+                        f"    [{symbol}] Emergency market exit ALSO FAILED: {e2} — position UNHEDGED")
 
         return {
             'symbol': symbol,

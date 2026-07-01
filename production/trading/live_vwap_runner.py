@@ -509,6 +509,7 @@ class LiveVwapRunner:
         logger.info(f"    Reason: {signal.get('reason', '?')}")
         logger.info(f"    Stop: ${stop_price:.2f} (VWAP {signal.get('vwap', 0):.2f} - {self.config.stop_vwap_offset:.2f})")
         entry_price = round(entry_price, 2)
+        stop_order_id = ''
         if not self.dry_run:
             result = self.broker.place_limit_buy(symbol, shares, entry_price)
             logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
@@ -583,9 +584,38 @@ class LiveVwapRunner:
                 stop_order_id = stop_result.order_id
                 logger.info(f"    Stop order: {stop_result.order_id} @ ${stop_price:.2f}")
             except Exception as e:
-                logger.error(f"    [{symbol}] STOP ORDER FAILED: {e} — position UNHEDGED")
-        else:
-            stop_order_id = ''
+                # Broker rejects a stop whose trigger price is already past current
+                # market (price crashed between fill and stop placement) — that means
+                # the position should already be exiting. Flatten immediately at market
+                # instead of leaving it open with no protection at all.
+                logger.error(
+                    f"    [{symbol}] STOP ORDER FAILED: {e} — attempting emergency market exit")
+                try:
+                    mkt_result = self.broker.place_market_sell(symbol, shares)
+                    time.sleep(2)
+                    mkt_fill = self.broker.get_order(mkt_result.order_id)
+                    if mkt_fill.status == 'filled':
+                        logger.warning(
+                            f"    [{symbol}] Emergency market exit FILLED: "
+                            f"{mkt_fill.filled_qty} @ ${mkt_fill.filled_price:.2f}")
+                        self.state.positions[symbol] = {
+                            'entry_price': entry_price,
+                            'stop_price': stop_price,
+                            'shares': shares,
+                            'entry_time': datetime.now(ET),
+                            'stop_order_id': '',
+                            'highest_since_entry': float(bar['high']),
+                            'bars_held': 0,
+                        }
+                        self._record_trade(
+                            symbol, mkt_fill.filled_price, 'STOP_REJECTED_MARKET_EXIT')
+                        return
+                    logger.error(
+                        f"    [{symbol}] Emergency market exit NOT FILLED "
+                        f"(status={mkt_fill.status}) — position UNHEDGED")
+                except Exception as e2:
+                    logger.error(
+                        f"    [{symbol}] Emergency market exit ALSO FAILED: {e2} — position UNHEDGED")
 
         self.state.positions[symbol] = {
             'entry_price': entry_price,
