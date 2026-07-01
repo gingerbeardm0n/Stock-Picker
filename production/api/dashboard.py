@@ -307,17 +307,66 @@ def get_position():
     }
 
 
+# live_trades.strategy uses short tags; generate_journal.py and the frontend
+# expect the same long-form names session state files use.
+_STRATEGY_DISPLAY_NAME = {
+    "scalp": "opening_bell_scalp",
+    "vwap": "vwap_reclaim",
+    "micro_pullback": "micro_pullback",
+}
+
+
 @app.get("/trades")
-def get_trades():
-    """Return trade history."""
-    trades_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "trades.json"
-    if trades_file.exists():
+def get_trades(days: int = Query(default=30, le=365)):
+    """Return trade history from Neon live_trades — durable, survives deploys.
+
+    /tmp/jtrader/trades.json (the old source) is on Render's ephemeral disk
+    and resets to empty on every redeploy regardless of what actually
+    happened. live_trades is populated by session_report.py (run after each
+    session) and isn't affected by app restarts.
+    """
+    try:
+        from api.session_persistence import _get_conn
+        conn = _get_conn()
         try:
-            trades = json.loads(trades_file.read_text())
-            return {"trades": trades}
-        except (json.JSONDecodeError, OSError):
-            pass
-    return {"trades": []}
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT trade_date, strategy, symbol, shares, decision_time,
+                           decision_price, paper_fill, paper_exit, paper_pnl, exit_reason
+                    FROM live_trades
+                    WHERE trade_date >= CURRENT_DATE - %s
+                    ORDER BY trade_date DESC, decision_time DESC
+                    LIMIT 500
+                """, (days,))
+                cols = [d[0] for d in cur.description]
+                rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        finally:
+            conn.close()
+
+        trades = []
+        for r in rows:
+            entry_price = r["paper_fill"] if r["paper_fill"] is not None else r["decision_price"]
+            trades.append({
+                "date": str(r["trade_date"]),
+                "strategy": _STRATEGY_DISPLAY_NAME.get(r["strategy"], r["strategy"]),
+                "symbol": r["symbol"],
+                "shares": r["shares"],
+                "entry_price": float(entry_price) if entry_price is not None else None,
+                "exit_price": float(r["paper_exit"]) if r["paper_exit"] is not None else None,
+                "pnl": float(r["paper_pnl"]) if r["paper_pnl"] is not None else None,
+                "exit_reason": r["exit_reason"],
+                "decision_time": r["decision_time"].isoformat() if r["decision_time"] else None,
+            })
+        return {"trades": trades}
+    except Exception as e:
+        logger.error(f"/trades: Neon query failed ({e}) — falling back to ephemeral file")
+        trades_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "trades.json"
+        if trades_file.exists():
+            try:
+                return {"trades": json.loads(trades_file.read_text())}
+            except (json.JSONDecodeError, OSError):
+                pass
+        return {"trades": []}
 
 
 @app.get("/status")
