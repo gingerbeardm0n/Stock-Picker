@@ -167,6 +167,7 @@ def run_daily_sessions():
             nonlocal mpstate
             mpstate = run_micro_pullback_session(dry_run=False, live=False)
             completed = getattr(mpstate, 'completed_trades', [])
+            first = completed[0] if completed else {}
             micro_pullback_state_data = {
                 "last_run": datetime.utcnow().isoformat(),
                 "strategy": "micro_pullback",
@@ -176,6 +177,17 @@ def run_daily_sessions():
                 "completed_trades": completed,
                 "trade_count": len(completed),
                 "pnl": sum(t.get('pnl', 0) for t in completed) if completed else 0,
+                "trade_done": getattr(mpstate, 'trade_done', False),
+                # Legacy single-position compat fields so dashboard _infer_stage
+                # and stage-tagging work the same way scalp/VWAP's do.
+                "top_pick": getattr(mpstate, 'symbol', '') or None,
+                "symbol": getattr(mpstate, 'symbol', ''),
+                "entry_price": first.get('entry_price') or getattr(mpstate, 'entry_price', None),
+                "exit_price": first.get('exit_price') or getattr(mpstate, 'exit_price', None),
+                "stop_price": getattr(mpstate, 'stop_price', None),
+                "shares": first.get('shares') or getattr(mpstate, 'shares', None),
+                "bars_held": first.get('bars_held') or getattr(mpstate, 'bars_held', None),
+                "exit_reason": first.get('exit_reason', '') or getattr(mpstate, 'exit_reason', ''),
             }
             (STATE_DIR / "micro_pullback_state.json").write_text(json.dumps(micro_pullback_state_data, default=str))
             for trade in completed:

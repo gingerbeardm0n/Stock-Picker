@@ -183,6 +183,18 @@ def _read_vwap_state() -> dict:
     return {}
 
 
+MICRO_PULLBACK_STATE_FILE = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "micro_pullback_state.json"
+
+
+def _read_micro_pullback_state() -> dict:
+    if MICRO_PULLBACK_STATE_FILE.exists():
+        try:
+            return json.loads(MICRO_PULLBACK_STATE_FILE.read_text())
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
+
+
 def _infer_stage(state_data: dict) -> str:
     if state_data.get("last_result") == "error":
         return "ERROR"
@@ -382,9 +394,11 @@ def get_dashboard():
     """Unified dashboard endpoint — all data in one call."""
     scalp_state = _read_state()
     vwap_state = _read_vwap_state()
+    mp_state = _read_micro_pullback_state()
 
     scalp_stage = _infer_stage(scalp_state)
     vwap_stage = _infer_stage(vwap_state)
+    mp_stage = _infer_stage(mp_state)
 
     scalp_candidates = scalp_state.get("candidates", [])
     scalp_top = scalp_state.get("top_pick")
@@ -418,6 +432,24 @@ def get_dashboard():
             else:
                 c["stage"] = "ARMED"
 
+    # Micro-Pullback is single-position (not multi like scalp/VWAP), so there's
+    # no "positions" dict — just the current/last trade's symbol.
+    mp_candidates = mp_state.get("watchlist", [])
+    mp_top = mp_state.get("top_pick") or mp_state.get("symbol")
+    mp_open_sym = mp_state.get("symbol") if mp_stage == "ENTERED" else None
+    mp_done_syms = {t.get("symbol") for t in (mp_state.get("completed_trades") or [])}
+    for c in mp_candidates:
+        if isinstance(c, dict):
+            sym = c.get("symbol", "")
+            if mp_stage in ("IDLE", "SCANNING"):
+                c["stage"] = "WATCHING"
+            elif sym == mp_open_sym:
+                c["stage"] = "ENTERED"
+            elif sym in mp_done_syms:
+                c["stage"] = "EXITED"
+            else:
+                c["stage"] = "ARMED"
+
     # Multi-position: return completed_trades list + any open positions dict.
     # Fall back to legacy single-position fields for backward compat.
     scalp_position = None
@@ -447,15 +479,32 @@ def get_dashboard():
             "exit_reason": vwap_state.get("exit_reason"),
         }
 
+    mp_position = None
+    if mp_stage in ("ENTERED", "EXITED"):
+        mp_position = {
+            "completed_trades": mp_state.get("completed_trades", []),
+            "trade_count": mp_state.get("trade_count", 0),
+            "pnl": mp_state.get("pnl"),
+            "entry_price": mp_state.get("entry_price"),
+            "exit_price": mp_state.get("exit_price"),
+            "stop_price": mp_state.get("stop_price"),
+            "shares": mp_state.get("shares"),
+            "bars_held": mp_state.get("bars_held"),
+            "exit_reason": mp_state.get("exit_reason"),
+        }
+
     scalp_pnl = scalp_state.get("pnl") or 0
     # VWAP may have multiple trades; use persisted total_pnl if available
     vwap_pnl = vwap_state.get("pnl") or 0
+    mp_pnl = mp_state.get("pnl") or 0
     scalp_trades = 1 if (scalp_state.get("entry_price") or 0) > 0 else 0
     vwap_trades = vwap_state.get("trade_count") or (1 if (vwap_state.get("entry_price") or 0) > 0 else 0)
-    trade_count = scalp_trades + vwap_trades
+    mp_trades = mp_state.get("trade_count") or (1 if (mp_state.get("entry_price") or 0) > 0 else 0)
+    trade_count = scalp_trades + vwap_trades + mp_trades
 
     from trading.live_scalp_runner import TRIAL_173_CONFIG as SCALP_CONFIG
     from trading.live_vwap_runner import TRIAL_56_CONFIG as VWAP_CONFIG
+    from trading.live_micro_pullback_runner import TRIAL_167_CONFIG as MP_CONFIG
 
     return {
         "server_time": datetime.utcnow().isoformat(),
@@ -479,7 +528,17 @@ def get_dashboard():
             "position": vwap_position,
             "config": _config_to_dict(VWAP_CONFIG),
         },
-        "session_pnl": scalp_pnl + vwap_pnl,
+        "micro_pullback": {
+            "stage": mp_stage,
+            "last_run": mp_state.get("last_run"),
+            "last_result": mp_state.get("last_result"),
+            "date": mp_state.get("date"),
+            "candidates": mp_candidates,
+            "top_pick": mp_top,
+            "position": mp_position,
+            "config": _config_to_dict(MP_CONFIG),
+        },
+        "session_pnl": scalp_pnl + vwap_pnl + mp_pnl,
         "trade_count": trade_count,
     }
 
