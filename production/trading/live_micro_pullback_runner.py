@@ -504,10 +504,43 @@ class LiveMicroPullbackRunner:
                         f"{shares} @ ${entry_price:.2f} — adopting position."
                     )
                 else:
-                    logger.warning(f"    Entry failed for {symbol}, skipping.")
-                    self.state.traded_symbols.append(symbol)
-                    _release_position(symbol)
-                    return
+                    # Limit missed — retry immediately with market order if stock
+                    # hasn't run away from the signal price (2% slippage cap).
+                    try:
+                        fresh_q = self.data_feed.get_quotes([symbol])
+                        current_ask = (fresh_q[symbol].ask
+                                       if symbol in fresh_q and fresh_q[symbol].ask > 0
+                                       else float(bar['close']))
+                    except Exception:
+                        current_ask = float(bar['close'])
+
+                    slippage_cap = entry_price * 1.02
+                    if current_ask > slippage_cap:
+                        logger.warning(
+                            f"    [{symbol}] Moved {(current_ask / entry_price - 1) * 100:.1f}% "
+                            f"past limit (ask=${current_ask:.2f} > cap=${slippage_cap:.2f}) — releasing, will re-eval next bar."
+                        )
+                        # Do NOT add to traded_symbols — if the pullback signal is
+                        # still valid next bar (stock came back), we want to retry.
+                        _release_position(symbol)
+                        return
+
+                    logger.info(
+                        f"    [{symbol}] Limit missed — retrying market order "
+                        f"(ask=${current_ask:.2f} ≤ cap=${slippage_cap:.2f})"
+                    )
+                    result2 = self.broker.place_market_buy(symbol, shares)
+                    time.sleep(3)
+                    fill2 = self.broker.get_order(result2.order_id)
+                    if fill2.status == 'filled':
+                        entry_price = fill2.filled_price
+                        shares = fill2.filled_qty
+                        logger.info(f"    MARKET FILLED: {shares} @ ${entry_price:.2f}")
+                    else:
+                        logger.warning(f"    [{symbol}] Market order also failed. Skipping.")
+                        self.state.traded_symbols.append(symbol)
+                        _release_position(symbol)
+                        return
 
             try:
                 stop_result = self.broker.place_stop_sell(symbol, shares, round(stop_price, 2))
