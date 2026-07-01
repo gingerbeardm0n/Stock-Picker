@@ -595,9 +595,27 @@ class LiveScalpRunner:
         self._wait_for_market_open()
         logger.info(f"Listening for bars on {len(symbols)} symbols...")
 
+        monitor_start = datetime.now(ET)
+        max_entry_wait = timedelta(minutes=self.config.max_entry_bars)
+
         while True:
             if all(m['done'] for m in sym_meta.values()) and not open_positions:
                 break
+
+            # Wall-clock fallback: a symbol whose bar-count timeout never
+            # fires because it never receives ANY bars (illiquid/no-quote
+            # ticker) would otherwise block this loop — and therefore VWAP +
+            # micro-pullback, which run after this returns — forever. The
+            # per-bar max_entry_bars check below can't help since it only
+            # runs when a bar for THAT symbol arrives.
+            if datetime.now(ET) - monitor_start >= max_entry_wait:
+                for sym, meta in sym_meta.items():
+                    if not meta['done'] and sym not in open_positions:
+                        logger.warning(
+                            f"  [{sym}] No entry after {max_entry_wait.total_seconds()/60:.0f}min "
+                            f"wall-clock ({meta['bars_since_open']} bars received) — "
+                            f"marking done (bar starvation)")
+                        meta['done'] = True
 
             try:
                 bar = self._bar_queue.get(timeout=180)
