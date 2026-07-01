@@ -44,7 +44,7 @@ from trading.scalp_engine import evaluate_entry, evaluate_exit, get_premarket_hi
 from trading.scalp_ranker import rank_candidates, get_top_candidate, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_news
 from trading.broker.base import OrderResult
-from trading.rel_vol_live import fetch_rel_vol_baseline, DEFAULT_REL_VOL
+from trading.rel_vol_live import fetch_rel_vol_baseline, fetch_missing_floats, DEFAULT_REL_VOL
 from backend.news_fetcher import has_news_catalyst
 
 ET = pytz.timezone('America/New_York')
@@ -169,13 +169,13 @@ class LiveScalpRunner:
         # from the data branch. None → rel_vol=10.0 fallback (filter no-op).
         baseline = fetch_rel_vol_baseline()
         self._rel_vol_baselines = baseline.get('baselines') if baseline else None
-        # Float baseline (Gap #2): floats are not yet populated in the baseline
-        # (build_baseline_cloud.py ships floats={} always). self._floats will be
-        # an empty dict → falsy → float filter is INACTIVE this session. This is
-        # a known parity gap: live allows any float, sim enforces max_float.
-        self._floats = baseline.get('floats') if baseline else None
+        # Float baseline (Gap #2): weekly bulk refresh (build_baseline_cloud.py,
+        # GitHub Actions daily 4:30pm ET) covers symbols already seen before. Always
+        # a dict (never None) so fetch_missing_floats() can enrich it per-scan for
+        # brand-new gappers not yet in the baseline — see rel_vol_live.py.
+        self._floats = (baseline.get('floats') if baseline else None) or {}
         if not self._floats:
-            logger.warning("Float baseline empty — max_float filter INACTIVE this session (parity gap)")
+            logger.warning("Float baseline empty — live per-scan fetch will populate as needed")
 
         # Live rel-vol: hybrid feed — today's cumulative volume from Tradier
         # (real-time premarket data, Alpaca can't serve same-day bars), 30-day
@@ -397,8 +397,12 @@ class LiveScalpRunner:
         # Filter (min_relative_volume) is NOT applied here; that happens at 9:25
         # refresh so thin candidates are dropped only when volume data is mature.
         self._assign_rel_vol(filtered)
+        # Float (Gap #2): weekly Neon baseline covers known symbols; live-fetch
+        # (yfinance) fills in any brand-new gapper not yet in that baseline. Cheap
+        # here — `filtered` is only the small news+gap-qualified short-list.
+        fetch_missing_floats([g['symbol'] for g in filtered], self._floats)
         for g in filtered:
-            g['float_shares'] = None  # TODO: fetch from fundamentals
+            g['float_shares'] = self._floats.get(g['symbol'])
 
         ranked = rank_candidates(filtered)
         self.state.candidates = ranked

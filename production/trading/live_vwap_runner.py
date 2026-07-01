@@ -47,7 +47,7 @@ from trading.vwap_models import VwapReclaimConfig, ENTRY_WINDOW_END, WATCH_TOP_N
 from trading.vwap_engine import VwapAccumulator, evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_bar, record_news
-from trading.rel_vol_live import fetch_rel_vol_baseline, DEFAULT_REL_VOL
+from trading.rel_vol_live import fetch_rel_vol_baseline, fetch_missing_floats, DEFAULT_REL_VOL
 from trading._positions_lock import try_claim as _claim_position, release as _release_position
 from backend.news_fetcher import has_news_catalyst
 
@@ -150,6 +150,13 @@ class LiveVwapRunner:
         from backend.news_fetcher import NewsFetcher, classify_news_tier
         self.news_fetcher = NewsFetcher()
         self.classify_news_tier = classify_news_tier
+
+        # Float data (display/data-quality only — VWAP has no max_float filter,
+        # never backtested with one, see parity audit's known VWAP-max_float gap).
+        # Weekly Neon baseline covers known symbols; fetch_missing_floats() fills
+        # in brand-new gappers per-scan. Always a dict, never None.
+        baseline = fetch_rel_vol_baseline()
+        self._floats = (baseline.get('floats') if baseline else None) or {}
 
         # Live rel-vol: hybrid feed — today's cumulative volume from Tradier (real-time
         # premarket data), 30-day average at the same minute-of-day from Alpaca historical
@@ -298,7 +305,6 @@ class LiveVwapRunner:
                 except Exception as e:
                     logger.debug(f"  rel-vol compute failed for {g['symbol']}: {e}")
             g['rel_vol'] = rv if rv is not None else DEFAULT_REL_VOL
-            g['float_shares'] = None
             # Same filter the sim applies — skip thin-volume candidates.
             if g['rel_vol'] < self.config.min_relative_volume:
                 logger.info(f"  SKIP {g['symbol']} gap={g['gap_pct']:.1f}% "
@@ -309,6 +315,11 @@ class LiveVwapRunner:
         if not filtered:
             logger.warning("No gappers passed news filter.")
             return
+
+        # Float (display/data-quality only, see note above self._floats init).
+        fetch_missing_floats([g['symbol'] for g in filtered], self._floats)
+        for g in filtered:
+            g['float_shares'] = self._floats.get(g['symbol'])
 
         self.state.watchlist = rank_candidates(filtered)[:WATCH_TOP_N]
         logger.info(f"\n>>> VWAP WATCHLIST ({len(self.state.watchlist)}):")

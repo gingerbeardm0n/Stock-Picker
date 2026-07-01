@@ -466,3 +466,93 @@ def compute_rel_vol(
     if quote_volume is None or quote_volume <= 0:
         return DEFAULT_REL_VOL
     return quote_volume / base
+
+
+def fetch_missing_floats(symbols: list[str], floats: dict[str, int]) -> dict[str, int]:
+    """Fetch float_shares via yfinance for `symbols` not already in `floats`.
+
+    Weekly bulk refresh (build_baseline_cloud.py, GitHub Actions daily 4:30pm ET)
+    covers symbols already in the Neon rel_vol_baselines table. This covers the
+    gap: a brand-new gapper never seen before has no baseline row at all, so its
+    float silently stays None and the max_float filter no-ops for it — exactly
+    the micro-float pump candidates that filter exists to catch.
+
+    Only ever called with the current scan's short-listed candidates (post gap/
+    news/rel-vol filtering, typically <20 symbols) — cheap even at yfinance's
+    ~1.2s/request rate limit. Mutates and returns `floats` in place. Writes
+    fetched values back to Neon (+ registers the symbol in active_symbols) so
+    the nightly job picks it up for a real avg_volume baseline next run instead
+    of re-fetching float forever.
+    """
+    missing = [s for s in symbols if s not in floats]
+    if not missing:
+        return floats
+
+    try:
+        import yfinance as yf
+    except ImportError:
+        logger.warning("yfinance not installed — cannot live-fetch float for %s", missing)
+        return floats
+
+    import time as _time
+    fetched: dict[str, int] = {}
+    for sym in missing:
+        try:
+            info = yf.Ticker(sym).info
+            raw = info.get("floatShares")
+            if raw and raw > 0:
+                fetched[sym] = int(raw)
+                floats[sym] = int(raw)
+        except Exception as e:
+            logger.debug("Live float fetch failed for %s: %s", sym, e)
+        _time.sleep(1.2)  # yfinance rate limit, ~50 req/min
+
+    if fetched:
+        logger.info(
+            "Live float fetch: %d/%d new symbol(s) resolved (%s)",
+            len(fetched), len(missing), ", ".join(fetched),
+        )
+        _upsert_floats_to_neon(fetched)
+    return floats
+
+
+def _upsert_floats_to_neon(floats: dict[str, int]) -> None:
+    """Best-effort write-back so a live-fetched float isn't re-fetched every scan.
+
+    New symbol -> placeholder avg_volume=0 (nothing live reads avg_volume from
+    Neon anymore, HybridRelVol replaced that path) + registered in active_symbols
+    so tonight's build_baseline_cloud.py computes a real avg_volume for it.
+    Existing symbol -> only float_shares/float_fetched_at touched, avg_volume
+    left untouched.
+    """
+    conn_str = os.getenv("NEON_CONNECTION_STRING", "")
+    if not conn_str or not floats:
+        return
+    try:
+        import psycopg2
+        from psycopg2.extras import execute_values
+        from datetime import date
+
+        conn = psycopg2.connect(conn_str, connect_timeout=5)
+        cur = conn.cursor()
+
+        baseline_rows = [(sym, 0.0, date.today(), fs) for sym, fs in floats.items()]
+        execute_values(cur, """
+            INSERT INTO rel_vol_baselines (symbol, avg_volume, as_of, float_shares, float_fetched_at)
+            VALUES %s
+            ON CONFLICT (symbol) DO UPDATE SET
+                float_shares = EXCLUDED.float_shares,
+                float_fetched_at = now()
+        """, baseline_rows, template="(%s, %s, %s, %s, now())")
+
+        symbol_rows = [(sym, date.today()) for sym in floats]
+        execute_values(cur, """
+            INSERT INTO active_symbols (symbol, added_on)
+            VALUES %s
+            ON CONFLICT (symbol) DO UPDATE SET updated_at = now()
+        """, symbol_rows)
+
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning("Float write-back to Neon failed: %s", e)
