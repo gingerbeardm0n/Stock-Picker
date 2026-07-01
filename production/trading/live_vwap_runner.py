@@ -327,6 +327,44 @@ class LiveVwapRunner:
             logger.info(f"  #{i+1} {c['symbol']:6s} gap={c['gap_pct']:.1f}% "
                         f"news={c.get('news_tier', '?')} score={c.get('scalp_score', 0):.3f}")
 
+    def _write_live_state(self):
+        """Write vwap_state.json as trades happen, not just once the whole
+        session function returns — see live_scalp_runner._write_live_state
+        for why (dashboard showed stale premarket data for the entire
+        trading window otherwise)."""
+        import json as _json
+        state_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "vwap_state.json"
+        watchlist = []
+        for c in (self.state.watchlist or []):
+            watchlist.append({k: c.get(k) for k in (
+                'symbol', 'gap_pct', 'open_price', 'prior_close', 'rel_vol',
+                'float_shares', 'has_news', 'news_tier', 'scalp_score', 'quote_volume',
+            )})
+        top_sym = self.state.watchlist[0]['symbol'] if self.state.watchlist else None
+        completed = self.state.completed_trades or []
+        total_pnl = sum(t.get('pnl', 0) for t in completed) if completed else self.state.pnl
+        try:
+            state_file.write_text(_json.dumps({
+                "last_run": datetime.utcnow().isoformat(),
+                "strategy": "vwap_reclaim",
+                "date": str(datetime.now(ET).date()),
+                "last_result": "trade" if completed or (self.state.entry_price or 0) > 0 else "scanning",
+                "symbol": self.state.symbol,
+                "top_pick": self.state.symbol or top_sym,
+                "entry_price": self.state.entry_price,
+                "exit_price": self.state.exit_price,
+                "pnl": total_pnl,
+                "shares": self.state.shares,
+                "bars_held": self.state.bars_held,
+                "exit_reason": self.state.exit_reason,
+                "positions": self.state.positions,
+                "watchlist": watchlist,
+                "completed_trades": completed,
+                "trade_count": len(completed),
+            }, default=str))
+        except Exception as e:
+            logger.warning(f"_write_live_state failed (non-fatal): {e}")
+
     # ── Phase 2: Bar-by-bar watch + trade ─────────────────────────────────────
 
     def execute(self):
@@ -620,7 +658,7 @@ class LiveVwapRunner:
                         }
                         self._record_trade(
                             symbol, mkt_fill.filled_price, 'STOP_REJECTED_MARKET_EXIT')
-                        return
+                        return  # _record_trade already wrote live state
                     logger.error(
                         f"    [{symbol}] Emergency market exit NOT FILLED "
                         f"(status={mkt_fill.status}) — position UNHEDGED")
@@ -640,6 +678,7 @@ class LiveVwapRunner:
         # Backward-compat single-trade fields (most recent entry)
         self.state.symbol = symbol
         self.state.entry_price = entry_price
+        self._write_live_state()
 
     def _place_exit(self, symbol: str, bar: dict, exit_signal: dict):
         pos = self.state.positions.get(symbol)
@@ -729,6 +768,7 @@ class LiveVwapRunner:
         self.state.pnl = sum(t['pnl'] for t in self.state.completed_trades)
         self.state.shares = pos['shares']
         self.state.bars_held = pos['bars_held']
+        self._write_live_state()
 
         # Release cross-strategy claim
         self._clear_active_position(symbol)

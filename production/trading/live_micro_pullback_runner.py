@@ -558,6 +558,7 @@ class LiveMicroPullbackRunner:
         self.state.highest_since_entry = float(bar['high'])
         self.state.bars_held = 0
         # Position already claimed atomically at top of _place_entry via _claim_position.
+        self._write_live_state()
 
     def _place_exit(self, symbol: str, bar: dict, exit_signal: dict):
         exit_price = exit_signal.get('exit_price', float(bar['close']))
@@ -625,6 +626,55 @@ class LiveMicroPullbackRunner:
         self.state.stop_order_id = ''
         self.state.highest_since_entry = 0.0
         self.state.bars_held = 0
+        self._write_live_state()
+
+    def _write_live_state(self):
+        """Write micro_pullback_state.json as trades happen, not just once
+        the whole session function returns — see
+        live_scalp_runner._write_live_state for why."""
+        import json as _json
+        state_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "micro_pullback_state.json"
+        watchlist = []
+        for c in (self.state.watchlist or []):
+            watchlist.append({k: c.get(k) for k in (
+                'symbol', 'gap_pct', 'open_price', 'prior_close', 'rel_vol',
+                'float_shares', 'has_news', 'news_tier', 'scalp_score', 'quote_volume',
+            )})
+        completed = self.state.completed_trades or []
+        last = completed[-1] if completed else {}
+        in_position = self.state.in_position
+        # Prefer live in-position fields; fall back to the last completed
+        # trade's fields once the position resets (so a closed trade's
+        # entry/exit/reason still shows instead of blanks).
+        symbol = self.state.symbol or last.get('symbol') or None
+        entry_price = self.state.entry_price or last.get('entry_price')
+        exit_price = self.state.exit_price if not in_position else None
+        shares = self.state.shares or last.get('shares')
+        bars_held = self.state.bars_held if in_position else last.get('bars_held')
+        exit_reason = self.state.exit_reason or last.get('reason', '')
+        total_pnl = sum(t.get('pnl', 0) for t in completed) if completed else 0
+        try:
+            state_file.write_text(_json.dumps({
+                "last_run": datetime.utcnow().isoformat(),
+                "strategy": "micro_pullback",
+                "date": str(datetime.now(ET).date()),
+                "last_result": "trade" if completed else "scanning",
+                "watchlist": watchlist,
+                "completed_trades": completed,
+                "trade_count": len(completed),
+                "pnl": total_pnl,
+                "trade_done": self.state.trade_done,
+                "top_pick": symbol,
+                "symbol": symbol,
+                "entry_price": entry_price,
+                "exit_price": exit_price,
+                "stop_price": self.state.stop_price,
+                "shares": shares,
+                "bars_held": bars_held,
+                "exit_reason": exit_reason,
+            }, default=str))
+        except Exception as e:
+            logger.warning(f"_write_live_state failed (non-fatal): {e}")
 
     def _enrich_with_news(self, candidates: list[dict]):
         today = datetime.now(ET).date()

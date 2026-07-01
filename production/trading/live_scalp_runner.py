@@ -518,6 +518,44 @@ class LiveScalpRunner:
             logger.warning("No candidates after refresh. No trade today.")
             self.state.trade_done = True
 
+    def _write_live_state(self):
+        """Write state.json as trades happen, not just once the whole session
+        function returns. Without this, /dashboard shows stale premarket-scan
+        data for the entire ~10-20min trading window even on a normal day —
+        found 2026-07-01 when Alpaca showed 6 closed round-trips while the
+        dashboard still read stage=ARMED, position=null."""
+        import json as _json
+        state_file = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "state.json"
+        candidates = []
+        for c in (self.state.candidates or []):
+            candidates.append({k: c.get(k) for k in (
+                'symbol', 'gap_pct', 'open_price', 'prior_close', 'rel_vol',
+                'float_shares', 'has_news', 'news_tier', 'scalp_score', 'quote_volume',
+            )})
+        top = self.state.top_pick
+        top_sym = (top.get('symbol') if isinstance(top, dict) else top) if top else None
+        first = self.state.completed_trades[0] if self.state.completed_trades else {}
+        try:
+            state_file.write_text(_json.dumps({
+                "last_run": datetime.utcnow().isoformat(),
+                "strategy": "opening_bell_scalp",
+                "last_result": "trade" if self.state.completed_trades else "scanning",
+                "date": str(datetime.now(ET).date()),
+                "candidates": candidates,
+                "top_pick": top_sym,
+                "positions": self.state.positions,
+                "completed_trades": self.state.completed_trades,
+                "trade_count": len(self.state.completed_trades),
+                "pnl": self.state.pnl,
+                "entry_price": first.get('entry_price'),
+                "exit_price": first.get('exit_price'),
+                "shares": first.get('shares'),
+                "bars_held": first.get('bars_held'),
+                "exit_reason": first.get('exit_reason', ''),
+            }, default=str))
+        except Exception as e:
+            logger.warning(f"_write_live_state failed (non-fatal): {e}")
+
     # ── Phase 2: Execute trade (9:30 - 9:40) ────────────────────────────────
 
     def execute_trade(self):
@@ -632,6 +670,9 @@ class LiveScalpRunner:
                             self.state.pnl += trade['pnl']
                             self.state.trade_count += 1
                             del open_positions[sym]
+                            self.state.positions.pop(sym, None)
+                            self.state.completed_trades = completed_trades
+                            self._write_live_state()
                         except Exception as e:
                             # Don't let one symbol's failure skip the rest.
                             logger.error(f"  [{sym}] Emergency exit failed: {e}", exc_info=True)
@@ -683,6 +724,9 @@ class LiveScalpRunner:
                         self.state.pnl += trade['pnl']
                         self.state.trade_count += 1
                         self.state.in_position = bool(open_positions)
+                        self.state.positions.pop(sym, None)
+                        self.state.completed_trades = completed_trades
+                        self._write_live_state()
                     except Exception as e:
                         # A single symbol's exit failure must NOT crash the monitor
                         # loop and orphan the other open positions (root cause of the
@@ -715,9 +759,13 @@ class LiveScalpRunner:
                             self.state.pnl += trade['pnl']
                             self.state.trade_count += 1
                             meta['done'] = True
+                            self.state.completed_trades = completed_trades
+                            self._write_live_state()
                         elif pos:
                             open_positions[sym] = pos
                             self.state.in_position = True
+                            self.state.positions[sym] = pos
+                            self._write_live_state()
                 elif n == 1:
                     logger.info(f"  [{sym}] Concurrent limit ({MAX_CONCURRENT}) reached — watching only")
 
