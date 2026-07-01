@@ -266,6 +266,10 @@ def build_journal(session_date: date, session_dir: Path) -> str:
     trades_raw = _load(session_dir / f"{prefix}_trades.json") or []
     logs_raw   = _load(session_dir / f"{prefix}_logs.json") or []
 
+    # Normalise trades (GET /trades returns {"trades": [...]} wrapper, not a bare list)
+    if isinstance(trades_raw, dict):
+        trades_raw = trades_raw.get("trades") or []
+
     # Normalise logs (may be list of dicts or {"logs": [...]} wrapper)
     if isinstance(logs_raw, dict):
         logs_raw = logs_raw.get("logs") or []
