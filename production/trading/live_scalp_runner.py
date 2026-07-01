@@ -781,7 +781,7 @@ class LiveScalpRunner:
             if fill.status == 'filled':
                 entry_price = fill.filled_price
                 shares = fill.filled_qty
-                logger.info(f"    FILLED: {shares} @ ${entry_price:.2f}")
+                logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
             else:
                 logger.info(f"    Order status: {fill.status} -- waiting...")
                 for _ in range(5):
@@ -790,7 +790,7 @@ class LiveScalpRunner:
                     if fill.status == 'filled':
                         entry_price = fill.filled_price
                         shares = fill.filled_qty
-                        logger.info(f"    FILLED: {shares} @ ${entry_price:.2f}")
+                        logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
                         break
                 else:
                     logger.warning(f"    [{symbol}] Entry not filled after 10s. Cancelling.")
@@ -902,7 +902,7 @@ class LiveScalpRunner:
             fill = self.broker.get_order(result.order_id)
             if fill.status == 'filled':
                 exit_price = fill.filled_price
-                logger.info(f"    FILLED: {fill.filled_qty} @ ${exit_price:.2f}")
+                logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
 
         pnl = (exit_price - pos['entry_price']) * pos['shares']
         logger.info(f"    P&L: ${pnl:+.2f}")

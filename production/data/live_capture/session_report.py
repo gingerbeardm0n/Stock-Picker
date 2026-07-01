@@ -97,6 +97,11 @@ def persist_trades(trade_date: str, rows: list[dict]):
     if not DB_DSN:
         print('[warn] DB_DSN not set — skipping trade persistence')
         return
+    for r in rows:
+        if not r.get('strategy'):
+            print(f"[warn] {r.get('symbol')}: strategy never resolved (missing Reason: tag "
+                  f"line?) — defaulting to 'unknown' so persistence doesn't fail")
+            r['strategy'] = 'unknown'
     conn = psycopg2.connect(DB_DSN)
     try:
         with conn:
@@ -127,15 +132,57 @@ def persist_trades(trade_date: str, rows: list[dict]):
 
 
 # ── Log parsing ─────────────────────────────────────────────────────────────
+#
+# Three runners, two log shapes:
+#   scalp:            >>> ENTRY [SYMBOL]: N shares @ $price   (symbol in brackets)
+#   vwap / mp:         >>> ENTRY: N shares of SYMBOL @ $price  (identical for both —
+#                       disambiguated by the Reason: tag on the very next line:
+#                       "Reason: VWAP_RECLAIM ..." vs "Reason: MICRO_PULLBACK ...")
+#
+# Trades are tracked in a dict keyed by symbol (not a single "current" var) so
+# scalp's concurrent multi-candidate positions, and VWAP/micro-pullback running
+# on separate threads at the same time, don't clobber each other. All 3 runners'
+# FILLED lines were patched (this session) to include the symbol, so a bare
+# "FILLED: SYMBOL N @ $price" line can always be routed to the right open trade.
 
-ENTRY_RE = re.compile(r'>>> ENTRY: (\d+) shares of (\w+) @ \$([\d.]+)')
-REASON_RE = re.compile(r'Reason: (\S+)')
-FILLED_RE = re.compile(r'FILLED: (\d+) @ \$([\d.]+)')
-EXIT_SUMMARY_KEYS = ('Exit:', 'P&L:', 'Bars held:', 'Reason:')
+ENTRY_BRACKET_RE = re.compile(r'>>> ENTRY \[(\w+)\]: (\d+) shares @ \$([\d.]+)')      # scalp
+ENTRY_OF_RE       = re.compile(r'>>> ENTRY: (\d+) shares of (\w+) @ \$([\d.]+)')      # vwap / mp
+EXIT_BRACKET_RE   = re.compile(r'>>> EXIT \[(\w+)\]: (\d+) shares @ \$([\d.]+)')      # scalp
+EXIT_OF_RE        = re.compile(r'>>> EXIT: (\d+) shares of (\w+) @ \$([\d.]+)')       # vwap / mp
+FILLED_RE         = re.compile(r'FILLED: (\w+) (\d+) @ \$([\d.]+)')                   # any strategy (symbol-tagged)
+SCALP_PNL_RE      = re.compile(r'^\s*P&L: \$([+-][\d,.]+)')                           # scalp's bare per-trade P&L line
+TRADE_SUMMARY_RE  = re.compile(r'Trade #\d+: (\w+) P&L \$([+-][\d,.]+) \((.+)\)')     # vwap/mp's close event (symbol+pnl+reason together)
+REASON_TAG_RE     = re.compile(r'Reason: (VWAP_RECLAIM|MICRO_PULLBACK)')
+STOP_RE           = re.compile(r'Stop: \$([\d.]+)')
+
+
+def fetch_logs_from_neon(run_date: str) -> list[dict]:
+    """Read the full session log from Neon's durable session_logs table.
+
+    /logs is an in-memory ring buffer (max 500 lines) that resets to empty
+    on every Render restart/redeploy — by the time this script runs, hours
+    after the actual trades, it usually only has a handful of lines from the
+    most recent restart. session_logs is written in real time and survives
+    deploys, so it's the only reliable source for a full day's log once any
+    redeploy has happened since the trades occurred.
+    """
+    if not DB_DSN:
+        return []
+    conn = psycopg2.connect(DB_DSN)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT logged_at, message FROM session_logs "
+                "WHERE run_date = %s ORDER BY logged_at",
+                (run_date,),
+            )
+            return [{'t': str(t), 'msg': msg} for t, msg in cur.fetchall()]
+    finally:
+        conn.close()
 
 
 def fetch_logs(count: int = 400) -> list[dict]:
-    r = requests.get(f'{DASHBOARD}/logs', params={'count': count},
+    r = requests.get(f'{DASHBOARD}/logs', params={'n': count},
                      headers={'X-API-Key': API_KEY}, timeout=30)
     r.raise_for_status()
     return r.json()['logs']
@@ -143,51 +190,132 @@ def fetch_logs(count: int = 400) -> list[dict]:
 
 def parse_trades(logs: list[dict]) -> list[dict]:
     """
-    Walk the session log and extract trade lifecycles:
-    decision (ENTRY line price = decision price), paper fill, paper exit.
-    Strategy attribution: ENTRY lines before 'VWAP RECLAIM SESSION STARTING'
-    belong to the scalp, after it to the vwap runner.
+    Walk the session log and extract trade lifecycles for all 3 live strategies
+    (scalp, vwap, micro_pullback), correctly attributed even when trades from
+    different strategies (or multiple scalp candidates) are open concurrently.
+
+    Design:
+      - Open trades are tracked in `open_trades`, keyed by SYMBOL (not a single
+        "current" variable) — scalp can hold several concurrent candidate
+        positions, and VWAP + micro-pullback run on separate threads that can
+        each have a fill in flight at the same time. A dict keyed by symbol
+        handles both without one trade's data clobbering another's.
+      - scalp's ENTRY/EXIT lines self-identify their symbol in brackets
+        (">>> ENTRY [SYM]: ..."), so there's no ambiguity for scalp at all.
+      - VWAP and micro-pullback share the exact same ENTRY/EXIT wording
+        (">>> ENTRY: N shares of SYM @ $price", no strategy tag) — the very
+        next "Reason: VWAP_RECLAIM ..." or "Reason: MICRO_PULLBACK ..." line
+        is what tells them apart. `pending_of_symbol` holds the symbol from
+        the most recent "of SYM"-style entry until that Reason line arrives.
+      - All 3 runners' FILLED lines were patched to include the symbol
+        (this session), so every "FILLED: SYM N @ $price" line can be routed
+        to the correct open trade even with several in flight at once.
+      - VWAP/micro-pullback additionally print a single unambiguous close
+        event when a trade finishes: "Trade #N: SYM P&L $+X.XX (reason)" —
+        used directly instead of trying to track every possible exit-fill
+        wording (limit fill, market fallback, stop-filled-during-cancel all
+        route through this one line via _record_trade()).
+      - scalp has no equivalent combined close line; its EXIT[SYM] line and
+        the plain "P&L: $+X.XX" line that follows it are paired via
+        `last_scalp_exit_symbol`, safe because scalp processes one bar-driven
+        action at a time within a single thread (no other EXIT can interleave
+        before its own P&L line is printed).
     """
-    trades = []
-    current = None
-    strategy = 'scalp'
+    trades: list[dict] = []
+    open_trades: dict[str, dict] = {}
+    pending_of_symbol: str | None = None
+    last_scalp_exit_symbol: str | None = None
+
+    def _new_trade(strategy, symbol, shares, price, t):
+        tr = {
+            'strategy': strategy, 'symbol': symbol, 'shares': shares,
+            'decision_price': price, 'decision_time': t,
+            'paper_fill': None, 'paper_exit': None, 'paper_pnl': None,
+            'exit_reason': None, 'stop_price': None,
+        }
+        open_trades[symbol] = tr
+        trades.append(tr)
+        return tr
+
     for entry in logs:
         msg = entry['msg']
-        if 'VWAP RECLAIM SESSION STARTING' in msg:
-            strategy = 'vwap'
-        m = ENTRY_RE.search(msg)
+        t = entry['t']
+
+        m = ENTRY_BRACKET_RE.search(msg)
         if m:
-            current = {
-                'strategy': strategy,
-                'symbol': m.group(2),
-                'shares': int(m.group(1)),
-                'decision_price': float(m.group(3)),
-                'decision_time': entry['t'],
-                'paper_fill': None,
-                'paper_exit': None,
-                'paper_pnl': None,
-                'exit_reason': None,
-            }
-            trades.append(current)
+            sym = m.group(1)
+            _new_trade('scalp', sym, int(m.group(2)), float(m.group(3)), t)
             continue
-        if current is None:
+
+        m = ENTRY_OF_RE.search(msg)
+        if m:
+            sym = m.group(2)
+            # strategy filled in once the Reason: tag line arrives, below
+            _new_trade(None, sym, int(m.group(1)), float(m.group(3)), t)
+            pending_of_symbol = sym
             continue
+
+        m = REASON_TAG_RE.search(msg)
+        if m and pending_of_symbol and pending_of_symbol in open_trades:
+            tag = m.group(1)
+            open_trades[pending_of_symbol]['strategy'] = (
+                'vwap' if tag == 'VWAP_RECLAIM' else 'micro_pullback'
+            )
+            continue
+
+        if pending_of_symbol:
+            m = STOP_RE.search(msg)
+            if m:
+                open_trades[pending_of_symbol]['stop_price'] = float(m.group(1))
+                pending_of_symbol = None  # stop line always closes out the ENTRY/Reason/Stop triplet
+                continue
+
         m = FILLED_RE.search(msg)
-        if m and current['paper_fill'] is None:
-            current['paper_fill'] = float(m.group(2))
-            current['shares'] = int(m.group(1))
+        if m:
+            sym = m.group(1)
+            tr = open_trades.get(sym)
+            if tr:
+                if tr['paper_fill'] is None:
+                    tr['paper_fill'] = float(m.group(3))
+                    tr['shares'] = int(m.group(2))
+                elif tr['paper_exit'] is None:
+                    tr['paper_exit'] = float(m.group(3))
             continue
-        if 'Exit:' in msg:
-            pm = re.search(r'\$([\d.]+)', msg)
-            if pm:
-                current['paper_exit'] = float(pm.group(1))
-        elif 'P&L:' in msg:
-            pm = re.search(r'\$([+-][\d,.]+)', msg)
-            if pm:
-                current['paper_pnl'] = float(pm.group(1).replace(',', ''))
-        elif 'Reason:' in msg and current['paper_exit'] is not None:
-            current['exit_reason'] = msg.split('Reason:')[1].strip()
-            current = None  # trade closed
+
+        m = TRADE_SUMMARY_RE.search(msg)
+        if m:
+            sym, pnl_str, reason = m.group(1), m.group(2), m.group(3)
+            tr = open_trades.pop(sym, None)
+            if tr:
+                pnl = float(pnl_str.replace(',', ''))
+                tr['paper_pnl'] = pnl
+                tr['exit_reason'] = reason
+                if tr['paper_exit'] is None and tr['paper_fill'] is not None and tr['shares']:
+                    tr['paper_exit'] = tr['paper_fill'] + pnl / tr['shares']
+            continue
+
+        m = EXIT_BRACKET_RE.search(msg)
+        if m:
+            last_scalp_exit_symbol = m.group(1)
+            continue
+
+        m = SCALP_PNL_RE.search(msg)
+        if m and last_scalp_exit_symbol:
+            tr = open_trades.pop(last_scalp_exit_symbol, None)
+            if tr:
+                pnl = float(m.group(1).replace(',', ''))
+                tr['paper_pnl'] = pnl
+                if tr['paper_exit'] is None and tr['paper_fill'] is not None and tr['shares']:
+                    tr['paper_exit'] = tr['paper_fill'] + pnl / tr['shares']
+            last_scalp_exit_symbol = None
+            continue
+
+        if 'Reason:' in msg and last_scalp_exit_symbol:
+            # scalp's exit reason line (comes before the P&L line)
+            sym = last_scalp_exit_symbol
+            if sym in open_trades:
+                open_trades[sym]['exit_reason'] = msg.split('Reason:')[1].strip()
+
     return trades
 
 
@@ -301,28 +429,35 @@ def main():
         except Exception as e:
             print(f'[warn] bar pull failed: {e}')
 
-    # 2. Parse trades from logs
-    logs = fetch_logs()
+    # 2. Parse trades from logs — prefer Neon's durable session_logs (survives
+    # deploys) over the /logs ring buffer, which resets to empty on every
+    # Render restart and is usually already wiped by the time this runs.
+    logs = fetch_logs_from_neon(args.date)
+    if not logs:
+        print('[info] no Neon session_logs for this date — falling back to /logs ring buffer')
+        logs = fetch_logs()
     trades = parse_trades(logs)
+    # An ENTRY line gets logged for every attempt, including ones that never
+    # filled (missed limit, cancelled, ran away) — those never get a
+    # paper_pnl (no exit ever happens for a position that was never opened),
+    # so this filter keeps only trades that actually completed.
+    total_attempts = len(trades)
+    trades = [t for t in trades if t['paper_pnl'] is not None]
+    skipped = total_attempts - len(trades)
+    if skipped:
+        print(f'[info] {skipped} entry attempt(s) never filled/closed — excluded from report')
     if not trades:
-        print('No trades found in session logs.')
+        print('No completed trades found in session logs.')
         return
 
-    # Parse stop prices for vwap trades from the log (line: Stop: $5.78 ...)
-    for entry in logs:
-        m = re.search(r'Stop: \$([\d.]+) \(VWAP', entry['msg'])
-        if m:
-            for t in trades:
-                if t['strategy'] == 'vwap' and t.get('stop_price') is None:
-                    t['stop_price'] = float(m.group(1))
 
     # 3. Replay each against the real tape
     print(f"\n{'=' * 78}")
     print(f"  SESSION REPORT {args.date} — paper vs live-counterfactual")
     print(f"{'=' * 78}")
-    print(f"{'strategy':>8} {'sym':>6} {'decision':>9} {'paper fill':>10} "
+    print(f"{'strategy':>14} {'sym':>6} {'decision':>9} {'paper fill':>10} "
           f"{'paper exit':>10} {'paper P&L':>10} | {'cf exit':>8} {'cf P&L':>10} {'cf reason':>14}")
-    print('-' * 105)
+    print('-' * 111)
 
     total_paper, total_cf = 0.0, 0.0
     for t in trades:
@@ -334,14 +469,14 @@ def main():
         total_paper += paper_pnl
         cf_pnl = cf['cf_pnl'] if cf else 0.0
         total_cf += cf_pnl
-        print(f"{t['strategy']:>8} {t['symbol']:>6} {t['decision_price']:>9.2f} "
+        print(f"{(t['strategy'] or '?'):>14} {t['symbol']:>6} {t['decision_price']:>9.2f} "
               f"{t['paper_fill'] or 0:>10.2f} {t['paper_exit'] or 0:>10.2f} "
               f"{paper_pnl:>+10.2f} | "
               f"{(cf['cf_exit'] if cf else 0):>8.2f} {cf_pnl:>+10.2f} "
               f"{(cf['cf_reason'] if cf else 'no tape'):>14}")
 
-    print('-' * 105)
-    print(f"{'TOTAL':>26} {'':>21} {total_paper:>+10.2f} | {'':>8} {total_cf:>+10.2f}")
+    print('-' * 111)
+    print(f"{'TOTAL':>32} {'':>21} {total_paper:>+10.2f} | {'':>8} {total_cf:>+10.2f}")
     print(f"\n  Sandbox distortion (paper - counterfactual): {total_paper - total_cf:+.2f}")
 
     # 4. Persist to DB

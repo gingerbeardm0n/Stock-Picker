@@ -535,7 +535,7 @@ class LiveVwapRunner:
             if fill.status == 'filled':
                 entry_price = fill.filled_price
                 shares = fill.filled_qty
-                logger.info(f"    FILLED: {shares} @ ${entry_price:.2f}")
+                logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
             else:
                 logger.warning("    Entry not filled after 12s. Cancelling.")
                 cancelled = self.broker.cancel_order(result.order_id)
@@ -583,7 +583,7 @@ class LiveVwapRunner:
                     if fill2.status == 'filled':
                         entry_price = fill2.filled_price
                         shares = fill2.filled_qty
-                        logger.info(f"    MARKET FILLED: {shares} @ ${entry_price:.2f}")
+                        logger.info(f"    MARKET FILLED: {symbol} {shares} @ ${entry_price:.2f}")
                     else:
                         logger.warning(f"    [{symbol}] Market order also failed. Skipping.")
                         self.state.traded_symbols.append(symbol)
@@ -678,7 +678,7 @@ class LiveVwapRunner:
                 fill = self.broker.get_order(result.order_id)
                 if fill.status == 'filled':
                     exit_price = fill.filled_price
-                    logger.info(f"    FILLED: {fill.filled_qty} @ ${exit_price:.2f}")
+                    logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
                 else:
                     logger.warning(
                         f"    Limit sell unfilled after 5s (status={fill.status}) — "
@@ -689,7 +689,7 @@ class LiveVwapRunner:
                     fill2 = self.broker.get_order(result2.order_id)
                     if fill2.status == 'filled':
                         exit_price = fill2.filled_price
-                        logger.info(f"    Market fallback FILLED: {fill2.filled_qty} @ ${exit_price:.2f}")
+                        logger.info(f"    Market fallback FILLED: {symbol} {fill2.filled_qty} @ ${exit_price:.2f}")
             else:
                 result = self.broker.place_market_sell(symbol, pos['shares'])
                 logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
@@ -697,7 +697,7 @@ class LiveVwapRunner:
                 fill = self.broker.get_order(result.order_id)
                 if fill.status == 'filled':
                     exit_price = fill.filled_price
-                    logger.info(f"    FILLED: {fill.filled_qty} @ ${exit_price:.2f}")
+                    logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
 
         self._record_trade(symbol, exit_price, exit_signal.get('reason', '?'))
 
