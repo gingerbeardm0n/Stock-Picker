@@ -312,6 +312,137 @@ class TradierRelVol:
                 self._cache.pop(symbol, None)
 
 
+class HybridRelVol:
+    """Rel-vol matching the simulator's 30-day denominator: today's cumulative
+    volume (Tradier, real-time) over a 30-day average at the same minute-of-day
+    (Alpaca historical minute bars, same source `rel_vol_cum_cache` was built
+    from — free tier, 7+ years back, no same-day SIP clamp issue since we only
+    need PRIOR days here).
+
+    Tradier's free tier only reaches ~6 trading days back for premarket
+    timesales, which was the reason TradierRelVol defaulted to a 5-day
+    denominator (see rel-vol-lookback-research memory: Ross Cameron's own
+    material names 7/14/30-day windows and states a preference for longer,
+    the sim/`rel_vol_cum_cache` build already uses 30 days). Splitting the
+    numerator and denominator across two data sources closes that gap without
+    needing a paid tier.
+    """
+
+    def __init__(self, tradier_feed, alpaca_feed, lookback_days: int = 30):
+        self._tradier = tradier_feed
+        self._alpaca = alpaca_feed
+        self._lookback = lookback_days
+        self._raw_bars: dict[str, list] = {}   # symbol -> concatenated historical bars
+        self._fetch_failed: set[str] = set()    # symbols with no Alpaca history (don't retry)
+        self._cache: dict[str, float] = {}      # symbol -> rel_vol (computed this session)
+        self._lock = threading.Lock()
+
+    def _numerator(self, symbol: str, now_et, cutoff_minute: int) -> float | None:
+        """Today's cumulative volume 4am ET -> cutoff_minute, via Tradier timesales."""
+        start_et = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
+        try:
+            bars = self._tradier._fetch_timesales(
+                symbol,
+                start_et.strftime('%Y-%m-%d %H:%M'),
+                now_et.strftime('%Y-%m-%d %H:%M'),
+            )
+        except Exception as e:
+            logger.debug("HybridRelVol numerator fetch failed for %s: %s", symbol, e)
+            return None
+        if not bars:
+            return None
+
+        import pytz
+        ET = pytz.timezone('America/New_York')
+        total = 0
+        for b in bars:
+            et = b.time.astimezone(ET)
+            mod = et.hour * 60 + et.minute
+            if 240 <= mod <= cutoff_minute:
+                total += b.volume
+        return total
+
+    def _ensure_history(self, symbols: list[str]) -> None:
+        missing = [s for s in symbols if s not in self._raw_bars and s not in self._fetch_failed]
+        if not missing:
+            return
+        bars_by_sym = self._alpaca.get_historical_minute_bars(
+            missing, lookback_days=self._lookback)
+        with self._lock:
+            for s in missing:
+                bars = bars_by_sym.get(s)
+                if bars:
+                    self._raw_bars[s] = bars
+                else:
+                    self._fetch_failed.add(s)
+
+    def _denominator(self, symbol: str, cutoff_minute: int) -> float | None:
+        """30-day average cumulative volume at the same minute-of-day, via Alpaca history."""
+        self._ensure_history([symbol])
+        bars = self._raw_bars.get(symbol)
+        if not bars:
+            return None
+
+        import pytz
+        ET = pytz.timezone('America/New_York')
+        by_day: dict = defaultdict(int)
+        for b in bars:
+            et = b.time.astimezone(ET)
+            mod = et.hour * 60 + et.minute
+            if 240 <= mod <= cutoff_minute:
+                by_day[et.date()] += b.volume
+
+        vols = sorted(by_day.items())[-self._lookback:]
+        vols = [v for _d, v in vols if v > 0]
+        if not vols:
+            return None
+        return sum(vols) / len(vols)
+
+    def compute(
+        self, symbol: str, now_et, cutoff_minute: int | None = None
+    ) -> float | None:
+        """Same signature/semantics as TradierRelVol.compute() — drop-in replacement.
+
+        None -> caller falls back to DEFAULT_REL_VOL=10.0. Cached per symbol per session.
+        """
+        import pytz
+        ET = pytz.timezone('America/New_York')
+        now_et = now_et.astimezone(ET)
+
+        with self._lock:
+            if symbol in self._cache:
+                return self._cache[symbol]
+
+        now_minute = now_et.hour * 60 + now_et.minute
+        if cutoff_minute is None:
+            cutoff_minute = now_minute
+        else:
+            cutoff_minute = min(cutoff_minute, now_minute)
+        if cutoff_minute < 240:
+            return None
+
+        numerator = self._numerator(symbol, now_et, cutoff_minute)
+        if numerator is None:
+            return None
+        denominator = self._denominator(symbol, cutoff_minute)
+        if not denominator or denominator <= 0:
+            return None
+
+        rel_vol = numerator / denominator
+        with self._lock:
+            self._cache[symbol] = rel_vol
+        return rel_vol
+
+    def invalidate(self, symbol: str | None = None) -> None:
+        """Drop cached rel_vol (not history) so the next compute() re-fetches today's
+        numerator. Historical denominator bars stay cached for the whole session."""
+        with self._lock:
+            if symbol is None:
+                self._cache.clear()
+            else:
+                self._cache.pop(symbol, None)
+
+
 def compute_rel_vol(
     symbol: str,
     quote_volume: float | None,

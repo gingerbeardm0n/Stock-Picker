@@ -44,7 +44,7 @@ from trading.scalp_engine import evaluate_entry, evaluate_exit, get_premarket_hi
 from trading.scalp_ranker import rank_candidates, get_top_candidate, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_news
 from trading.broker.base import OrderResult
-from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol, RealtimeRelVolCache, DEFAULT_REL_VOL
+from trading.rel_vol_live import fetch_rel_vol_baseline, DEFAULT_REL_VOL
 from backend.news_fetcher import has_news_catalyst
 
 ET = pytz.timezone('America/New_York')
@@ -177,23 +177,24 @@ class LiveScalpRunner:
         if not self._floats:
             logger.warning("Float baseline empty — max_float filter INACTIVE this session (parity gap)")
 
-        # Live rel-vol: single-feed Tradier (numerator AND denominator from Tradier
-        # timesales). This replaces the broken Alpaca path — Alpaca quote snapshots carry
-        # NO volume (quote_volume was always 0 → rel_vol always 10.0). See rel_vol_live.py
-        # TradierRelVol and memory rel-vol-live-fix.
-        from trading.rel_vol_live import TradierRelVol
+        # Live rel-vol: hybrid feed — today's cumulative volume from Tradier
+        # (real-time premarket data, Alpaca can't serve same-day bars), 30-day
+        # average at the same minute-of-day from Alpaca historical minute bars
+        # (matches the simulator's rel_vol_cum_cache denominator exactly — see
+        # rel-vol-lookback-research memory). Replaces the 5-day Tradier-only
+        # denominator, which was a vendor-constraint stopgap, not a match for
+        # the 30-day window the sim was tuned against.
+        from trading.rel_vol_live import HybridRelVol
         self._relvol = None
         try:
-            self._relvol = TradierRelVol(
-                Config._make_tradier_data_feed(), lookback_days=5)
-            logger.info("Rel-vol: Tradier single-feed (5-day premarket denominator)")
+            self._relvol = HybridRelVol(
+                Config._make_tradier_data_feed(),
+                Config._make_alpaca_data_feed(),
+                lookback_days=30)
+            logger.info("Rel-vol: hybrid (Tradier numerator, Alpaca 30-day denominator)")
         except Exception as e:
             logger.warning(
-                f"TradierRelVol unavailable: {e} — rel_vol falls back to 10.0")
-
-        # Legacy Alpaca rel-vol path (kept only as a fallback denominator source).
-        self._realtime_rv_cache = RealtimeRelVolCache()
-        self._alpaca_hist_feed = None
+                f"HybridRelVol unavailable: {e} — rel_vol falls back to 10.0")
 
         # Symbol list for scanning
         self._symbols = self._load_symbols()
