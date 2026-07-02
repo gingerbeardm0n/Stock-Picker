@@ -72,7 +72,10 @@ jobs:
           python-version: '3.11'
 
       - name: Generate trade journal
+        env:
+          NEON_CONNECTION_STRING: ${{ secrets.NEON_CONNECTION_STRING }}
         run: |
+          pip install --quiet psycopg2-binary
           TODAY=$(date -u +%Y-%m-%d)
           echo "Generating trade journal for ${TODAY}..."
           python production/data/live_capture/generate_journal.py \

@@ -35,6 +35,37 @@ def _load(path: Path) -> dict | list | None:
         return None
 
 
+def _fetch_logs_from_neon(session_date: date) -> list[dict]:
+    """Read the day's full log from Neon session_logs (durable, survives
+    Render deploys). The /logs ring buffer captured to _logs.json is wiped
+    by any mid-day deploy, so prefer Neon when a connection string is set."""
+    dsn = os.getenv("NEON_CONNECTION_STRING") or os.getenv("DB_DSN")
+    if not dsn:
+        return []
+    try:
+        import psycopg2
+        conn = psycopg2.connect(dsn)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT logged_at, level, message FROM session_logs "
+                    "WHERE run_date = %s ORDER BY logged_at",
+                    (session_date.isoformat(),),
+                )
+                return [{"t": str(t), "level": lvl, "msg": msg}
+                        for t, lvl, msg in cur.fetchall()]
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[warn] Neon session_logs unavailable ({e}) — falling back to _logs.json")
+        return []
+
+
+def _fmt_date_long(session_date: date) -> str:
+    """'July 1, 2026' — portable replacement for '%-d' (Linux-only strftime)."""
+    return f"{session_date.strftime('%B')} {session_date.day}, {session_date.year}"
+
+
 def _fmt_pnl(pnl) -> str:
     if pnl is None:
         return "—"
@@ -264,7 +295,8 @@ def build_journal(session_date: date, session_dir: Path) -> str:
     prefix = str(session_date)
     dashboard = _load(session_dir / f"{prefix}_dashboard.json") or {}
     trades_raw = _load(session_dir / f"{prefix}_trades.json") or []
-    logs_raw   = _load(session_dir / f"{prefix}_logs.json") or []
+    logs_raw   = _fetch_logs_from_neon(session_date) \
+        or _load(session_dir / f"{prefix}_logs.json") or []
 
     # Normalise trades (GET /trades returns {"trades": [...]} wrapper, not a bare list)
     if isinstance(trades_raw, dict):
@@ -278,7 +310,7 @@ def build_journal(session_date: date, session_dir: Path) -> str:
     lines: list[str] = []
 
     # ── Header ──────────────────────────────────────────────────────────────
-    lines.append(f"# Trade Journal — {dow} {session_date.strftime('%B %-d, %Y')}")
+    lines.append(f"# Trade Journal — {dow} {_fmt_date_long(session_date)}")
     lines.append("")
 
     # ── Session summary ──────────────────────────────────────────────────────
@@ -290,7 +322,7 @@ def build_journal(session_date: date, session_dir: Path) -> str:
     lines.append("")
     lines.append("| | |")
     lines.append("|---|---|")
-    lines.append(f"| Date | {dow}, {session_date.strftime('%B %-d, %Y')} |")
+    lines.append(f"| Date | {dow}, {_fmt_date_long(session_date)} |")
     lines.append(f"| Result | {result_str} |")
     lines.append(f"| Session P&L | {_fmt_pnl(total_pnl)} |")
     lines.append(f"| Strategies | Opening Bell Scalp + VWAP Reclaim + Micro-Pullback |")
