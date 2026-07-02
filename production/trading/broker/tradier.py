@@ -548,7 +548,8 @@ class TradierBarPoller:
             record_bar(symbol, bar_dict, source='poller')
 
         logger.info(
-            f"TradierBarPoller: pushed {pushed}/{len(symbols)} bars "
+            f"TradierBarPoller: {pushed} new bar(s) pushed "
+            f"({len(symbols)} watched, {len(symbols) - pushed} no-op) "
             f"at {now_et.strftime('%H:%M:%S')} "
             f"({'delayed' if self._delay_min else 'live'})"
         )
