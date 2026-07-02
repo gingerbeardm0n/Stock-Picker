@@ -2,7 +2,7 @@
 Daily session job — runs both strategies in sequence and persists state.
 
 Shared by:
-  - api/server.py     (APScheduler daily 8:55 AM ET job, --run-now flag)
+  - api/server.py     (APScheduler daily 7:00 AM ET job, --run-now flag)
   - api/dashboard.py  (POST /trigger manual kick)
 
 Order: Opening Bell Scalp (9:30-9:40) then VWAP Reclaim (10:00-11:30).
