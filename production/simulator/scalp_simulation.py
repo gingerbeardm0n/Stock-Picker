@@ -29,6 +29,9 @@ from trading.scalp_models import ScalpConfig
 from trading.scalp_ranker import rank_candidates, get_top_candidate, screen_candidates
 from trading.scalp_engine import get_premarket_high, evaluate_entry, evaluate_exit
 from backend.news_fetcher import has_news_catalyst
+from simulator.fill_model import (
+    limit_price, resolve_limit_fill, apply_slippage, uses_marketable_limit,
+)
 from utils.query_helpers import StockDataDB
 
 logger = logging.getLogger(__name__)
@@ -517,7 +520,7 @@ class ScalpSimulationRunner:
             sym = c['symbol']
             bars, pm_high = self._load_symbol_bars(db, sym)
             meta[sym] = {'candidate': c, 'pm_high': pm_high, 'done': not bars,
-                         'position': None, 'bars': bars}
+                         'position': None, 'pending': None, 'bars': bars}
             for i, b in enumerate(bars):
                 events.append((b['_et'], sym, i, b))
         events.sort(key=lambda e: e[0])
@@ -529,6 +532,26 @@ class ScalpSimulationRunner:
             m = meta[sym]
             if m['done']:
                 continue
+
+            # Resolve a pending marketable-limit order against this (next) bar.
+            # The slot was reserved at order placement, like live's in-flight
+            # wait; a miss releases it and the symbol keeps being evaluated.
+            pend = m['pending']
+            if pend is not None:
+                m['pending'] = None
+                fill = resolve_limit_fill(pend['limit'], bar)
+                if fill is not None:
+                    entry_price = apply_slippage(fill, self.config)
+                    m['position'] = {
+                        'entry_price': entry_price,
+                        'entry_idx': i,
+                        'entry_reason': pend['reason'],
+                        'entry_time': bar.get('_et'),
+                        'shares': self._position_size_live(entry_price, max_concurrent),
+                        'highest': entry_price,
+                    }
+                    continue
+                open_count -= 1  # miss — release the slot, fall through
 
             pos = m['position']
             if pos is not None:
@@ -549,7 +572,15 @@ class ScalpSimulationRunner:
                         m['candidate'], bar, m['pm_high'],
                         bars_since_open=i, config=self.config)
                     if signal:
-                        entry_price = signal['entry_price']
+                        if uses_marketable_limit(self.config):
+                            # Order goes out now, resolves on the next bar
+                            m['pending'] = {
+                                'limit': limit_price(signal['entry_price'], self.config),
+                                'reason': signal['reason'],
+                            }
+                            open_count += 1
+                            continue
+                        entry_price = apply_slippage(signal['entry_price'], self.config)
                         m['position'] = {
                             'entry_price': entry_price,
                             'entry_idx': i,
@@ -562,6 +593,9 @@ class ScalpSimulationRunner:
                         continue
                 # Entry-window timeout mirrors live's per-bar counter check
                 if i + 1 >= self.config.max_entry_bars and m['position'] is None:
+                    if m['pending'] is not None:
+                        m['pending'] = None
+                        open_count -= 1
                     m['done'] = True
 
         # Force-exit anything still open at its last available bar (live's

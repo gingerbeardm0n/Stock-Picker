@@ -48,6 +48,13 @@ class ScalpConfig:
     risk_pct: float = 3.0               # % of account to risk
     max_position_pct: float = 30.0      # Max % of account in one position
 
+    # ── Sim entry fill model (docs/SIM_FILL_MODEL_DESIGN.md) ───────────────
+    # 'perfect' keeps historical results reproducible; live-parity diagnostic
+    # runs use 'marketable_limit'. Ignored by the live runners.
+    fill_model: str = 'perfect'         # 'perfect' | 'marketable_limit'
+    entry_headroom_pct: float = 0.25    # marketable-limit headroom above signal
+    entry_slippage_pct: float = 0.0     # flat extra slippage on any fill
+
     def to_dict(self) -> dict:
         """Serialize to dict."""
         return asdict(self)

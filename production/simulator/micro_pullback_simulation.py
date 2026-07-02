@@ -27,6 +27,9 @@ from trading.micro_pullback_models import MicroPullbackConfig, WATCH_TOP_N
 from trading.micro_pullback_engine import evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, screen_candidates
 from backend.news_fetcher import has_news_catalyst
+from simulator.fill_model import (
+    limit_price, resolve_limit_fill, apply_slippage, uses_marketable_limit,
+)
 from utils.query_helpers import StockDataDB
 
 logger = logging.getLogger(__name__)
@@ -393,7 +396,7 @@ class MicroPullbackSimulationRunner:
                     market_bars.append(bar)
             meta[sym] = {
                 'candidate': c, 'bars': market_bars, 'done': not market_bars,
-                'bars_so_far': [], 'position': None,
+                'bars_so_far': [], 'position': None, 'pending': None,
             }
             for i, b in enumerate(market_bars):
                 events.append((b['_et'], sym, i, b))
@@ -408,6 +411,26 @@ class MicroPullbackSimulationRunner:
                 continue
 
             m['bars_so_far'].append(bar)
+
+            # Resolve a pending marketable-limit order against this (next) bar
+            pend = m['pending']
+            if pend is not None:
+                m['pending'] = None
+                fill = resolve_limit_fill(pend['limit'], bar)
+                if fill is not None:
+                    entry_price = apply_slippage(fill, self.config)
+                    m['position'] = {
+                        'entry_price': entry_price,
+                        'stop_price': pend['stop_price'],
+                        'entry_idx': i,
+                        'entry_reason': pend['reason'],
+                        'entry_time': bar.get('_et'),
+                        'shares': self._position_size_multi(
+                            entry_price, pend['stop_price'], max_concurrent),
+                        'highest': entry_price,
+                    }
+                    continue
+                open_count -= 1  # miss — release the slot, fall through
 
             pos = m['position']
             if pos is not None:
@@ -427,7 +450,15 @@ class MicroPullbackSimulationRunner:
                     signal = evaluate_entry(
                         m['candidate'], m['bars_so_far'], self.config)
                     if signal:
-                        entry_price = signal['entry_price']
+                        if uses_marketable_limit(self.config):
+                            m['pending'] = {
+                                'limit': limit_price(signal['entry_price'], self.config),
+                                'stop_price': signal['stop_price'],
+                                'reason': signal['reason'],
+                            }
+                            open_count += 1
+                            continue
+                        entry_price = apply_slippage(signal['entry_price'], self.config)
                         stop_price = signal['stop_price']
                         m['position'] = {
                             'entry_price': entry_price,
