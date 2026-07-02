@@ -138,7 +138,6 @@ celerybeat.pid
 .env
 .env.paper
 .env.live
-.env.render.dec
 .envrc
 .venv
 env/
@@ -212,38 +211,60 @@ __marimo__/
 # Project-specific
 
 # Optimization & Analysis Artifacts (keep locally, don't commit to GitHub)
-archive/optunaDBfiles/          # SQLite optimizer databases (large, keep as local backup)
-research/analysis/outputs/*.csv # Generated analysis outputs (regenerated on demand)
-analysis/*.csv                  # Old analysis outputs location
+# NOTE: gitignore does NOT support trailing inline comments — keep comments on their own lines.
+# SQLite optimizer databases (large, keep as local backup)
+archive/optunaDBfiles/
+# Generated analysis outputs (regenerated on demand)
+research/analysis/outputs/
+# Old analysis outputs location
+analysis/*.csv
+# DB audit CSVs (regenerable)
+database/audit_reports/
+# Optimizer trade detail exports
+optimizer/*.csv
 
 # Research data artifacts (cache, temp files)
-research/optimizer/*.csv
+research/optimizer/**/*.csv
 research/optimizer/logs/
+# Optimizer scratch data / ablation outputs / cache
+research/optimizer/data/
+research/optimizer/ablation/
+research/optimizer/cache/
+# Optimizer run logs
+*_log.txt
 data/cache/
-# Generated rel-vol baseline — lives on the dedicated 'data' branch, not main
-data/rel_vol_baseline.json
+
+# Backfill progress files (regenerable run-state)
+*_progress_*.json
+*_progress.json
 
 # Live trading logs (keep locally, don't commit)
 production/logs/
+# Live data stream captures
+production/data/stream/
+
+# SOPS decrypted env (local only — never commit plaintext secrets)
+production/.env.render.dec
+
+# Crash dumps + junk
+*.stackdump
+
+# Playwright MCP artifacts
+.playwright-mcp/
 
 # Haiku batch extraction outputs (temporary)
 Ross Cameron Day Trading Videos/haiku_output_*.txt
 Ross Cameron Day Trading Videos/*_merged.txt
+Ross Cameron Day Trading Videos/**/*.csv
 
 # Raw transcripts — 1,799 files / 36 MB, keep locally, don't bloat git
 Ross Cameron Day Trading Videos/Text transcriptions/
 
+# Corpus tooling (local only, not part of the trading system)
+Ross Cameron Day Trading Videos/scripts/
+Ross Cameron Day Trading Videos/extractions/
+Ross Cameron Day Trading Videos/prompts/
+Ross Cameron Day Trading Videos/compressed_transcripts/
+
 # Local Claude workspace config
 Ross Cameron Day Trading Videos/.claude/
-
-# ── Custodian: local-only data / binaries (keep out of git) ──
-*.db
-*.parquet
-*.log
-*.log.*
-*_progress.json
-analysis/gapper_universe.csv
-research/optimizer/data/*.csv
-production/services/stocks_in_price_range.json
-production/services/stocks_in_price_range.txt
-temp_*.txt
