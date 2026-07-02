@@ -1,0 +1,55 @@
+name: Post-Session Trade Report
+
+on:
+  schedule:
+    # 12:15 PM ET = 16:15 UTC — after both strategy windows end (11:45 ET)
+    # and after the 12:00 PM session capture.
+    - cron: '15 16 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Trade date (YYYY-MM-DD, default today UTC)'
+        required: false
+        default: ''
+
+jobs:
+  session-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r production/requirements-deploy.txt
+
+      - name: Run session report
+        env:
+          NEON_CONNECTION_STRING: ${{ secrets.NEON_CONNECTION_STRING }}
+          JTRADER_API_KEY: ${{ secrets.JTRADER_API_KEY }}
+          TRADIER_PRODUCTION_TOKEN: ${{ secrets.TRADIER_PRODUCTION_TOKEN }}
+        run: |
+          set -o pipefail
+          DATE="${{ github.event.inputs.date }}"
+          [ -z "$DATE" ] && DATE=$(date -u +%Y-%m-%d)
+          echo "Running session report for ${DATE}..."
+          python production/data/live_capture/session_report.py \
+            --date "$DATE" --skip-pull | tee report.txt
+
+      - name: Publish report to step summary
+        if: always()
+        run: |
+          {
+            echo '## Session Report'
+            echo '```'
+            cat report.txt 2>/dev/null || echo "(no report output)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
