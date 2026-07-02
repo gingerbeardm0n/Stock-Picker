@@ -519,7 +519,11 @@ class LiveMicroPullbackRunner:
                     except Exception:
                         current_ask = float(bar['close'])
 
-                    slippage_cap = entry_price * 1.02
+                    # 0.5% cap (was a never-backtested 2%): slippage sensitivity
+                    # shows MP's per-trade edge ~2.2%, so paying 2% is near
+                    # break-even. Strategy is under review for live viability —
+                    # see docs/SIM_FILL_MODEL_DESIGN.md + fill_model_diagnostic.
+                    slippage_cap = entry_price * 1.005
                     if current_ask > slippage_cap:
                         logger.warning(
                             f"    [{symbol}] Moved {(current_ask / entry_price - 1) * 100:.1f}% "

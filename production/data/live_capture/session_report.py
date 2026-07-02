@@ -346,7 +346,7 @@ def replay_counterfactual(trade: dict, tape: list[dict]) -> dict | None:
     """
     if trade['strategy'] == 'vwap':
         from trading.vwap_engine import evaluate_exit
-        from trading.live_vwap_runner import TRIAL_56_CONFIG as cfg
+        from trading.live_vwap_runner import TRIAL_184_CONFIG as cfg
         # VWAP-anchored stop: reconstruct from decision price the same way the
         # runner did (it logged stop = VWAP - offset; approximate VWAP from the
         # decision log is overkill — use decision_price-relative replay with

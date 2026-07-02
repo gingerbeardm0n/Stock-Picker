@@ -61,9 +61,33 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ── vwap_v1 trial 173 (train 2021-23, selected 2024, sealed-2025 test:
-#    151 trades, 90.1% WR, +$2,669, PF 4.76) ───────────────────────────────
+# ── vwap_fill_v1 trial 184 (train 2021-23 w/ marketable-limit fill model,
+#    plateau-selected on 2024 [+$1,396, PF 1.77, DD $199], sealed-2025:
+#    457 trades, 79.0% WR, +$1,844, PF 1.60, DD $389).
+#    Replaced Trial 56 (2026-07-02): 56 was tuned assuming perfect fills;
+#    under realistic fills its sealed PnL halved (+$1,188, DD $587).
+#    See docs/SIM_FILL_MODEL_DESIGN.md + fill_model_diagnostic.txt. ─────────
 
+TRIAL_184_CONFIG = VwapReclaimConfig(
+    min_gap_pct=6.044448161357272,
+    min_relative_volume=4.810536080054221,
+    max_price=28.67209577725149,
+    require_news=True,
+    lookback_bars=10,
+    min_bars_below=3,
+    reclaim_vol_mult=1.2481258804099267,
+    entry_mode='reclaim_high_break',
+    stop_vwap_offset=0.07047963700569011,
+    profit_target_pct=10.426314905440028,
+    max_hold_bars=55,
+    trailing_stop_pct=0.004207618495699649,
+    risk_pct=3.3256118117400466,
+    max_position_pct=44.85366067989038,
+    fill_model='marketable_limit',
+    entry_headroom_pct=0.9692522165642825,
+)
+
+# Deprecated 2026-07-02 — kept for reference/rollback only.
 TRIAL_56_CONFIG = VwapReclaimConfig(
     min_gap_pct=7.67625431374268,
     min_relative_volume=7.4539522822260995,
@@ -120,7 +144,7 @@ class LiveVwapRunner:
         dry_run: bool = False,
         live: bool = False,
     ):
-        self.config = config or TRIAL_56_CONFIG
+        self.config = config or TRIAL_184_CONFIG
         self.dry_run = dry_run
         self.live = live
         self.state = LiveVwapState()
@@ -558,9 +582,15 @@ class LiveVwapRunner:
         logger.info(f"    Reason: {signal.get('reason', '?')}")
         logger.info(f"    Stop: ${stop_price:.2f} (VWAP {signal.get('vwap', 0):.2f} - {self.config.stop_vwap_offset:.2f})")
         entry_price = round(entry_price, 2)
+        # Marketable limit: headroom is the Optuna-tuned slippage budget the
+        # sealed backtest already paid for (sim parity: simulator/fill_model.py
+        # resolves the same limit against the next bar). Trial 184: ~0.97%.
+        headroom = getattr(self.config, 'entry_headroom_pct', 0.0)
+        limit_buy_price = round(entry_price * (1 + headroom / 100), 2)
         stop_order_id = ''
         if not self.dry_run:
-            result = self.broker.place_limit_buy(symbol, shares, entry_price)
+            result = self.broker.place_limit_buy(symbol, shares, limit_buy_price)
+            logger.info(f"    Limit: ${limit_buy_price:.2f} (signal ${entry_price:.2f} +{headroom:.2f}%)")
             logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
 
             time.sleep(2)
@@ -590,8 +620,10 @@ class LiveVwapRunner:
                         f"{shares} @ ${entry_price:.2f} — adopting position."
                     )
                 else:
-                    # Limit missed — retry immediately with market order if stock
-                    # hasn't run away from the signal price (2% slippage cap).
+                    # Limit missed — retry with a market order ONLY if the ask is
+                    # still within the tuned headroom (the sealed backtest's
+                    # slippage budget). The old flat 2% cap was never backtested
+                    # and exceeds the strategy's per-trade edge.
                     try:
                         fresh_q = self.data_feed.get_quotes([symbol])
                         current_ask = (fresh_q[symbol].ask
@@ -600,7 +632,7 @@ class LiveVwapRunner:
                     except Exception:
                         current_ask = float(bar['close'])
 
-                    slippage_cap = entry_price * 1.02
+                    slippage_cap = limit_buy_price
                     if current_ask > slippage_cap:
                         logger.warning(
                             f"    [{symbol}] Moved {(current_ask / entry_price - 1) * 100:.1f}% "
