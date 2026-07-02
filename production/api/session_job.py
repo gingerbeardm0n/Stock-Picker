@@ -87,7 +87,11 @@ def run_daily_sessions():
             "last_result": "trade" if scalp_completed else "no_trade",
             "date": str(datetime.now().date()),
             "candidates": _serialize_candidates(getattr(state, 'candidates', None)),
-            "top_pick": getattr(state, 'top_pick', None),
+            # top_pick on the runner state is the full candidate dict; store
+            # just the symbol (JSON state + Neon session_runs both expect text)
+            "top_pick": (getattr(state, 'top_pick', None) or {}).get('symbol')
+                        if isinstance(getattr(state, 'top_pick', None), dict)
+                        else getattr(state, 'top_pick', None),
             "completed_trades": scalp_completed,
             "trade_count": len(scalp_completed),
             "pnl": getattr(state, 'pnl', 0),

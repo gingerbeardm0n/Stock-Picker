@@ -333,24 +333,38 @@ class AlpacaDataFeed(DataFeedInterface):
         return results
 
     def get_prior_closes(self, symbols: list[str]) -> dict[str, float]:
-        """Prior day's close via daily bars (last bar in a 5-day window)."""
+        """Prior day's close via daily bars (last bar in a 5-day window).
+
+        Retries on transient Alpaca errors (2026-07-02: a single 500 at the
+        9:45 ET re-scan returned 0 prior closes, zeroing the VWAP and
+        micro-pullback watchlists for the whole day)."""
+        import time as _time
         from datetime import date, timedelta as td
         today = date.today()
         start = today - td(days=5)   # handles weekends
         results = {}
-        try:
-            resp = self._client.get_stock_bars(StockBarsRequest(
-                symbol_or_symbols=symbols,
-                timeframe=TimeFrame.Day,
-                start=datetime(start.year, start.month, start.day, tzinfo=timezone.utc),
-                end=datetime(today.year, today.month, today.day, tzinfo=timezone.utc),
-            ))
-            bars_data = resp.data if hasattr(resp, 'data') else resp
-            for sym, bar_list in bars_data.items():
-                if bar_list:
-                    results[sym] = float(bar_list[-1].close)
-        except Exception as e:
-            logger.error(f"Alpaca prior close fetch failed: {e}")
+        for attempt in range(3):
+            try:
+                resp = self._client.get_stock_bars(StockBarsRequest(
+                    symbol_or_symbols=symbols,
+                    timeframe=TimeFrame.Day,
+                    start=datetime(start.year, start.month, start.day, tzinfo=timezone.utc),
+                    end=datetime(today.year, today.month, today.day, tzinfo=timezone.utc),
+                ))
+                bars_data = resp.data if hasattr(resp, 'data') else resp
+                for sym, bar_list in bars_data.items():
+                    if bar_list:
+                        results[sym] = float(bar_list[-1].close)
+                return results
+            except Exception as e:
+                if attempt < 2:
+                    delay = 5 * (attempt + 1)
+                    logger.warning(
+                        f"Alpaca prior close fetch failed (attempt {attempt + 1}/3): "
+                        f"{e} — retrying in {delay}s")
+                    _time.sleep(delay)
+                else:
+                    logger.error(f"Alpaca prior close fetch failed after 3 attempts: {e}")
         return results
 
 

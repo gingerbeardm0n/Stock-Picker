@@ -91,6 +91,12 @@ def _ensure_tables(conn):
 
 
 def _persist_run(conn, run_date: str, strategy: str, state_data: dict):
+    # top_pick may arrive as the full candidate dict (scalp state stores the
+    # ranked candidate object) — psycopg2 can't adapt a dict, so coerce to the
+    # symbol string. Root cause of 2026-07-02 "can't adapt type 'dict'" failure.
+    top_pick = state_data.get("top_pick")
+    if isinstance(top_pick, dict):
+        top_pick = top_pick.get("symbol")
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO session_runs
@@ -111,12 +117,13 @@ def _persist_run(conn, run_date: str, strategy: str, state_data: dict):
             run_date,
             strategy,
             state_data.get("last_result"),
-            state_data.get("top_pick"),
+            top_pick,
             state_data.get("entry_price"),
             state_data.get("exit_price"),
             state_data.get("pnl"),
-            json.dumps(state_data.get("candidates") or state_data.get("watchlist") or []),
-            json.dumps(state_data),
+            json.dumps(state_data.get("candidates") or state_data.get("watchlist") or [],
+                       default=str),
+            json.dumps(state_data, default=str),
         ))
 
 
