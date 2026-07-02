@@ -819,9 +819,18 @@ class LiveScalpRunner:
         entry_order_id = ''
         stop_order_id = ''
         entry_price = round(entry_price, 2)
+        # Marketable limit: 0.25% above signal close. Exact-close limits suffer
+        # adverse selection on fast gappers — 2026-07-02: 12/15 attempts missed
+        # (price ran = the winners), the 2 fills came on falling bars and both
+        # stopped out. 0.25% keeps ~70% of the backtested edge if paid
+        # (slippage sensitivity: edge dies at ~1%; see
+        # research/analysis/outputs/slippage_sensitivity.txt). Sub-$4 names
+        # round back to the close (a penny would exceed the 0.25% budget).
+        limit_price = round(entry_price * 1.0025, 2)
         if not self.dry_run:
-            result = self.broker.place_limit_buy(symbol, shares, entry_price)
+            result = self.broker.place_limit_buy(symbol, shares, limit_price)
             entry_order_id = result.order_id
+            logger.info(f"    Limit: ${limit_price:.2f} (signal close ${entry_price:.2f} +0.25%)")
             logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
 
             time.sleep(2)
