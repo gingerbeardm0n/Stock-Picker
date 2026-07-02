@@ -46,16 +46,20 @@
   - `production/trading/broker/alpaca.py` — `AlpacaBroker(paper=True)`
 - **NOTE**: Alpaca paper reset button was removed in 2023-2025 UI redesign. No API endpoint. See `research/reset_paper_account.py`.
 
-### Tradier (Data Feed Only — Real-time Quotes)
-- **Account**: Production token for real-time quotes; paper token for sandbox orders (no longer used for orders)
-- **Env vars**: `TRADIER_PAPER_TOKEN`, `TRADIER_ACCOUNT_ID`, `TRADIER_PRODUCTION_TOKEN` in `production/.env.paper`
+### Tradier (Data Feed — Real-time Quotes + Premarket Timesales)
+- **Account**: Dual-token setup — production token for real-time data, sandbox token for paper orders (15-min delayed, blind premarket)
+- **Env vars**: `TRADIER_PAPER_TOKEN`, `TRADIER_ACCOUNT_ID`, `TRADIER_PRODUCTION_TOKEN` in `production/.env.paper` + SOPS-encrypted `production/.env.render`
 - **Provides**:
   - Real-time quotes (batched) — via production token
+  - **Premarket timesales** — production token; ONLY source with same-day premarket volume data (Alpaca returns volume=0). Used as HybridRelVol numerator.
   - **NOT used for orders anymore** — switched to Alpaca paper 2026-06-17
   - **NOT**: minute/hourly historical bars (timesales returns null without funded brokerage)
-- **Last verified working**: 2026-06-17 (quotes via production token)
+- **Critical for rel-vol**: `HybridRelVol` uses Tradier production timesales as numerator (real-time cumulative volume) + Alpaca 30-day historical minute bars as denominator. Without Tradier production token, rel-vol falls back to 10.0× default.
+- **Last verified working**: 2026-07-01 (premarket timesales via production token; HybridRelVol live-tested)
+- **MUST set `TRADIER_PRODUCTION_TOKEN` on Render** — sandbox token has no real-time premarket data
 - **Scripts that use it**:
-  - `production/trading/broker/tradier.py` — TradierDataFeed (still available as fallback, `BROKER=tradier`)
+  - `production/trading/rel_vol_live.py` — `HybridRelVol._numerator()` (timesales)
+  - `production/trading/broker/tradier.py` — TradierDataFeed (fallback, `BROKER=tradier`)
 
 ### Polygon / Massive.com (Inactive)
 - **Account**: Basic tier (free)
@@ -78,15 +82,20 @@
 
 ### Neon PostgreSQL (Rel-Vol Baseline + Float Data — primary live store)
 - **Account**: Free tier (neondb_owner)
-- **Env vars**: `NEON_CONNECTION_STRING` in `.env` (local) and Render dashboard
+- **Env vars**: `NEON_CONNECTION_STRING` in SOPS-encrypted `production/.env.render` (Render) + `production/.env.render.dec` (local, via `decrypt-local.sh`)
 - **Tables**:
-  - `rel_vol_baselines` — 235 symbols, `as_of=2026-06-22`; `float_shares` column added 2026-06-23
-  - `active_symbols` — 2,306 symbols accumulated from live sessions
-  - `pipeline_runs` — 3 runs logged, latest 2026-06-22
-- **Populated by**: `production/data/live_capture/build_baseline_cloud.py` via GitHub Actions (`rel-vol-baseline.yml`, daily 4:30 PM ET)
+  - `rel_vol_baselines` — 235+ symbols, `float_shares` column; new gappers auto-inserted by `fetch_missing_floats()`
+  - `active_symbols` — 2,300+ symbols accumulated from live sessions; new gappers auto-registered
+  - `pipeline_runs` — daily 4:30 PM ET runs logged
+  - `session_bars`, `session_logs`, `session_news`, `session_runs` — live session persistence
+  - `live_trades` — completed trade records
+  - `stock_candles_live_1m`, `stock_news_live` — live-captured minute bars + news
+- **Populated by**:
+  - `production/data/live_capture/build_baseline_cloud.py` via GitHub Actions (`rel-vol-baseline.yml`, daily 4:30 PM ET) — bulk refresh
+  - `production/trading/rel_vol_live.py` `fetch_missing_floats()` — live yfinance fallback for new gappers (writes back to Neon)
 - **Used by**: `production/trading/rel_vol_live.py` `_fetch_from_neon()` — primary source on Render
-- **Last verified working**: 2026-06-23 (235 rows, Render env var confirmed set)
-- **Notes**: Float data (yfinance) fetched on first-seen + weekly refresh. `NEON_CONNECTION_STRING` must be set on Render for primary source to activate; falls back to GitHub JSON (also 235 symbols) if absent.
+- **Last verified working**: 2026-07-01 (float write-back tested with SVRE, CELZ, JBDI, GVH, JEM)
+- **Notes**: Float data two-tier: weekly bulk refresh (yfinance, `FLOAT_STALE_DAYS=7`) for known symbols + live per-scan `fetch_missing_floats()` for brand-new gappers. `NEON_CONNECTION_STRING` lives in SOPS-encrypted `.env.render`; falls back to GitHub JSON if absent.
 
 ### Finnhub (News — primary)
 - **Account**: Free tier
@@ -94,9 +103,28 @@
 - **Provides**: Real-time news for live runners
 - **Last verified working**: 2026-06-23 (primary waterfall slot)
 
+### yfinance (Float Data — live fallback)
+- **Account**: No API key required (scrapes Yahoo Finance)
+- **Provides**: `floatShares` for individual tickers via `yf.Ticker(sym).info`
+- **Rate limit**: ~1.2s/request (self-imposed sleep to avoid throttling)
+- **Used by**:
+  - `production/data/live_capture/build_baseline_cloud.py` — weekly bulk float refresh
+  - `production/trading/rel_vol_live.py` `fetch_missing_floats()` — live per-scan fallback for new gappers
+- **Last verified working**: 2026-07-01 (SVRE, CELZ, JBDI, GVH, JEM all resolved)
+- **Gotcha**: Some tickers return `None` for `floatShares` (very new IPOs, SPACs). These are silently skipped; `max_float` filter treats them as `None` → no-op (passes through).
+
 ### Marketaux (News — REMOVED 2026-06-23)
 - **Status**: ⚫ REMOVED from `news_fetcher.py` waterfall. Rate limit was always exhausted; each timeout = 5s × 50 symbols = 4+ min wasted per scan cycle.
 - **Commit**: `0efa80a`
+
+### SOPS + age Encryption (Secrets Management)
+- **Config**: `.sops.yaml` in repo root (age public key)
+- **Encrypted file**: `production/.env.render` — single source of truth for ALL secrets (DB, API keys, tokens)
+- **Render**: `decrypt-and-start.sh` decrypts at boot using `SOPS_AGE_KEY` env var (the ONLY secret manually set on Render)
+- **Local**: `production/scripts/decrypt-local.sh` → `production/.env.render.dec` (gitignored)
+- **Age key location**: `C:\Users\joelb\AppData\Roaming\sops\age\keys.txt` (local); `SOPS_AGE_KEY` env var (Render)
+- **Workflow**: Edit `.env.render` plaintext → `sops -e -i production/.env.render` → commit → deploy. Never touch Render dashboard for secrets.
+- **Last verified working**: 2026-07-01 (local decrypt + Render boot tested)
 
 ## DB Coverage (as of 2026-06-09)
 
@@ -146,3 +174,11 @@
 9. **Render uses `production/requirements-deploy.txt`, not root `requirements.txt`.** Any new Python dependency needed on Render (psycopg2, yfinance, etc.) must be added to `production/requirements-deploy.txt`. The root file is for local dev only. This caused psycopg2 + yfinance to silently fail on Render for weeks.
 
 10. **Render ephemeral disk wipes on every deploy.** Session state JSON, bar captures, and logs are lost. Always run `session_report.py` and pull bars BEFORE any deploy. The `session-capture.yml` GitHub Action (12 PM ET daily) mitigates this but only captures one snapshot per day.
+
+11. **Alpaca real-time feed returns volume=0 for premarket** (2026-06-30). The iex feed on the free tier has no premarket volume data. Cumulative volume is always 0 → rel-vol ratio always hits the 10.0× fallback cap → every stock looks like a monster. Root cause of "always 10.0×" bug. Fix: use Tradier production timesales for the numerator (only source with same-day premarket volume). See `HybridRelVol` in `rel_vol_live.py`.
+
+12. **Alpaca stop-sell rejection (error 42210000)** when price crashes past stop trigger before the order reaches the broker (2026-07-01). Alpaca won't auto-convert to market; it just rejects. On fast-crashing small-caps, the gap between entry-fill and stop-placement (several seconds for order poll + fill confirmation) is enough. Fix: catch rejection → immediately place market sell. See `live_scalp_runner.py` and `live_vwap_runner.py`.
+
+13. **SOPS `--input-type dotenv --output-type dotenv` required for .env files** (2026-07-01). Default `sops -d` assumes JSON → `Error unmarshalling input json`. Must explicitly specify dotenv format for `.env.render`. The decrypt-local.sh script handles this automatically.
+
+14. **yfinance `floatShares` returns None for some tickers.** Very new IPOs, SPACs, and some micro-caps have no float data on Yahoo Finance. `fetch_missing_floats()` silently skips these; the `max_float` filter treats `None` as pass-through (no-op). This is intentional: better to trade without float data than to silently drop a valid candidate.

@@ -4,7 +4,7 @@ Living record of what was built, when, why — plus a component index and file-h
 Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pass written manually
 2026-05-31 from git history + session context; incremental passes append from `git log`.
 
-**History watermark (last commit folded in):** `32a5777` (2026-06-23)
+**History watermark (last commit folded in):** `8053170` (2026-07-01)
 
 ---
 
@@ -167,33 +167,75 @@ Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pa
 - `0efa80a` — fix(runners): 4 bugs — dashboard 500 (wrong import alias), sub-penny Tradier rejection (`round(entry_price,2)` in all 3 runners), Marketaux removed from news waterfall, `psycopg2-binary`/`yfinance` added to `requirements-deploy.txt`
 - `32a5777` — feat(runners): multi-position VWAP refactor (`positions: dict` replaces single-pos fields); premarket hybrid scan (60s watchlist re-quote + 5-min full scan); dashboard updated for multi-position state
 
+### Phase 15 — Rel-vol parity, order resilience, SOPS secrets (2026-06-23 → 07-01)
+
+**2026-06-23**
+- `51bf13c` — fix(vwap): re-evaluate entry next bar when limit misses + stock ran away — releases lock so next bar can re-attempt instead of one-and-done.
+- `ccddf0c` — docs(historian): phase 14 history + data sources update (Jun 17-23).
+
+**2026-06-24**
+- `e5cd09d` — fix(scanner): use stored `prior_close` for gap% in watchlist refresh — was re-fetching (different value mid-session).
+- `79df177` — fix(scanner): always use daily-bar prior_close, not Alpaca quote snapshot — Alpaca latest-quote has no reliable prev_close.
+- `19fda41` — fix(live): 4 post-mortem fixes from Jun 24 session.
+- `f9ce608` — feat(rel-vol): real-time baseline for gapper symbols not in Neon — fallback Alpaca 5-day lookback for new tickers.
+- `663fa83` — fix(scalp): set `max_entry_bars=10` permanently (was 4 → too aggressive; 10 = data-backed).
+- `1dc3b0e` — fix(dashboard): all watchlist candidates show ARMED badge in multi-candidate mode.
+
+**2026-06-25**
+- `1ace135` — fix(scanner): stale-last fallback in `refresh_top_pick` gap recalc — used stale cached value when bars unavailable.
+- `9773e5b` — fix(live): cancel-and-wait on exit + orphan guard + micro-pullback $1 floor — ensure exit orders fully cancel before placing new; guard against orphaned positions on runner shutdown.
+
+**2026-06-26**
+- `dafef1c` — fix(resilience): guard all critical API calls + real-time log persistence to Neon — `try/except` around every broker/data call; session logs write to Neon for post-mortem.
+- `23490e9` — feat(deploy): **SOPS + age encrypted env for Render** — `production/.env.render` encrypted with age key; `decrypt-and-start.sh` decrypts at boot; single source of truth for secrets.
+- `5533196` — fix(deploy): force LF line endings for SOPS files (`.gitattributes`).
+
+**2026-06-30**
+- `32129ea` — fix(rel-vol): **single-feed Tradier rel-vol** — fixes "always 10.0x" bug. Root cause: Alpaca real-time feed returns `volume=0` for premarket → cumulative vol always 0 → ratio always 10× (fallback). Fix: use Tradier timesales for numerator (only source with same-day premarket volume).
+- `430cb0b` — fix(scalp): re-evaluate gap on refresh + auto-resume after deploy.
+- `6221528` — fix(post-session): wire local scripts to decrypt SOPS env (`session_report.py`, `pull_live_bars.py`); fix stale import `TRIAL_173_CONFIG → TRIAL_56_CONFIG`; add `NEON_CONNECTION_STRING` fallback.
+- `9859720` — fix(rel-vol): **30-day Alpaca denominator via HybridRelVol** — replaces 5-day Tradier stopgap. Tradier numerator (real-time premarket timesales) + Alpaca 30-day historical minute bars denominator. Matches Ross Cameron's stated 30-day average. Drop-in replacement for `TradierRelVol`.
+
+**2026-07-01**
+- `46c0c50` — fix(orders): **emergency market-exit on stop rejection** — Alpaca error 42210000 (stop price > current = price crashed past stop). Now immediately sells at market instead of leaving orphaned position. Also fixes VWAP `stop_order_id` `UnboundLocalError` crash-then-orphan bug.
+- `8053170` — fix(float): **live yfinance fetch for new gappers** missing from weekly Neon baseline. `fetch_missing_floats()` in `rel_vol_live.py`; writes back to Neon so nightly job picks it up. Closes max_float filter no-op gap for brand-new tickers.
+
 ---
 
 ## Component Index
 Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remove)
 
-### The engine (`production/trading/` — ONE copy, sim + live share it)
+### Legacy monolith engine (⚫ deprecated — NOT imported by active runners)
+These files belong to the pre-pivot 126-param monolith. None are imported by `live_scalp_runner.py`, `live_vwap_runner.py`, or `live_micro_pullback_runner.py`. They only import each other. Safe to delete; kept for traceability. Some already removed from disk (orchestrator, patterns, indicators, entry_engine, order_manager, live_broker, live_scanner).
+
 | File | Purpose | Status | Since |
 |---|---|---|---|
-| `orchestrator.py` | The one per-minute decision pipeline (`on_minute`). Broker-agnostic. Tracks `_high_of_day` per symbol; scanner mode uses `qualifies_momentum()`. | 🟢 | e814136 |
-| `momentum_scanner.py` | Pure `qualifies_momentum()` — 6 corpus gates (G1-G6). ONE shared fn for sim + live discovery parity. | 🟢 | 8ce62f1 |
-| `execution.py` | Broker Protocol (the only order interface the engine touches) | 🟢 | c2fa532 |
-| `entry_engine.py` / `exit_engine.py` / `add_on_engine.py` | pure evaluators | 🟢 | phases 1-3 |
-| `scoring_engine.py` | composite entry score (sizing + threshold) | 🟢 | 7401d8d |
-| `patterns.py` / `indicators.py` | pattern detectors + TA | 🟢 | phase 1+ |
-| `market_temperature.py` | HOT/NEUTRAL/COLD/CHOP state machine | 🟢 | 1f86931 |
-| `portfolio_manager.py` | daily risk rules (max-loss / green-to-red / give-back) | 🟢 | 323ec41 |
-| `trading_engine.py` | `Trade` + `PositionManager` (fills, balance, daily loss) | 🟢 | 1f86931 |
-| `sizing.py` | `compute_shares` + `cushion_size_multiplier` (single source) | 🟢 | c2fa532 |
-| `entry_gate.py` | pure capacity→session-stop→risk-rule entry gate | 🟢 | c2fa532 |
-| `data_feed.py` | DataFeed Protocol | 🟢 | c2fa532 |
-| `models.py` | all config dataclasses (Scanner/Entry/Exit/Scoring/AddOn/Temp) | 🟢 | phase 1+ |
-| `order_manager.py` | `OrderExecutor` + `LiveTradeManager` (real broker lifecycle) | 🟢 | cf1a431 |
-| `live_broker.py` | LiveBroker (Broker over LiveTradeManager) | 🟢 | c2fa532 |
-| `live_scanner.py` | live runtime: premarket scan + **intraday momentum scan** (9:35-10:45, cap=50) + (flag-gated) orchestrator path | 🟡 flip default-OFF | d1cd5cd |
+| `orchestrator.py` | per-minute decision pipeline | ⚫ DELETED | e814136 |
+| `momentum_scanner.py` | `qualifies_momentum()` — 6 corpus gates | ⚫ dead (only ref = its own test) | 8ce62f1 |
+| `execution.py` | Broker Protocol | ⚫ dead (only ref = monolith internals) | c2fa532 |
+| `entry_engine.py` | entry evaluator | ⚫ DELETED | phases 1-3 |
+| `exit_engine.py` | exit evaluator | ⚫ dead (only ref = monolith internals) | phases 1-3 |
+| `add_on_engine.py` | pyramid evaluator | ⚫ dead (only ref = monolith internals) | phases 1-3 |
+| `scoring_engine.py` | composite entry score | ⚫ dead (unused) | 7401d8d |
+| `patterns.py` / `indicators.py` | pattern detectors + TA | ⚫ DELETED | phase 1+ |
+| `market_temperature.py` | HOT/NEUTRAL/COLD/CHOP state machine | ⚫ dead (only ref = monolith internals) | 1f86931 |
+| `portfolio_manager.py` | daily risk rules | ⚫ dead (unused) | 323ec41 |
+| `trading_engine.py` | `Trade` + `PositionManager` | ⚫ dead (only ref = monolith internals) | 1f86931 |
+| `sizing.py` | `compute_shares` | ⚫ dead (only ref = its own test) | c2fa532 |
+| `entry_gate.py` | entry gate | ⚫ dead (only ref = its own test) | c2fa532 |
+| `data_feed.py` | DataFeed Protocol | ⚫ dead (unused) | c2fa532 |
+| `order_manager.py` | `OrderExecutor` + `LiveTradeManager` | ⚫ DELETED | cf1a431 |
+| `live_broker.py` | LiveBroker | ⚫ DELETED | c2fa532 |
+| `live_scanner.py` | old live runtime | ⚫ DELETED | d1cd5cd |
+
+### Active shared modules (`production/trading/`)
+| File | Purpose | Status | Since |
+|---|---|---|---|
+| `models.py` | config dataclasses (Scanner/Entry/Exit/Scoring/AddOn/Temp) — still imported by all 3 runners | 🟢 | phase 1+ |
 | `broker/base.py`,`broker/tradier.py` | broker/data-feed interfaces + Tradier impl (prod-token data feed in paper) | 🟢 | cf1a431 |
-| `bar_capture.py` | records every live bar + news to daily JSONL (`bars_/news_YYYYMMDD.jsonl`); `read_*_for_date`/`available_dates` for prior-day pulls | 🟢 | f5ccb3c |
-| `rel_vol_live.py` | live rel-vol parity: fetch 30-day baseline (+floats) from `data` branch, `compute_rel_vol` w/ 10.0 fallback | 🟢 | 73bf2a5 |
+| `broker/alpaca.py` | AlpacaBroker (paper/live) + AlpacaDataFeed + AlpacaBarStream | 🟢 | 79d96d1 |
+| `bar_capture.py` | records every live bar + news to daily JSONL; `read_*_for_date`/`available_dates` for prior-day pulls | 🟢 | f5ccb3c |
+| `rel_vol_live.py` | HybridRelVol (Tradier numerator + Alpaca 30-day denominator), `fetch_missing_floats()` yfinance fallback, Neon write-back | 🟢 | 73bf2a5 |
 
 ### Strategy #1 — Opening Bell Scalp (`production/trading/`, LIVE)
 | File | Purpose | Status | Since |
@@ -278,6 +320,25 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 - `session_job.py` — parallel micro-pullback thread; `positions` field in VWAP state write; `_serialize_candidates()` saves full candidate dicts (not symbol strings)
 - `requirements-deploy.txt` — `psycopg2-binary>=2.9` + `yfinance>=0.2` added (Render uses this file, not root `requirements.txt`)
 
+### New in Phase 15
+| File | Purpose | Status | Since |
+|---|---|---|---|
+| `production/.env.render` | SOPS-encrypted single source of truth for all secrets (age encryption) | 🟢 | 23490e9 |
+| `production/scripts/decrypt-and-start.sh` | Render boot: decrypt `.env.render` → source → start server | 🟢 | 23490e9 |
+| `production/scripts/decrypt-local.sh` | Local one-command SOPS decrypt → `.env.render.dec` (gitignored) | 🟢 | 6221528 |
+| `.gitattributes` | Force LF line endings for SOPS-encrypted files | 🟢 | 5533196 |
+| `.sops.yaml` | SOPS config: age public key for encryption | 🟢 | 23490e9 |
+
+**Phase 15 updates to existing components:**
+- `rel_vol_live.py` — **HybridRelVol** class added (Tradier numerator + Alpaca 30-day denominator); `TradierRelVol` superseded; `fetch_missing_floats()` + `_upsert_floats_to_neon()` for live yfinance fallback
+- `live_scalp_runner.py` — switched `TradierRelVol(5)` → `HybridRelVol(30)`; emergency market-exit on stop rejection; `fetch_missing_floats()` replaces hardcoded `float_shares=None`
+- `live_vwap_runner.py` — switched `TradierRelVol(5)` → `HybridRelVol(30)`; `stop_order_id` init fix (crash-then-orphan bug); emergency market-exit; float data populated (no new filter)
+- `session_report.py` — wired `.env.render.dec` loading; fixed stale `TRIAL_173_CONFIG` → `TRIAL_56_CONFIG` import
+- `pull_live_bars.py` — fixed `.env.paper` path (was repo root, now `production/`); wired `.env.render.dec` + `NEON_CONNECTION_STRING` fallback
+- `dashboard.py` — API key auth (`JTRADER_API_KEY` header check); `/health` stays public
+- `broker/alpaca.py` — stop-sell order error handling (42210000 rejection)
+- `broker/base.py` — expanded broker protocol with additional methods
+
 ### New in Phase 13
 | File | Purpose | Status | Since |
 |---|---|---|---|
@@ -313,6 +374,9 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 - ⚫ `simulation_engine._cushion_size_multiplier` — moved to `sizing.cushion_size_multiplier`.
 - 🟡 `live_scanner._collect_entry_candidate` / `_execute_pending_entry` / `_try_exit` — become dead once
   `_use_orchestrator` defaults True; still the live path today. Remove after the flip is verified live.
+- ⚫ `TradierRelVol` class in `rel_vol_live.py` — superseded by `HybridRelVol` (2026-06-30, `9859720`). Both runners now use `HybridRelVol`. `TradierRelVol` still importable but unused.
+- ⚫ `RealtimeRelVolCache` class in `rel_vol_live.py` — dead; was the old Alpaca-feed-only cache. Import removed from both runners.
+- ⚫ `compute_rel_vol()` function in `rel_vol_live.py` — standalone function superseded by `HybridRelVol.compute()`. Import removed from both runners.
 
 ---
 
@@ -386,3 +450,15 @@ Status: 🟢 active · 🟡 partial/transitional · ⚫ deprecated (safe to remo
 - ℹ️ **NOTE — Alpaca paper has no reset API**: `POST /v2/account` returns 404. Custom balance simulation via `PAPER_STARTING_BALANCE=5000` env var (position-sizing only; actual Alpaca balance stays at $100k). See `research/reset_paper_account.py`.
 - ℹ️ **NOTE — record-keeping restructure (this session):** `MEMORY.md` slimmed 411→~62 lines; legacy detail preserved verbatim in `memory/archive_legacy_monolith.md`. New `STATUS.md` (root) + `docs/PARITY.md` are the live "where are we" + parity-ledger sources going forward.
 - ⚠️ **6 failing tests in the deprecated monolith path** (`tests/test_indicators.py`, `test_patterns.py`, `test_entry_engine.py`) — NOT imported by the deployed scalp/VWAP strategies, so they don't affect live. **Real finding inside:** `calculate_ema([10,11,12,13,14], period=3)` returns 12.0 at index 3 where a true EMA = 11.5 → `indicators.calculate_ema` is computing a trailing **SMA, not an EMA** (name/behavior mismatch). Also flat_top/ABCD/bull_flag/MACD-negative-gate fixtures fail. NOT skip-marked (would hide the EMA bug) and NOT fixed (deprecated path, changing it needs monolith re-validation). Revisit only if the monolith is revived; otherwise candidates for deletion with the rest of the monolith.
+
+## Hygiene flags — custodian pass 2026-07-01 (FLAG ONLY — nothing deleted/moved)
+- ✅ **RESOLVED — secrets management**: SOPS + age encryption pipeline complete. `production/.env.render` is single source of truth; `decrypt-and-start.sh` on Render, `decrypt-local.sh` locally. No more hand-adding keys to Render dashboard.
+- ✅ **RESOLVED — rel-vol "always 10.0x"**: Root cause identified (Alpaca returns volume=0 for premarket). Fixed via `HybridRelVol` (Tradier numerator + Alpaca 30-day denominator). Sim/live lookback now both 30 days.
+- ✅ **RESOLVED — float always null for new gappers**: `fetch_missing_floats()` yfinance fallback + Neon write-back. `max_float` filter now works for brand-new tickers.
+- ✅ **RESOLVED — stop order rejection orphans**: Emergency market-exit fallback on Alpaca 42210000 error. VWAP `stop_order_id` UnboundLocalError crash-then-orphan fixed.
+- ⚠️ **100+ CSV files tracked in git** — `analysis/`, `database/audit_reports/`, `optimizer/` contain committed CSVs that should be gitignored per FILE_PLACEMENT_GUIDE. **Recommend: `git rm --cached` sweep + add patterns to `.gitignore`**. No `.db`/`.parquet`/`.log` files tracked (those are clean).
+- ⚠️ **Carried (still untracked):** `FILE_ORGANIZATION_SETUP.md`, `docs/backtesting_pipeline_discovery.md`, `docs/dashboard-ui-plan.md`, backfill `*_progress_*.json`, optimizer scratch, corpus tooling under `Ross Cameron Day Trading Videos/`, `research/analysis/outputs/`, `production/data/stream/`, `research/maintenance/backfill_daily_gappers_cache.py`. Recommend `.gitignore` sweep.
+- ⚠️ **Legacy monolith component index STILL stale** (carried from 06-17). `orchestrator.py`, `patterns.py`, etc. listed as 🟢 but belong to archived monolith. Recommend marking ⚫ deprecated.
+- ⚠️ **Dead rel-vol classes**: `TradierRelVol`, `RealtimeRelVolCache`, `compute_rel_vol()` in `rel_vol_live.py` — superseded by `HybridRelVol`. Still importable. Safe to delete after confirming no external callers.
+- ⚠️ **Parity audit known failures (2 pre-existing)**: `scalp sim uses rank_candidates()` and `VWAP sim checks max_float` — accepted gaps, not regressions. No new failures introduced in Phase 15.
+- ℹ️ **NOTE — `bash.exe.stackdump` + `.playwright-mcp/`** from prior passes no longer present (cleaned up).
