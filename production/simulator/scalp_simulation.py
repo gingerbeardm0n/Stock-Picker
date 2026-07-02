@@ -423,6 +423,190 @@ class ScalpSimulationRunner:
             'top_candidate': top_candidate,
         }
 
+    # ── Multi-candidate mode (live parity: MAX_ARMED / MAX_CONCURRENT) ────────
+
+    def run_multi(self, max_armed: int = 10, max_concurrent: int = 3) -> dict:
+        """
+        Run one day in multi-candidate mode, mirroring the live runner's
+        execute_trade(): arm the top `max_armed` ranked candidates, walk all
+        their minute bars in time order, enter on each symbol's own
+        evaluate_entry signal while fewer than `max_concurrent` positions are
+        open, one entry per symbol per day.
+
+        Returns {'traded', 'trades': [ScalpTrade], 'pnl', 'candidate_count',
+                 'top_candidate'} — 'trades' is a LIST (0..max_concurrent+ per day).
+        """
+        with StockDataDB() as db:
+            candidates = self._find_candidates(db)
+            if not candidates:
+                return self._no_trade_multi(0, None)
+            candidates = screen_candidates(candidates)
+            candidates = self._enrich_candidates(db, candidates)
+            filtered = self._apply_filters(candidates)
+            if not filtered:
+                return self._no_trade_multi(len(candidates), None)
+
+            armed = rank_candidates(filtered)[:max_armed]
+            if not armed:
+                return self._no_trade_multi(len(candidates), None)
+
+            trades = self._simulate_trades_multi(db, armed, max_concurrent)
+
+        pnl = sum(t.pnl for t in trades)
+        return {
+            'traded': bool(trades),
+            'trades': trades,
+            'pnl': round(pnl, 2),
+            'candidate_count': len(candidates),
+            'top_candidate': armed[0],
+        }
+
+    def _no_trade_multi(self, candidate_count: int, top: dict | None) -> dict:
+        return {'traded': False, 'trades': [], 'pnl': 0.0,
+                'candidate_count': candidate_count, 'top_candidate': top}
+
+    def _load_symbol_bars(self, db: StockDataDB, symbol: str) -> tuple[list, float | None]:
+        """Market-hours bars (with _et) + premarket high for one symbol."""
+        end_minute = 30 + self.config.max_entry_bars + self.config.max_hold_bars + 2
+        end_hour = 9 + (end_minute // 60)
+
+        bars_data = db.get_minute_bars([symbol], self.trade_date,
+                                       start_hour=9, end_hour=end_hour + 1)
+        all_bars = bars_data.get(symbol, [])
+
+        pm_bars = db.get_minute_bars([symbol], self.trade_date,
+                                     start_hour=4, end_hour=9).get(symbol, [])
+        pm_hour_bars = db.get_hour_bars([symbol], self.trade_date,
+                                        start_hour=4, end_hour=9).get(symbol, [])
+        premarket_high = get_premarket_high(pm_hour_bars + pm_bars)
+
+        market_bars = []
+        for bar in all_bars:
+            t = bar.get('time')
+            if t is None:
+                continue
+            et = (t.astimezone(ET) if hasattr(t, 'astimezone')
+                  else datetime.fromisoformat(str(t)).astimezone(ET))
+            if et.hour > 9 or (et.hour == 9 and et.minute >= 30):
+                bar['_et'] = et
+                market_bars.append(bar)
+        return market_bars, premarket_high
+
+    def _position_size_live(self, entry_price: float, max_concurrent: int) -> int:
+        """Live runner's multi-candidate sizing: full risk budget per trade,
+        but max_position_pct split across concurrent slots."""
+        risk_amount = self.account_size * (self.config.risk_pct / 100)
+        stop_distance = entry_price * (self.config.stop_loss_pct / 100)
+        shares_by_risk = int(risk_amount / stop_distance) if stop_distance > 0 else 0
+        max_position_value = (self.account_size
+                              * (self.config.max_position_pct / 100) / max_concurrent)
+        shares_by_position = int(max_position_value / entry_price) if entry_price > 0 else 0
+        return max(1, min(shares_by_risk, shares_by_position))
+
+    def _simulate_trades_multi(
+        self, db: StockDataDB, armed: list[dict], max_concurrent: int,
+    ) -> list[ScalpTrade]:
+        """Time-ordered lockstep walk over all armed symbols' bars,
+        replicating the live bar-queue loop (first-signal-wins, concurrency cap,
+        per-symbol bar counters, one entry per symbol per day)."""
+        # Load bars per symbol; a symbol with no bars is 'done' immediately
+        # (sim equivalent of live's wall-clock bar-starvation fallback).
+        meta: dict[str, dict] = {}
+        events: list[tuple] = []   # (et, symbol, bar_index_within_symbol, bar)
+        for c in armed:
+            sym = c['symbol']
+            bars, pm_high = self._load_symbol_bars(db, sym)
+            meta[sym] = {'candidate': c, 'pm_high': pm_high, 'done': not bars,
+                         'position': None, 'bars': bars}
+            for i, b in enumerate(bars):
+                events.append((b['_et'], sym, i, b))
+        events.sort(key=lambda e: e[0])
+
+        open_count = 0
+        trades: list[ScalpTrade] = []
+
+        for et, sym, i, bar in events:
+            m = meta[sym]
+            if m['done']:
+                continue
+
+            pos = m['position']
+            if pos is not None:
+                # Manage the open position on its own bars
+                bar_high = float(bar['high'])
+                pos['highest'] = max(pos['highest'], bar_high)
+                bars_held = i - pos['entry_idx']
+                exit_signal = evaluate_exit(
+                    pos['entry_price'], pos['highest'], bar, bars_held, self.config)
+                if exit_signal:
+                    trades.append(self._close_multi(m, pos, bar, i, exit_signal))
+                    m['position'] = None
+                    m['done'] = True
+                    open_count -= 1
+            else:
+                if open_count < max_concurrent:
+                    signal = evaluate_entry(
+                        m['candidate'], bar, m['pm_high'],
+                        bars_since_open=i, config=self.config)
+                    if signal:
+                        entry_price = signal['entry_price']
+                        m['position'] = {
+                            'entry_price': entry_price,
+                            'entry_idx': i,
+                            'entry_reason': signal['reason'],
+                            'entry_time': bar.get('_et'),
+                            'shares': self._position_size_live(entry_price, max_concurrent),
+                            'highest': entry_price,
+                        }
+                        open_count += 1
+                        continue
+                # Entry-window timeout mirrors live's per-bar counter check
+                if i + 1 >= self.config.max_entry_bars and m['position'] is None:
+                    m['done'] = True
+
+        # Force-exit anything still open at its last available bar (live's
+        # END_OF_DATA equivalent — max_hold_bars exit normally fires first).
+        for sym, m in meta.items():
+            pos = m['position']
+            if pos is not None and m['bars']:
+                last_idx = len(m['bars']) - 1
+                last_bar = m['bars'][last_idx]
+                trades.append(self._close_multi(
+                    m, pos, last_bar, last_idx,
+                    {'exit_price': float(last_bar['close']),
+                     'reason': 'END_OF_DATA forced exit',
+                     'exit_type': 'end_of_data'}))
+                m['position'] = None
+
+        return trades
+
+    def _close_multi(self, m: dict, pos: dict, bar: dict,
+                     bar_idx: int, exit_signal: dict) -> ScalpTrade:
+        c = m['candidate']
+        entry_price = pos['entry_price']
+        exit_price = exit_signal['exit_price']
+        shares = pos['shares']
+        pnl = (exit_price - entry_price) * shares
+        return ScalpTrade(
+            symbol=c['symbol'],
+            date=self.trade_date,
+            entry_price=entry_price,
+            exit_price=exit_price,
+            shares=shares,
+            entry_time=pos['entry_time'],
+            exit_time=bar.get('_et', bar.get('time')),
+            entry_reason=pos['entry_reason'],
+            exit_reason=exit_signal['reason'],
+            exit_type=exit_signal['exit_type'],
+            pnl=round(pnl, 2),
+            pnl_pct=round((exit_price - entry_price) / entry_price * 100, 2),
+            bars_held=bar_idx - pos['entry_idx'],
+            gap_pct=c.get('gap_pct', 0),
+            rel_vol=c.get('rel_vol', 0),
+            news_tier=c.get('news_tier', 'none'),
+            scalp_score=c.get('scalp_score', 0),
+        )
+
 
 def run_scalp_date_range(
     config: ScalpConfig,
@@ -496,6 +680,68 @@ def run_scalp_date_range(
         'win_rate': win_rate,
         'total_pnl': round(total_pnl, 2),
         'avg_daily_pnl': round(avg_daily_pnl, 2),
+        'max_drawdown': round(max_dd, 2),
+        'profit_factor': round(profit_factor, 2),
+        'trades': trades,
+        'daily_pnls': daily_pnls,
+    }
+
+
+def run_scalp_date_range_multi(
+    config: ScalpConfig,
+    start_date: str,
+    end_date: str,
+    account_size: float = 5000.0,
+    max_armed: int = 10,
+    max_concurrent: int = 3,
+    verbose: bool = True,
+    print_dates: bool = False,
+) -> dict:
+    """Multi-candidate variant of run_scalp_date_range (live-parity behavior).
+    Same aggregate metrics shape; 'trades' may contain several per day."""
+    with StockDataDB() as db:
+        trading_days = db.get_trading_days(start_date, end_date)
+
+    if not trading_days:
+        logger.warning(f"No trading days found between {start_date} and {end_date}")
+        return _empty_result()
+
+    trades: list[ScalpTrade] = []
+    daily_pnls: list[float] = []
+
+    for trade_date in trading_days:
+        runner = ScalpSimulationRunner(trade_date, config, account_size, verbose=verbose)
+        result = runner.run_multi(max_armed=max_armed, max_concurrent=max_concurrent)
+        trades.extend(result['trades'])
+        daily_pnls.append(result['pnl'])
+        if print_dates:
+            status = (f"${result['pnl']:+.2f} ({len(result['trades'])} trades)"
+                      if result['traded'] else "no trade")
+            print(f"  {trade_date} | {status}")
+
+    total_pnl = sum(t.pnl for t in trades)
+    winners = [t for t in trades if t.pnl > 0]
+    losers = [t for t in trades if t.pnl <= 0]
+    win_rate = (len(winners) / len(trades) * 100) if trades else 0.0
+    gross_profit = sum(t.pnl for t in winners)
+    gross_loss = abs(sum(t.pnl for t in losers))
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+
+    cum_pnl = peak = max_dd = 0.0
+    for pnl in daily_pnls:
+        cum_pnl += pnl
+        peak = max(peak, cum_pnl)
+        max_dd = max(max_dd, peak - cum_pnl)
+
+    days_traded = len([p for p in daily_pnls if p != 0.0])
+    return {
+        'days_traded': days_traded,
+        'total_trades': len(trades),
+        'winners': len(winners),
+        'losers': len(losers),
+        'win_rate': win_rate,
+        'total_pnl': round(total_pnl, 2),
+        'avg_daily_pnl': round(total_pnl / days_traded, 2) if days_traded else 0.0,
         'max_drawdown': round(max_dd, 2),
         'profit_factor': round(profit_factor, 2),
         'trades': trades,

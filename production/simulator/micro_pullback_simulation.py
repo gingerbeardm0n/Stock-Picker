@@ -320,6 +320,173 @@ class MicroPullbackSimulationRunner:
             'top_candidate': None,
         }
 
+    # ── Multi-candidate mode (live parity: arm N / max concurrent) ────────
+
+    def run_multi(self, max_armed: int = 10, max_concurrent: int = 3) -> dict:
+        """Run one day in multi-candidate mode: arm top `max_armed` ranked
+        candidates, walk all their bars in time order, enter on each symbol's
+        own pullback signal while < `max_concurrent` positions open."""
+        with StockDataDB() as db:
+            candidates = db.find_gappers(
+                self.trade_date,
+                min_gap_pct=self.config.min_gap_pct,
+                max_price=self.config.max_price,
+            )
+            if not candidates:
+                return self._no_trade_multi(0, None)
+            candidates = screen_candidates(candidates)
+            candidates = self._enrich_candidates(db, candidates)
+            filtered = self._apply_filters(candidates)
+            if not filtered:
+                return self._no_trade_multi(len(candidates), None)
+
+            armed = rank_candidates(filtered)[:max_armed]
+            if not armed:
+                return self._no_trade_multi(len(candidates), None)
+
+            trades = self._simulate_trades_multi(db, armed, max_concurrent)
+
+        pnl = sum(t.pnl for t in trades)
+        return {
+            'traded': bool(trades),
+            'trades': trades,
+            'pnl': round(pnl, 2),
+            'candidate_count': len(candidates),
+            'top_candidate': armed[0],
+        }
+
+    def _no_trade_multi(self, candidate_count: int, top: dict | None) -> dict:
+        return {'traded': False, 'trades': [], 'pnl': 0.0,
+                'candidate_count': candidate_count, 'top_candidate': top}
+
+    def _position_size_multi(self, entry_price: float, stop_price: float,
+                             max_concurrent: int) -> int:
+        risk_per_share = max(entry_price - stop_price, entry_price * 0.005)
+        risk_amount = self.account_size * (self.config.risk_pct / 100)
+        max_position_value = (self.account_size
+                              * (self.config.max_position_pct / 100) / max_concurrent)
+        return max(1, min(int(risk_amount / risk_per_share),
+                          int(max_position_value / entry_price)))
+
+    def _simulate_trades_multi(
+        self, db: StockDataDB, armed: list[dict], max_concurrent: int,
+    ) -> list[MicroPullbackTrade]:
+        """Lockstep walk over all armed symbols' bars: per-symbol bars_so_far
+        accumulation, concurrent entry cap, per-symbol exit tracking."""
+        symbols = [c['symbol'] for c in armed]
+        bars_data = db.get_minute_bars(symbols, self.trade_date, start_hour=9, end_hour=11)
+
+        meta: dict[str, dict] = {}
+        events: list[tuple] = []
+        for c in armed:
+            sym = c['symbol']
+            all_bars = bars_data.get(sym, [])
+            market_bars = []
+            for bar in all_bars:
+                t = bar.get('time')
+                if t is None:
+                    continue
+                et = (t.astimezone(ET) if hasattr(t, 'astimezone')
+                      else datetime.fromisoformat(str(t)).astimezone(ET))
+                if et.hour > 9 or (et.hour == 9 and et.minute >= 30):
+                    bar['_et'] = et
+                    market_bars.append(bar)
+            meta[sym] = {
+                'candidate': c, 'bars': market_bars, 'done': not market_bars,
+                'bars_so_far': [], 'position': None,
+            }
+            for i, b in enumerate(market_bars):
+                events.append((b['_et'], sym, i, b))
+        events.sort(key=lambda e: e[0])
+
+        open_count = 0
+        trades: list[MicroPullbackTrade] = []
+
+        for et_time, sym, i, bar in events:
+            m = meta[sym]
+            if m['done']:
+                continue
+
+            m['bars_so_far'].append(bar)
+
+            pos = m['position']
+            if pos is not None:
+                bar_high = float(bar['high'])
+                pos['highest'] = max(pos['highest'], bar_high)
+                bars_held = i - pos['entry_idx']
+                exit_signal = evaluate_exit(
+                    pos['entry_price'], pos['stop_price'], pos['highest'],
+                    bar, bars_held=bars_held, config=self.config)
+                if exit_signal:
+                    trades.append(self._close_multi(m, pos, bar, i, exit_signal))
+                    m['position'] = None
+                    m['done'] = True
+                    open_count -= 1
+            else:
+                if open_count < max_concurrent:
+                    signal = evaluate_entry(
+                        m['candidate'], m['bars_so_far'], self.config)
+                    if signal:
+                        entry_price = signal['entry_price']
+                        stop_price = signal['stop_price']
+                        m['position'] = {
+                            'entry_price': entry_price,
+                            'stop_price': stop_price,
+                            'entry_idx': i,
+                            'entry_reason': signal['reason'],
+                            'entry_time': bar.get('_et'),
+                            'shares': self._position_size_multi(
+                                entry_price, stop_price, max_concurrent),
+                            'highest': entry_price,
+                        }
+                        open_count += 1
+                        continue
+                # Past entry window end
+                if et_time.hour == 10 and et_time.minute > 35:
+                    m['done'] = True
+                elif et_time.hour >= 11:
+                    m['done'] = True
+
+        for sym, m in meta.items():
+            pos = m['position']
+            if pos is not None and m['bars']:
+                last_idx = len(m['bars']) - 1
+                last_bar = m['bars'][last_idx]
+                trades.append(self._close_multi(
+                    m, pos, last_bar, last_idx,
+                    {'exit_price': float(last_bar['close']),
+                     'reason': 'END_OF_DATA forced exit',
+                     'exit_type': 'end_of_data'}))
+                m['position'] = None
+
+        return trades
+
+    def _close_multi(self, m: dict, pos: dict, bar: dict,
+                     bar_idx: int, exit_signal: dict) -> MicroPullbackTrade:
+        c = m['candidate']
+        entry_price = pos['entry_price']
+        exit_price = exit_signal['exit_price']
+        shares = pos['shares']
+        pnl = (exit_price - entry_price) * shares
+        return MicroPullbackTrade(
+            symbol=c['symbol'],
+            date=self.trade_date,
+            entry_price=entry_price,
+            exit_price=exit_price,
+            shares=shares,
+            entry_time=pos['entry_time'],
+            exit_time=bar.get('_et', bar.get('time')),
+            entry_reason=pos['entry_reason'],
+            exit_reason=exit_signal['reason'],
+            exit_type=exit_signal['exit_type'],
+            pnl=round(pnl, 2),
+            pnl_pct=round((exit_price - entry_price) / entry_price * 100, 2),
+            bars_held=bar_idx - pos['entry_idx'],
+            gap_pct=c.get('gap_pct', 0),
+            rel_vol=c.get('rel_vol', 0),
+            news_tier=c.get('news_tier', 'none'),
+        )
+
 
 def run_micro_pullback_date_range(
     config: MicroPullbackConfig,
@@ -383,6 +550,67 @@ def run_micro_pullback_date_range(
         'win_rate': win_rate,
         'total_pnl': round(total_pnl, 2),
         'avg_daily_pnl': round(avg_daily_pnl, 2),
+        'max_drawdown': round(max_dd, 2),
+        'profit_factor': round(profit_factor, 2),
+        'trades': trades,
+        'daily_pnls': daily_pnls,
+    }
+
+
+def run_micro_pullback_date_range_multi(
+    config: MicroPullbackConfig,
+    start_date: str,
+    end_date: str,
+    account_size: float = 5000.0,
+    max_armed: int = 10,
+    max_concurrent: int = 3,
+    verbose: bool = True,
+    print_dates: bool = False,
+) -> dict:
+    """Multi-candidate variant of run_micro_pullback_date_range (live-parity)."""
+    with StockDataDB() as db:
+        trading_days = db.get_trading_days(start_date, end_date)
+
+    if not trading_days:
+        return _empty_result()
+
+    trades: list[MicroPullbackTrade] = []
+    daily_pnls: list[float] = []
+
+    for trade_date in trading_days:
+        runner = MicroPullbackSimulationRunner(
+            trade_date, config, account_size, verbose=verbose)
+        result = runner.run_multi(max_armed=max_armed, max_concurrent=max_concurrent)
+        trades.extend(result['trades'])
+        daily_pnls.append(result['pnl'])
+        if print_dates:
+            status = (f"${result['pnl']:+.2f} ({len(result['trades'])} trades)"
+                      if result['traded'] else "no trade")
+            print(f"  {trade_date} | {status}")
+
+    total_pnl = sum(t.pnl for t in trades)
+    winners = [t for t in trades if t.pnl > 0]
+    losers = [t for t in trades if t.pnl <= 0]
+    win_rate = (len(winners) / len(trades) * 100) if trades else 0.0
+    gross_profit = sum(t.pnl for t in winners)
+    gross_loss = abs(sum(t.pnl for t in losers))
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+
+    cum_pnl = peak = max_dd = 0.0
+    for pnl in daily_pnls:
+        cum_pnl += pnl
+        peak = max(peak, cum_pnl)
+        max_dd = max(max_dd, peak - cum_pnl)
+
+    days_traded = len([p for p in daily_pnls if p != 0.0])
+    return {
+        'days_traded': days_traded,
+        'total_trades': len(trades),
+        'winners': len(winners),
+        'losers': len(losers),
+        'win_rate': win_rate,
+        'total_pnl': round(total_pnl, 2),
+        'avg_daily_pnl': round(total_pnl / days_traded, 2) if days_traded else 0.0,
         'max_drawdown': round(max_dd, 2),
         'profit_factor': round(profit_factor, 2),
         'trades': trades,
