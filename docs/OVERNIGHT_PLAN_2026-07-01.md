@@ -292,3 +292,41 @@ existing format). Do NOT mark anything "verified" that wasn't actually verified.
 - A2 DONE — session_job.py docstring 8:55→7:00 (`3104028`); TradeHistory.tsx empty-state text fixed, tsc+build clean, pushed dashboard `10c10bd`.
 - A3 DONE — 3 line-ending-only files reverted (`git diff --ignore-all-space` empty); `.env.example` deletion confirmed deliberate (never re-added since Jun 17 cleanup), staged via `git rm` for A4 commit.
 - A4 DONE (partial) — gitignore + 3 docs harvested; found+fixed gitignore inline-comment bug (patterns with trailing `# comment` matched NOTHING — root cause CSVs were ever tracked); 83 CSVs untracked (`1d960ee`); docs commit `f7ce1d0`. **rel_vol_live.py dead-code deletion SKIPPED**: live callers now exist on main — live_micro_pullback_runner.py:163 uses TradierRelVol, :50 imports compute_rel_vol; test_rel_vol_baseline.py tests compute_rel_vol. Worktree audit predates MP runner. Needs user decision: migrate MP runner to HybridRelVol first, then delete. 77 tests pass.
+- Phase A pushed `406c8a7`.
+- B1 DONE — `.github/workflows/session-report.yml` (`a9c2e3e`), TRADIER_PRODUCTION_TOKEN secret set (NEON/JTRADER already existed). workflow_dispatch test run 28562317417 GREEN first try: parsed Jul 1 from Neon logs, 6-trade table in step summary, persisted; live_trades count for 2026-07-01 still 6 after re-run (idempotent confirmed).
+- B2 DONE (`774dc85`) — generate_journal.py prefers Neon session_logs (falls back to _logs.json), `%-d` strftime fixed portably (Windows crash gone — verified by running locally on Windows against real Jul 1 Neon logs, FILLED lines present in journal). session-capture.yml gains NEON_CONNECTION_STRING env + psycopg2 install.
+- C1 DONE (`8022669`) — root cause: MQ/BACC never watched (screened out 9:25 — MQ float 367M, BACC rel_vol 0.00); GUACU is a SPAC unit with 8 prints ALL DAY (first 11:46 ET) = genuine illiquidity, no symbol-format issue. Wall-clock fallback is correct final fix. DATA_SOURCES lesson 15 + memory updated; item closed.
+- C2 DONE (`5ce772a`) — research/short_squeeze_data_sources.md: FINRA bi-monthly SI (free, archives to 2014, API) recommended; SEC FTD supplement; Ortex/Fintel deferred on cost; tag-first experiment design.
+- C3 DONE (`20e23f1`) — research/corporate_actions_detection.md: Alpaca corporate-actions announcements (keys already in hand) + price/volume heuristic fallback; Polygon splits history as backtest ground truth.
+- C4 DONE (`7490392`) — docs/SESSION_RESILIENCE_DESIGN.md: 3 options + effort table; recommend push-window guard → Neon flag w/ heartbeat → position-reconcile slice of phase checkpoints. User decides.
+
+## End-of-run summary
+
+| Task | Status | Commit(s) |
+|---|---|---|
+| A1 bar-poller log reword | DONE | `a6f5889` |
+| A2 stale docstring + frontend text | DONE | `3104028`, dashboard `10c10bd` (pushed) |
+| A3 line-ending noise + .env.example | DONE | (folded into `1d960ee`) |
+| A4 worktree harvest | DONE except rel_vol dead-code (skipped — see below) | `1d960ee`, `f7ce1d0` |
+| B1 session-report workflow | DONE, tested green (run 28562317417), idempotent | `a9c2e3e` |
+| B2 journal Neon logs + strftime | DONE, tested locally on Windows | `774dc85` |
+| C1 zero-bars root cause | DONE, item closed | `8022669` |
+| C2 squeeze data survey | DONE | `5ce772a` |
+| C3 corp-actions survey | DONE | `20e23f1` |
+| C4 resilience design | DONE (docs only) | `7490392` |
+
+**Needs user decision:**
+1. rel_vol_live.py dead-code deletion BLOCKED — live_micro_pullback_runner.py uses
+   `TradierRelVol` (line 163) + `compute_rel_vol`; migrate MP runner to HybridRelVol
+   first (same fix scalp/VWAP got Jun 30), then delete + drop test_rel_vol_baseline.py.
+2. SESSION_RESILIENCE_DESIGN.md — pick option(s); recommend starting with the
+   pre-push window guard.
+3. Squeeze + corp-actions research docs propose FINRA SI backfill and Polygon
+   splits pull — approve before any code.
+
+**Bonus find:** .gitignore trailing inline comments made several patterns match
+NOTHING (root cause the CSVs were ever tracked). Fixed in `1d960ee`.
+
+**Watch tomorrow (Jul 2):** session-report.yml first scheduled run 12:15 PM ET;
+session-capture journal now reads Neon logs; incremental live-state writes
+(`322b148`) first live confirmation; scalp wall-clock fallback day 1/3.
