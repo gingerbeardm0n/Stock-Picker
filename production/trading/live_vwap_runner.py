@@ -795,7 +795,7 @@ class LiveVwapRunner:
         Cross-vendor caveat: bars come from Tradier, the baseline was built from
         Alpaca historical data, so a residual volume-definition offset remains —
         far smaller than the 2-3x timing error this fixes. Symbols with no
-        pre-9:25 bars are omitted → compute_rel_vol falls back to the 10.0 default.
+        pre-9:25 bars are omitted → rel-vol falls back to the 10.0 default.
         """
         out: dict[str, float] = {}
         try:

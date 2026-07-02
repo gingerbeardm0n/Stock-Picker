@@ -47,7 +47,7 @@ from trading.micro_pullback_models import MicroPullbackConfig, ENTRY_WINDOW_END,
 from trading.micro_pullback_engine import evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_bar, record_news
-from trading.rel_vol_live import fetch_rel_vol_baseline, compute_rel_vol, DEFAULT_REL_VOL
+from trading.rel_vol_live import fetch_rel_vol_baseline, DEFAULT_REL_VOL
 from trading._positions_lock import try_claim as _claim_position, release as _release_position
 from backend.news_fetcher import has_news_catalyst
 
@@ -157,17 +157,22 @@ class LiveMicroPullbackRunner:
         if not self._floats:
             logger.warning("Float baseline empty — max_float filter INACTIVE this session (parity gap)")
 
-        # Live rel-vol: single-feed Tradier (numerator + 5-day denominator). Replaces the
-        # broken Alpaca path (quote_volume always 0 → rel_vol always 10.0). See
-        # rel_vol_live.TradierRelVol and memory rel-vol-live-fix.
-        from trading.rel_vol_live import TradierRelVol
+        # Live rel-vol: hybrid feed — today's cumulative volume from Tradier
+        # (real-time premarket data, Alpaca can't serve same-day bars), 30-day
+        # average at the same minute-of-day from Alpaca historical minute bars
+        # (matches the simulator's rel_vol_cum_cache denominator exactly).
+        # Same setup as the scalp and VWAP runners.
+        from trading.rel_vol_live import HybridRelVol
         self._relvol = None
         try:
-            self._relvol = TradierRelVol(
-                Config._make_tradier_data_feed(), lookback_days=5)
-            logger.info("Rel-vol: Tradier single-feed (5-day premarket denominator)")
+            self._relvol = HybridRelVol(
+                Config._make_tradier_data_feed(),
+                Config._make_alpaca_data_feed(),
+                lookback_days=30)
+            logger.info("Rel-vol: hybrid (Tradier numerator, Alpaca 30-day denominator)")
         except Exception as e:
-            logger.warning(f"TradierRelVol unavailable: {e} — rel_vol falls back to 10.0")
+            logger.warning(
+                f"HybridRelVol unavailable: {e} — rel_vol falls back to 10.0")
 
         self._bar_queue = queue.Queue(maxsize=1000)
 
