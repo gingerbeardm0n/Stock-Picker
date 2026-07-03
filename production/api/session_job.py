@@ -131,12 +131,59 @@ def _claim_session_today() -> bool:
     return claimed
 
 
+def _is_market_holiday_today() -> bool | None:
+    """True if the exchange calendar says today is closed, None if unknowable.
+
+    2026-07-03 (Independence Day observed — the cron's mon-fri gate can't see
+    moved holidays): the session ran anyway, Tradier quotes served stale
+    Thursday snapshots with vol=0, the scanner 'found' 189 phantom gappers
+    (ORBS +2764%), and rel-vol silently fell back to 10.0 for everything.
+    Date-based calendar check (not /markets/clock) so there is no race with
+    the 7:00 premarket state transition. Fail-OPEN: an API error returns None
+    and the session proceeds — a missed holiday wastes a scan cycle, but a
+    false positive would skip a real trading day.
+    """
+    token = os.getenv("TRADIER_PRODUCTION_TOKEN", "")
+    if not token:
+        return None
+    try:
+        import requests
+        today = datetime.now().date()
+        r = requests.get(
+            "https://api.tradier.com/v1/markets/calendar",
+            params={"month": today.month, "year": today.year},
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+            timeout=10,
+        )
+        r.raise_for_status()
+        days = r.json()["calendar"]["days"]["day"]
+        entry = next((d for d in days if d["date"] == str(today)), None)
+        if entry is None:
+            return None
+        closed = entry.get("status") == "closed"
+        if closed:
+            logger.warning(
+                f"Market CLOSED today per Tradier calendar: "
+                f"{entry.get('description', 'no description')}")
+        return closed
+    except Exception as e:
+        logger.warning(f"Holiday calendar check failed ({e}) — proceeding as if open")
+        return None
+
+
 def run_daily_sessions():
     """Run scalp, micro-pullback, and VWAP reclaim in coordinated parallel; persist state."""
     from trading.live_scalp_runner import run_scalp_session
     from trading.live_vwap_runner import run_vwap_session
     from trading.live_micro_pullback_runner import run_micro_pullback_session
     import threading
+
+    # Holiday guard BEFORE the session claim: on a closed day nothing should
+    # run, and the flag should stay unclaimed so a real session isn't blocked
+    # if the calendar was wrong.
+    if _is_market_holiday_today():
+        logger.warning("run_daily_sessions: market closed today (holiday) — skipping session.")
+        return
 
     # Atomically claim today's session (Neon flag). This is the hard guard —
     # deploy-wiped local files can no longer cause a duplicate session.

@@ -228,6 +228,7 @@ class LiveScalpRunner:
         same minute). None → DEFAULT_REL_VOL=10.0 fallback. Mutates in place.
         """
         now = datetime.now(ET)
+        fallbacks = 0
         for c in candidates:
             rv = None
             if self._relvol is not None:
@@ -235,8 +236,16 @@ class LiveScalpRunner:
                     self._relvol.invalidate(c['symbol'])  # numerator grows intraday
                     rv = self._relvol.compute(c['symbol'], now)
                 except Exception as e:
-                    logger.debug(f"  rel-vol compute failed for {c['symbol']}: {e}")
+                    logger.warning(f"  rel-vol compute raised for {c['symbol']}: {e}")
+            if rv is None:
+                fallbacks += 1
             c['rel_vol'] = rv if rv is not None else DEFAULT_REL_VOL
+        if candidates and fallbacks:
+            log = logger.warning if fallbacks == len(candidates) else logger.info
+            log(f"Rel-vol: {len(candidates) - fallbacks}/{len(candidates)} computed, "
+                f"{fallbacks} fell back to {DEFAULT_REL_VOL:.1f}x"
+                + (" — ALL candidates on fallback, filter is a no-op this scan"
+                   if fallbacks == len(candidates) else ""))
 
     def scan_premarket(self):
         """

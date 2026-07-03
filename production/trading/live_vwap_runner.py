@@ -317,6 +317,7 @@ class LiveVwapRunner:
         # premarket-cumulative basis the sim uses. None → 10.0 fallback.
         now = datetime.now(ET)
         filtered = []
+        rv_attempts = rv_fallbacks = 0
         for g in top_gappers:
             if self.config.require_news and not g.get('has_news', False):
                 logger.info(f"  SKIP {g['symbol']} gap={g['gap_pct']:.1f}% -- no news")
@@ -327,7 +328,10 @@ class LiveVwapRunner:
                     self._relvol.invalidate(g['symbol'])
                     rv = self._relvol.compute(g['symbol'], now, cutoff_minute=565)
                 except Exception as e:
-                    logger.debug(f"  rel-vol compute failed for {g['symbol']}: {e}")
+                    logger.warning(f"  rel-vol compute raised for {g['symbol']}: {e}")
+            rv_attempts += 1
+            if rv is None:
+                rv_fallbacks += 1
             g['rel_vol'] = rv if rv is not None else DEFAULT_REL_VOL
             # Same filter the sim applies — skip thin-volume candidates.
             if g['rel_vol'] < self.config.min_relative_volume:
@@ -335,6 +339,13 @@ class LiveVwapRunner:
                             f"rel_vol={g['rel_vol']:.2f} < {self.config.min_relative_volume:.2f}")
                 continue
             filtered.append(g)
+
+        if rv_attempts and rv_fallbacks:
+            log = logger.warning if rv_fallbacks == rv_attempts else logger.info
+            log(f"Rel-vol: {rv_attempts - rv_fallbacks}/{rv_attempts} computed, "
+                f"{rv_fallbacks} fell back to {DEFAULT_REL_VOL:.1f}x"
+                + (" — ALL candidates on fallback, filter is a no-op this scan"
+                   if rv_fallbacks == rv_attempts else ""))
 
         if not filtered:
             logger.warning("No gappers passed news filter.")

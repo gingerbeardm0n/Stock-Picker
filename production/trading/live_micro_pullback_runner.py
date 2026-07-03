@@ -264,6 +264,7 @@ class LiveMicroPullbackRunner:
 
         now = datetime.now(ET)
         filtered = []
+        rv_attempts = rv_fallbacks = 0
         for g in top_gappers:
             if self.config.require_news and not g.get('has_news', False):
                 logger.info(f"  SKIP {g['symbol']} gap={g['gap_pct']:.1f}% -- no news")
@@ -274,7 +275,10 @@ class LiveMicroPullbackRunner:
                     self._relvol.invalidate(g['symbol'])
                     rv = self._relvol.compute(g['symbol'], now)
                 except Exception as e:
-                    logger.debug(f"  rel-vol compute failed for {g['symbol']}: {e}")
+                    logger.warning(f"  rel-vol compute raised for {g['symbol']}: {e}")
+            rv_attempts += 1
+            if rv is None:
+                rv_fallbacks += 1
             g['rel_vol'] = rv if rv is not None else DEFAULT_REL_VOL
             if g['rel_vol'] < self.config.min_relative_volume:
                 logger.info(f"  SKIP {g['symbol']} gap={g['gap_pct']:.1f}% "
@@ -287,6 +291,13 @@ class LiveMicroPullbackRunner:
                             f"float={float_shares:,.0f} > {self.config.max_float:,.0f}")
                 continue
             filtered.append(g)
+
+        if rv_attempts and rv_fallbacks:
+            log = logger.warning if rv_fallbacks == rv_attempts else logger.info
+            log(f"Rel-vol: {rv_attempts - rv_fallbacks}/{rv_attempts} computed, "
+                f"{rv_fallbacks} fell back to {DEFAULT_REL_VOL:.1f}x"
+                + (" — ALL candidates on fallback, filter is a no-op this scan"
+                   if rv_fallbacks == rv_attempts else ""))
 
         if not filtered:
             logger.warning("No gappers passed filters.")

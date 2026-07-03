@@ -139,7 +139,25 @@ class HybridRelVol:
         self._raw_bars: dict[str, list] = {}   # symbol -> concatenated historical bars
         self._fetch_failed: set[str] = set()    # symbols with no Alpaca history (don't retry)
         self._cache: dict[str, float] = {}      # symbol -> rel_vol (computed this session)
+        self._warned: set[str] = set()          # symbols already WARNING-logged (no spam)
         self._lock = threading.Lock()
+
+    def _warn_once(self, symbol: str, reason: str) -> None:
+        """WARNING (once per symbol per session) whenever compute() returns None.
+
+        Every None becomes rel_vol=10.0 in the runners, silently disabling the
+        min_relative_volume filter for that symbol. That fallback used to be
+        visible only at DEBUG — three incidents (Jun 30, Jul 2, Jul 3) all
+        showed the same '10x everywhere' symptom with zero log evidence of
+        WHICH leg failed."""
+        with self._lock:
+            if symbol in self._warned:
+                return
+            self._warned.add(symbol)
+        logger.warning(
+            "Rel-vol UNAVAILABLE for %s (%s) — caller falls back to %.1fx "
+            "(min_relative_volume filter no-op for this symbol)",
+            symbol, reason, DEFAULT_REL_VOL)
 
     def _numerator(self, symbol: str, now_et, cutoff_minute: int) -> float | None:
         """Today's cumulative volume 4am ET -> cutoff_minute, via Tradier timesales."""
@@ -151,9 +169,13 @@ class HybridRelVol:
                 now_et.strftime('%Y-%m-%d %H:%M'),
             )
         except Exception as e:
-            logger.debug("HybridRelVol numerator fetch failed for %s: %s", symbol, e)
+            self._warn_once(symbol, f"Tradier timesales fetch failed: {e}")
             return None
         if not bars:
+            self._warn_once(
+                symbol,
+                "Tradier timesales returned 0 prints today (illiquid symbol, "
+                "very early premarket, or market closed/holiday)")
             return None
 
         import pytz
@@ -170,8 +192,13 @@ class HybridRelVol:
         missing = [s for s in symbols if s not in self._raw_bars and s not in self._fetch_failed]
         if not missing:
             return
-        bars_by_sym = self._alpaca.get_historical_minute_bars(
-            missing, lookback_days=self._lookback)
+        try:
+            bars_by_sym = self._alpaca.get_historical_minute_bars(
+                missing, lookback_days=self._lookback)
+        except Exception as e:
+            for s in missing:
+                self._warn_once(s, f"Alpaca history fetch raised: {e}")
+            return  # not marked failed — retry next scan (transient errors)
         with self._lock:
             for s in missing:
                 bars = bars_by_sym.get(s)
@@ -223,13 +250,18 @@ class HybridRelVol:
         else:
             cutoff_minute = min(cutoff_minute, now_minute)
         if cutoff_minute < 240:
+            self._warn_once(symbol, f"cutoff minute {cutoff_minute} before 4:00 ET")
             return None
 
         numerator = self._numerator(symbol, now_et, cutoff_minute)
         if numerator is None:
-            return None
+            return None  # _numerator already warned with the specific reason
         denominator = self._denominator(symbol, cutoff_minute)
         if not denominator or denominator <= 0:
+            self._warn_once(
+                symbol,
+                "no Alpaca 30-day history baseline (new listing, or Alpaca "
+                "minute-bar fetch failed)")
             return None
 
         rel_vol = numerator / denominator
