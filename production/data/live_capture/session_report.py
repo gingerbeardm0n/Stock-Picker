@@ -154,6 +154,15 @@ SCALP_PNL_RE      = re.compile(r'^\s*P&L: \$([+-][\d,.]+)')                     
 TRADE_SUMMARY_RE  = re.compile(r'Trade #\d+: (\w+) P&L \$([+-][\d,.]+) \((.+)\)')     # vwap/mp's close event (symbol+pnl+reason together)
 REASON_TAG_RE     = re.compile(r'Reason: (VWAP_RECLAIM|MICRO_PULLBACK)')
 STOP_RE           = re.compile(r'Stop: \$([\d.]+)')
+TOTAL_PNL_RE      = re.compile(r'Total P&L: \$([+-]?[\d,.]+)')                        # runner's DAILY SUMMARY line
+
+# Exit reasons the runners actually print — used to reject ENTRY reason lines
+# ("Reason: FIRST_GREEN bar on CLRO") that interleave between another symbol's
+# EXIT and P&L lines in the multi-candidate loop. 2026-07-02: those interleaved
+# entry reasons were being recorded as OTHER symbols' exit_reason in live_trades.
+_EXIT_REASON_KEYWORDS = ('STOP_LOSS', 'PROFIT_TARGET', 'TRAILING_STOP',
+                         'TIME_STOP', 'MAX_HOLD', 'END_OF_', 'EMERGENCY',
+                         'STOP_FILLED')
 
 
 def fetch_logs_from_neon(run_date: str) -> list[dict]:
@@ -171,14 +180,31 @@ def fetch_logs_from_neon(run_date: str) -> list[dict]:
     conn = psycopg2.connect(DB_DSN)
     try:
         with conn.cursor() as cur:
+            # ORDER BY id tiebreaker is load-bearing: logged_at is
+            # second-precision, and a close block logs EXIT/Reason/P&L within
+            # the same second — ordering by logged_at alone scrambles them
+            # (2026-07-02: Reason lines sorted BEFORE their own EXIT lines,
+            # breaking trade attribution downstream).
             cur.execute(
                 "SELECT logged_at, message FROM session_logs "
-                "WHERE run_date = %s ORDER BY logged_at",
+                "WHERE run_date = %s ORDER BY logged_at, id",
                 (run_date,),
             )
-            return [{'t': str(t), 'msg': msg} for t, msg in cur.fetchall()]
+            rows = cur.fetchall()
     finally:
         conn.close()
+
+    # Dedupe identical (timestamp, message) rows — a restarted process can
+    # end up with a doubled log handler (2026-07-02's second session logged
+    # every line twice), which otherwise double-creates trades in the parser.
+    logs, seen = [], set()
+    for t, msg in rows:
+        key = (str(t), msg)
+        if key in seen:
+            continue
+        seen.add(key)
+        logs.append({'t': str(t), 'msg': msg})
+    return logs
 
 
 def fetch_logs(count: int = 400) -> list[dict]:
@@ -296,7 +322,17 @@ def parse_trades(logs: list[dict]) -> list[dict]:
 
         m = EXIT_BRACKET_RE.search(msg)
         if m:
+            # A new EXIT while a previous one never got its P&L line means
+            # that earlier pairing is stale (missing/garbled log line) —
+            # finalize it as-is (pnl stays None; reconciliation flags it)
+            # rather than letting the new symbol's lines contaminate it.
+            if last_scalp_exit_symbol and last_scalp_exit_symbol in open_trades:
+                open_trades.pop(last_scalp_exit_symbol, None)
             last_scalp_exit_symbol = m.group(1)
+            # capture the exit price from the EXIT line itself as a fallback
+            tr = open_trades.get(last_scalp_exit_symbol)
+            if tr is not None and tr.get('paper_exit') is None:
+                tr['paper_exit'] = float(m.group(3))
             continue
 
         m = SCALP_PNL_RE.search(msg)
@@ -311,10 +347,30 @@ def parse_trades(logs: list[dict]) -> list[dict]:
             continue
 
         if 'Reason:' in msg and last_scalp_exit_symbol:
-            # scalp's exit reason line (comes before the P&L line)
-            sym = last_scalp_exit_symbol
-            if sym in open_trades:
-                open_trades[sym]['exit_reason'] = msg.split('Reason:')[1].strip()
+            # Scalp's exit reason line (comes before the P&L line). ONLY accept
+            # exit-shaped reasons — entry reasons from OTHER symbols
+            # ("Reason: FIRST_GREEN bar on CLRO") can interleave here in the
+            # multi-candidate loop and must not be recorded as this exit's.
+            reason = msg.split('Reason:')[1].strip()
+            if any(k in reason for k in _EXIT_REASON_KEYWORDS):
+                sym = last_scalp_exit_symbol
+                if sym in open_trades and open_trades[sym].get('exit_reason') is None:
+                    open_trades[sym]['exit_reason'] = reason
+            continue
+
+        m = TOTAL_PNL_RE.search(msg)
+        if m:
+            # Runner's own DAILY SUMMARY total — reconcile parsed trades
+            # against it so silent mis-attribution can't pass unnoticed.
+            summary_total = float(m.group(1).replace(',', ''))
+            parsed_total = sum(t['paper_pnl'] for t in trades
+                               if t.get('paper_pnl') is not None
+                               and t.get('strategy') == 'scalp')
+            if abs(summary_total - parsed_total) > 0.01:
+                print(f"[warn] parser reconciliation: runner DAILY SUMMARY total "
+                      f"${summary_total:+.2f} != parsed scalp total ${parsed_total:+.2f} "
+                      f"— check attribution")
+            continue
 
     return trades
 

@@ -51,13 +51,84 @@ def _append_trade(trade_data: dict):
 
 _SESSION_STARTED_FILE = STATE_DIR / "session_started_date.txt"
 
+_FLAG_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS session_flags (
+    run_date   DATE PRIMARY KEY,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)
+"""
+
+
+def _neon_conn():
+    conn_str = os.getenv("NEON_CONNECTION_STRING", "")
+    if not conn_str:
+        return None
+    import psycopg2
+    return psycopg2.connect(conn_str, connect_timeout=5)
+
 
 def is_session_started_today() -> bool:
-    """True if run_daily_sessions() already kicked off today."""
+    """True if run_daily_sessions() already kicked off today.
+
+    Neon is the source of truth — the old local-file flag lives on Render's
+    ephemeral disk, so every deploy wiped it and the server's startup
+    auto-trigger happily launched a SECOND full session (confirmed live
+    2026-07-02: a ~11:55 ET deploy spawned a duplicate session that traded 7
+    midday positions 11:59-12:07 ET). File is kept as a fallback for when
+    Neon is unreachable.
+    """
+    try:
+        conn = _neon_conn()
+        if conn is not None:
+            with conn, conn.cursor() as cur:
+                cur.execute(_FLAG_TABLE_SQL)
+                cur.execute("SELECT 1 FROM session_flags WHERE run_date = %s",
+                            (datetime.now().date(),))
+                row = cur.fetchone()
+            conn.close()
+            return row is not None
+    except Exception as e:
+        logger.warning(f"Neon session flag check failed ({e}) — file fallback")
     try:
         return _SESSION_STARTED_FILE.read_text().strip() == str(datetime.now().date())
     except OSError:
         return False
+
+
+def _claim_session_today() -> bool:
+    """Atomically claim today's session. Returns False if already claimed.
+
+    INSERT ... ON CONFLICT DO NOTHING makes the claim race-safe: if the 7:00
+    cron, a watchdog /trigger, and a startup auto-trigger all fire together,
+    exactly one caller gets rowcount 1.
+    """
+    claimed = None
+    try:
+        conn = _neon_conn()
+        if conn is not None:
+            with conn, conn.cursor() as cur:
+                cur.execute(_FLAG_TABLE_SQL)
+                cur.execute(
+                    "INSERT INTO session_flags (run_date) VALUES (%s) "
+                    "ON CONFLICT (run_date) DO NOTHING",
+                    (datetime.now().date(),))
+                claimed = cur.rowcount == 1
+            conn.close()
+    except Exception as e:
+        logger.warning(f"Neon session flag claim failed ({e}) — file fallback")
+
+    # Local file kept in sync (fast reads + fallback when Neon is down)
+    already_in_file = False
+    try:
+        already_in_file = (_SESSION_STARTED_FILE.read_text().strip()
+                           == str(datetime.now().date()))
+    except OSError:
+        pass
+    _SESSION_STARTED_FILE.write_text(str(datetime.now().date()))
+
+    if claimed is None:  # Neon unreachable — best-effort file semantics
+        return not already_in_file
+    return claimed
 
 
 def run_daily_sessions():
@@ -67,8 +138,13 @@ def run_daily_sessions():
     from trading.live_micro_pullback_runner import run_micro_pullback_session
     import threading
 
-    # Write start flag immediately — lets /trigger guard against double-fire.
-    _SESSION_STARTED_FILE.write_text(str(datetime.now().date()))
+    # Atomically claim today's session (Neon flag). This is the hard guard —
+    # deploy-wiped local files can no longer cause a duplicate session.
+    if not _claim_session_today():
+        logger.warning(
+            "run_daily_sessions: today's session already claimed "
+            "(Neon session_flags) — refusing duplicate run.")
+        return
 
     scalp_state_data = {}
     vwap_state_data = {}
@@ -219,8 +295,6 @@ def run_daily_sessions():
     logger.info("=== PERSISTING SESSION TO DB ===")
     try:
         from api.session_persistence import persist_session
-        # persist_session currently takes scalp + vwap; micro-pullback trades
-        # are appended via _append_trade above, so no additional call needed
-        persist_session(scalp_state_data, vwap_state_data)
+        persist_session(scalp_state_data, vwap_state_data, micro_pullback_state_data)
     except Exception as e:
         logger.error(f"Session persistence import/call failed: {e}", exc_info=True)

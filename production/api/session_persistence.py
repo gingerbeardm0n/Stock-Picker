@@ -235,7 +235,8 @@ def _persist_logs(conn, run_date: str):
     return len(rows)
 
 
-def persist_session(scalp_state: dict, vwap_state: dict):
+def persist_session(scalp_state: dict, vwap_state: dict,
+                    micro_pullback_state: dict | None = None):
     """Persist all session data to TimescaleDB. Never raises — logs errors."""
     run_date = str(datetime.now(timezone.utc).date())
     try:
@@ -247,6 +248,8 @@ def persist_session(scalp_state: dict, vwap_state: dict):
                 _persist_run(conn, run_date, "opening_bell_scalp", scalp_state)
             if vwap_state:
                 _persist_run(conn, run_date, "vwap_reclaim", vwap_state)
+            if micro_pullback_state:
+                _persist_run(conn, run_date, "micro_pullback", micro_pullback_state)
 
             bar_count = _persist_bars(conn, run_date)
             news_count = _persist_news(conn, run_date)
