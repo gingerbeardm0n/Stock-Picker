@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-07-02",
+  "as_of":"2026-07-03",
   "symbols":[
     "AACPU",
     "AADX",
@@ -127,6 +127,8 @@
     "AMKR",
     "AMLX",
     "AMPG",
+    "AMPGR",
+    "AMPGZ",
     "AMPH",
     "AMPL",
     "AMPU",
@@ -1848,6 +1850,7 @@
     "SFIX",
     "SG",
     "SGHC",
+    "SGLY",
     "SGML",
     "SHAZ",
     "SHIM",
@@ -2144,6 +2147,7 @@
     "UP",
     "UPB",
     "UPBD",
+    "UPC",
     "UPSX",
     "UPWK",
     "UPXI",
@@ -2338,5 +2342,5 @@
     "ZVRA"
   ],
   "added":[],
-  "total":2335
+  "total":2339
 }
