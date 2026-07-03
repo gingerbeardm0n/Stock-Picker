@@ -206,6 +206,84 @@ human remembering to run them before every deploy? Given today's finding that
 
 ---
 
+## Audit 2026-07-02 (end of day) — full pass against code + Neon + Alpaca
+
+### 🔴 NEW P0 — Phase 0 double-fire CONFIRMED LIVE, with real (paper) trades
+
+`server.py:78-83`: on ANY server start between 7:00-11:59 ET, if
+`_SESSION_STARTED_FILE` is missing (every deploy wipes it — ephemeral disk),
+the server auto-triggers a **full new `run_daily_sessions()`**. Today a
+~11:55 ET push (the bug-fix deploy) restarted Render inside that window →
+a SECOND scalp session launched at 11:59 ET and traded **7 more positions
+(PLBL, USDE, CWD, SDEV, WHLR, PPCB, CLRO), 11:59-12:07 ET** — midday chop,
+outside the strategy's 9:30-9:40 design window, and past the 11:45 no-deploy
+cutoff. All rows visible in Neon `live_trades` (decision_time 15:59-16:07 UTC)
+and Alpaca. Yesterday's version of this was "suspected"; today it's proven.
+The "never push 08:00-11:45 ET" rule is insufficient — the danger window is
+**any deploy before 12:00 ET**. Interim rule until fixed: **no pushes to main
+before 12:00 ET, period.** Real fix = the started-flag must live in Neon, not
+on ephemeral disk (option 2 in `docs/SESSION_RESILIENCE_DESIGN.md`, currently
+deferred — recommend un-deferring this one piece).
+
+### Same-day fixes shipped (all reset their steps' verification counters)
+
+| Commit | What |
+|---|---|
+| `ccae5d1` | Alpaca prior-close retry (3x w/ backoff) — a single 500 at the 9:45 re-scan had zeroed BOTH VWAP and MP watchlists today; persistence "can't adapt type 'dict'" (top_pick dict) — first session's persist rolled back entirely; dashboard scalp trade_count (was capped at 1 via entry_price) |
+| `0c5ddce` | MP runner migrated to HybridRelVol (was still on dead 5-day TradierRelVol) |
+| `31397d5` | Scalp entries: marketable limit +0.25% (12/15 exact-close limits missed today — adverse selection confirmed live) |
+| `7bd92d5` | Marketable-limit fill model in all 3 sims (docs/SIM_FILL_MODEL_DESIGN.md) |
+| `2a11234` | VWAP live config → fill-aware Trial 184 (sealed 2025: +$1,844, PF 1.60); live limit = signal +0.97%; market-fallback cap = tuned headroom (was flat 2%); MP fallback cap 2%→0.5% |
+
+### Status of the Jul 1 open items (re-verified today)
+
+1. Phase 3 bar-starvation hang → **wall-clock fallback WORKED today**:
+   CNNE/BACCR/LOCO all logged "No entry after 10min wall-clock — marking done
+   (bar starvation)". Day 1/3 ✅.
+2. `/dashboard` state sync (5.1) → incremental writes worked (stages updated
+   live) but the header showed **0 trades while 2 were filled** — that was the
+   trade_count bug, fixed `ccae5d1`, unverified live. Still 0/3.
+3. `/trades` → Neon (5.2) → working; `live_trades` has today's rows. BUT see
+   new parser-attribution issue below. Day 1 ⚠️.
+4. MP dashboard section (5.3) → rendered correctly (IDLE) — no MP trade yet to
+   confirm stage inference. Still awaiting a real fill.
+5. MP trades → Neon (Phase 4) → **CONFIRMED GAP**: `session_runs` today has
+   scalp + vwap rows only; `persist_session()` still never receives MP state.
+   Open.
+6. `session_runs` empty mystery → **RESOLVED**: populates fine once a session
+   completes AND the dict bug is fixed — today's 2 rows came from the (buggy,
+   unwanted) second session, which ran AFTER the `ccae5d1` fix deployed. Note
+   the upsert on (run_date, strategy) means the second session **overwrote the
+   first session's real results** — scalp row shows the midday CLRO session
+   (pnl -$47.99), not the real 9:30 session (-$102.38). Double-fire corrupts
+   history, not just adds trades.
+7. MP market-fallback retry → still untested live (MP had no watchlist today
+   thanks to the Alpaca 500). Cap since tightened to 0.5%.
+8. Bar poller log wording → ✅ DONE Jul 2 `a6f5889` (verified in today's logs).
+9. `session_job.py` stale docstring → ✅ DONE (now says 7:00 AM ET).
+10. Capture mechanics → session-capture.yml ran; ALSO NEW: `session-report.yml`
+    (`a9c2e3e`, 12:15 PM ET cron) had its **first scheduled run today** — it's
+    what populated `live_trades` rows 44-52 at 18:01 UTC. Working, but…
+
+### 🟠 NEW — session-report parser attribution bugs in `live_trades`
+
+Today's rows show cross-symbol contamination: PLBL's row carries exit_reason
+"FIRST_GREEN bar on CLRO", USDE's second row says "FIRST_GREEN bar on SDEV",
+WHLR has exit_reason NULL, and paper_pnl signs don't reconcile against the
+runner's own DAILY SUMMARY (-$102.38 for the real session). The parser handles
+the multi-candidate interleaved log format imperfectly — plausible-looking but
+wrong rows are worse than missing rows for a journal. Needs a parser pass with
+the multi-position log format + a reconciliation check against Alpaca fills.
+
+### Phases not yet re-verified (unchanged from Jul 1 status)
+
+- Phase 7 rel-vol baseline: now has TWO workflows — original + cloud builder
+  (`a25f52d`, no-DB variant). Doc predates the second; fold in next audit.
+- Phase 8 manual scripts: `pull_live_bars.py` run manually today pre-deploy
+  (83 bars, 285 news) — the "before any deploy" discipline held.
+
+---
+
 ## Verification Tracker
 
 For each step, track the last 3 trading days it was checked. All three must
@@ -214,20 +292,39 @@ resets to 0.
 
 | Step | Day 1 | Day 2 | Day 3 | Status |
 |---|---|---|---|---|
-| 0.1-0.5 Watchdog triggers | | | | not started |
-| 1.1-1.2 Session kickoff | | | | not started |
-| 2.1-2.4 Scalp | 2026-07-01 ✅ | | | 1/3 |
-| 3.1-3.5 VWAP + Micro-Pullback parallel | 2026-07-01 🔴 | | | 0/3 — fix shipped `5a1f0e0` 13:33 ET, awaiting tomorrow's confirmation |
-| 4.1-4.2 Neon persistence | | | | unverified, needs check first |
-| 5.1-5.2 Dashboard/trades sync | 2026-07-01 🔴 | | | 0/3 (still broken) |
-| 5.3 Micro-pullback dashboard section | | | | fix shipped `9412848`/`f8a6bca` 14:15 ET, awaiting a real trade + 3-day confirmation |
-| 6.1-6.2 GitHub capture | 2026-07-01 🟢 (mechanics) | | | capture-pipeline bug fixed `147372a`, first successful run since Jun 19 — still inherits Phase 5.1/5.2 data-quality issues |
-| 7.1 Rel-vol baseline refresh | | | | not started |
-| 8.1-8.3 Manual post-session scripts | | | | not started |
+| 0.1-0.5 Watchdog triggers | 2026-07-02 🔴 | | | 0/3 — double-fire CONFIRMED live (second session 11:59 ET after deploy); startup auto-trigger is the mechanism, not the watchdog crons themselves |
+| 1.1-1.2 Session kickoff | 2026-07-02 ✅ | | | 1/3 (7:00 ET fire clean) |
+| 2.1-2.4 Scalp | 2026-07-01 ✅ / 07-02 ✅* | | | reset — entry logic changed `31397d5` (marketable limit); *session itself ran clean |
+| 3.1-3.5 VWAP + Micro-Pullback parallel | 2026-07-02 🔴 | | | 0/3 — launched fine (hang fix verified ✅) but both watchlists zeroed by Alpaca 500 (retry shipped `ccae5d1`, unverified) |
+| 4.1-4.2 Neon persistence | 2026-07-02 ⚠️ | | | dict bug fixed + `session_runs` now populates, but MP still has no path in, and double-fire OVERWRITES same-day rows |
+| 5.1-5.2 Dashboard/trades sync | 2026-07-02 ⚠️ | | | stages live-updated ✅; trade_count showed 0 (fixed `ccae5d1`, unverified); /trades works but parser attribution bugs |
+| 5.3 Micro-pullback dashboard section | 2026-07-02 ✅ (empty-state) | | | still awaiting a real MP trade |
+| 6.1-6.2 GitHub capture | 2026-07-02 🟢 | | | 2/3 mechanics |
+| 6.3 session-report.yml (12:15 ET, NEW `a9c2e3e`) | 2026-07-02 ⚠️ | | | ran + wrote live_trades, but attribution bugs in output |
+| 7.1 Rel-vol baseline refresh | | | | not started (now 2 workflows — doc update pending) |
+| 8.1-8.3 Manual post-session scripts | 2026-07-02 ✅ (8.1) | | | pull-before-deploy discipline held |
 
 ---
 
-## Open items from today needing resolution before their step can pass
+## Open items after the 2026-07-02 audit (supersedes the Jul 1 list below)
+
+1. **P0 — kill the double-fire**: move `_SESSION_STARTED_FILE` to a Neon flag
+   (SESSION_RESILIENCE_DESIGN.md option 2, un-defer just this piece). Until
+   then: NO pushes to main before 12:00 ET. Also consider: second-session
+   upsert overwrote the real session's `session_runs` row — flag should also
+   prevent that.
+2. **session-report parser attribution** — cross-symbol exit_reason
+   contamination + P&L mismatch vs runner summary in `live_trades`; add
+   reconciliation against Alpaca fills.
+3. **MP state → `persist_session()`** — micro-pullback still has no path into
+   `session_runs`.
+4. Verify tomorrow (all shipped today, zero live evidence yet): prior-close
+   retry, dashboard trade_count, scalp +0.25% limit fill-rate, VWAP Trial 184
+   + 0.97% headroom entries, MP HybridRelVol + 0.5% cap.
+5. Fold the second rel-vol workflow (`a25f52d` cloud builder) into Phase 7.
+6. Scalp cross-strategy position claim (`_positions_lock`) — task #27, still open.
+
+## Open items from Jul 1 needing resolution before their step can pass
 
 1. ✅ **DONE** — Root-cause the Phase 3 (VWAP + MP) no-launch. Primary cause
    (bar-starved symbols hanging the scalp loop) fixed `5a1f0e0`. Secondary
