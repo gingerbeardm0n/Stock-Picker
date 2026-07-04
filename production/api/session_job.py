@@ -55,7 +55,9 @@ _FLAG_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS session_flags (
     run_date   DATE PRIMARY KEY,
     started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)
+);
+ALTER TABLE session_flags ADD COLUMN IF NOT EXISTS heartbeat TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE session_flags ADD COLUMN IF NOT EXISTS completed BOOLEAN NOT NULL DEFAULT FALSE
 """
 
 
@@ -113,6 +115,29 @@ def _claim_session_today() -> bool:
                     "ON CONFLICT (run_date) DO NOTHING",
                     (datetime.now().date(),))
                 claimed = cur.rowcount == 1
+                if not claimed:
+                    # Stale-claim recovery: a session that claimed the flag and
+                    # then died (deploy kill, crash) would otherwise block the
+                    # whole day. Reclaim ONLY if its heartbeat is >10 min old, it
+                    # never completed, AND it's still before 9:25 ET — past
+                    # that, a restarted session could enter positions midday
+                    # (the exact Jul 2 ghost-session failure this flag exists
+                    # to prevent) and might orphan real open positions.
+                    import pytz
+                    now_et = datetime.now(pytz.timezone('US/Eastern'))
+                    if (now_et.hour, now_et.minute) < (9, 25):
+                        cur.execute(
+                            "UPDATE session_flags SET heartbeat = NOW(), "
+                            "started_at = NOW() WHERE run_date = %s "
+                            "AND completed = FALSE "
+                            "AND heartbeat < NOW() - INTERVAL '10 minutes'",
+                            (datetime.now().date(),))
+                        if cur.rowcount == 1:
+                            claimed = True
+                            logger.warning(
+                                "Reclaimed STALE session flag (previous session "
+                                "died without completing; heartbeat >10 min old, "
+                                "pre-9:25 ET) — starting recovery session.")
             conn.close()
     except Exception as e:
         logger.warning(f"Neon session flag claim failed ({e}) — file fallback")
@@ -129,6 +154,44 @@ def _claim_session_today() -> bool:
     if claimed is None:  # Neon unreachable — best-effort file semantics
         return not already_in_file
     return claimed
+
+
+def _start_heartbeat() -> "threading.Event":
+    """Update session_flags.heartbeat every 60s while the session runs.
+
+    Lets a future starter distinguish 'session alive' from 'session died with
+    the flag claimed' (stale-claim recovery in _claim_session_today)."""
+    import threading
+    stop = threading.Event()
+
+    def beat():
+        while not stop.wait(60):
+            try:
+                conn = _neon_conn()
+                if conn is not None:
+                    with conn, conn.cursor() as cur:
+                        cur.execute(
+                            "UPDATE session_flags SET heartbeat = NOW() "
+                            "WHERE run_date = %s", (datetime.now().date(),))
+                    conn.close()
+            except Exception:
+                pass  # transient Neon failure — next beat retries
+
+    threading.Thread(target=beat, daemon=True, name="session-heartbeat").start()
+    return stop
+
+
+def _mark_session_completed() -> None:
+    try:
+        conn = _neon_conn()
+        if conn is not None:
+            with conn, conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE session_flags SET completed = TRUE, heartbeat = NOW() "
+                    "WHERE run_date = %s", (datetime.now().date(),))
+            conn.close()
+    except Exception as e:
+        logger.warning(f"Could not mark session completed in Neon: {e}")
 
 
 def _is_market_holiday_today() -> bool | None:
@@ -192,6 +255,8 @@ def run_daily_sessions():
             "run_daily_sessions: today's session already claimed "
             "(Neon session_flags) — refusing duplicate run.")
         return
+
+    heartbeat_stop = _start_heartbeat()
 
     scalp_state_data = {}
     vwap_state_data = {}
@@ -345,3 +410,7 @@ def run_daily_sessions():
         persist_session(scalp_state_data, vwap_state_data, micro_pullback_state_data)
     except Exception as e:
         logger.error(f"Session persistence import/call failed: {e}", exc_info=True)
+
+    heartbeat_stop.set()
+    _mark_session_completed()
+    logger.info("=== DAILY SESSIONS COMPLETE (flag marked completed) ===")

@@ -43,7 +43,9 @@ import pytz
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from config import Config
-from trading.vwap_models import VwapReclaimConfig, ENTRY_WINDOW_END, WATCH_TOP_N
+from trading.vwap_models import (
+    VwapReclaimConfig, ENTRY_WINDOW_END, WATCH_TOP_N, MAX_CONCURRENT,
+)
 from trading.vwap_engine import VwapAccumulator, evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, ENRICH_TOP_N, MAX_GAP_PCT
 from trading.bar_capture import record_bar, record_news
@@ -460,7 +462,12 @@ class LiveVwapRunner:
                         f"VWAP={v:.2f}" if v else f"  {sym}: no session bars yet")
 
         window_end_min = ENTRY_WINDOW_END[0] * 60 + ENTRY_WINDOW_END[1]
-        max_concurrent = len(symbols)  # enter up to all watchlist symbols simultaneously
+        # Hard cap, NOT len(symbols): every sealed validation (Trial 184:
+        # +$1,844 / PF 1.60 on 2025) ran arm 10 / max 3 concurrent, and
+        # position sizing divides max_position_pct by this number. With the
+        # watchlist now at 10, len(symbols) would allow 10 tiny unvalidated
+        # concurrent positions.
+        max_concurrent = MAX_CONCURRENT
 
         while not self.state.trade_done:
             try:

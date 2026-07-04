@@ -315,7 +315,10 @@ def fetch_missing_floats(symbols: list[str], floats: dict[str, int]) -> dict[str
                 fetched[sym] = int(raw)
                 floats[sym] = int(raw)
         except Exception as e:
-            logger.debug("Live float fetch failed for %s: %s", sym, e)
+            # WARNING not debug: a failed float fetch leaves float_shares=None,
+            # silently disabling the max_float filter for exactly the
+            # micro-float pumps it exists to catch.
+            logger.warning("Live float fetch failed for %s: %s", sym, e)
         _time.sleep(1.2)  # yfinance rate limit, ~50 req/min
 
     if fetched:

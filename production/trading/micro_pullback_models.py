@@ -22,7 +22,13 @@ from dataclasses import dataclass, asdict
 # anti-overfitting playbook (method 2.9, cut degrees of freedom).
 ENTRY_WINDOW_START = (9, 40)    # ET — right after the scalp's open window
 ENTRY_WINDOW_END = (10, 30)     # ET — after 10:30 the pullback becomes a reversal
-WATCH_TOP_N = 3                 # watch the top-N ranked gappers for a pullback
+WATCH_TOP_N = 10                # watch top-N ranked gappers (sealed validation = arm 10)
+# KNOWN PARITY GAP: the live runner is single-position while the sealed
+# validation allowed up to 3 concurrent. Live therefore trades a conservative
+# subset of the validated behavior. Left as-is deliberately — the strategy is
+# UNDER-REVIEW for live viability (fill-aware re-opt failed its sealed test,
+# see docs/SIM_FILL_MODEL_DESIGN.md); convert to multi-position only if it
+# earns its way out of review.
 EMA_PERIOD = 9                  # Ross's 9-period EMA (fixed, not tuned)
 
 

@@ -268,3 +268,24 @@ Ross Cameron Day Trading Videos/compressed_transcripts/
 
 # Local Claude workspace config
 Ross Cameron Day Trading Videos/.claude/
+
+# Local databases + logs (never commit)
+optimizer/*.db
+research/optimizer/*.db
+database/collector.log.*
+production/data/collector/collector.log.*
+data/sessions/
+
+# Local scratch outputs
+production/services/stocks_in_price_range.json
+production/services/stocks_in_price_range.txt
+
+# Corpus transcripts variant dir (space in name)
+Ross Cameron Day Trading Videos/compressed transcripts/
+
+# Stray logs / temp files
+research/optimizer/*.log.err
+research/session_logs_*.txt
+temp_*.txt
+research/optimizer/optimizer/
+research/data/cache/

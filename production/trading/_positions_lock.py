@@ -58,8 +58,13 @@ def release(symbol: str) -> None:
             active = json.loads(f.read_text())
             active.pop(symbol, None)
             f.write_text(json.dumps(active))
-        except Exception:
-            pass
+        except Exception as e:
+            # A failed release leaves the symbol claimed for the whole
+            # session, blocking every other strategy from entering it.
+            import logging
+            logging.getLogger(__name__).warning(
+                "positions_lock release FAILED for %s (%s) — symbol stays "
+                "claimed until session end", symbol, e)
 
 
 def is_claimed(symbol: str) -> bool:

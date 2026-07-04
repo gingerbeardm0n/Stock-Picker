@@ -21,7 +21,8 @@ from dataclasses import dataclass, asdict
 # per anti-overfitting playbook method 2.9 (cut degrees of freedom).
 ENTRY_WINDOW_START = (10, 0)    # ET — VWAP needs ≥30 min of bars to be meaningful
 ENTRY_WINDOW_END = (11, 30)     # ET — post-noon reclaims on morning runners fail
-WATCH_TOP_N = 3                 # watch the top-N ranked gappers for a reclaim
+WATCH_TOP_N = 10                # watch top-N ranked gappers (sealed validation = arm 10)
+MAX_CONCURRENT = 3              # max simultaneous positions (sealed validation = max 3)
 
 
 @dataclass

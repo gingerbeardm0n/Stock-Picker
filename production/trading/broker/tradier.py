@@ -351,7 +351,10 @@ class TradierDataFeed(DataFeedInterface):
             r = self._session.get(url, params=params, timeout=10)
             r.raise_for_status()
         except Exception as e:
-            logger.debug(f"Timesales fetch failed for {symbol}: {e}")
+            # WARNING not debug: an HTTP failure here is indistinguishable
+            # from "no prints" downstream ([] either way) — rel-vol numerators
+            # and bar polling both quietly degrade on it.
+            logger.warning(f"Timesales fetch failed for {symbol}: {e}")
             return []
 
         series = r.json().get('series')

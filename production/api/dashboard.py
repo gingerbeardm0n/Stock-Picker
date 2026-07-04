@@ -19,7 +19,7 @@ import sys
 import json
 import logging
 from collections import deque
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Query, Request, HTTPException
@@ -556,7 +556,10 @@ def get_dashboard():
     from trading.live_micro_pullback_runner import TRIAL_167_CONFIG as MP_CONFIG
 
     return {
-        "server_time": datetime.utcnow().isoformat(),
+        # timezone-AWARE isoformat (ends +00:00). A naive utcnow() string made
+        # the frontend's `new Date(...)` parse it as LOCAL time — the header
+        # clock showed UTC labeled as ET (4h ahead).
+        "server_time": datetime.now(timezone.utc).isoformat(),
         "scalp": {
             "stage": scalp_stage,
             "last_run": scalp_state.get("last_run"),
