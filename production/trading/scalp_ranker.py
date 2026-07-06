@@ -67,7 +67,6 @@ def _news_score(has_news: bool, news_tier: str | None) -> float:
         'tier1': 1.0,
         'tier2': 0.7,
         'tier3': 0.4,
-        'presence': 0.2,
         'none': 0.0,
     }
     return tier_scores.get(news_tier or 'none', 0.0)

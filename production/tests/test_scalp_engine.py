@@ -304,7 +304,7 @@ class TestRanker:
         assert _news_score(True, 'tier1') == 1.0
         assert _news_score(True, 'tier2') == 0.7
         assert _news_score(True, 'tier3') == 0.4
-        assert _news_score(True, 'presence') == 0.2
+        assert _news_score(True, 'presence') == 0.0  # presence no longer a catalyst
         assert _news_score(False, 'tier1') == 0.0
         assert _news_score(False, None) == 0.0
 

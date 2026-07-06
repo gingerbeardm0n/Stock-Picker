@@ -58,7 +58,7 @@ def classify_news_tier(articles: list) -> str:
     return 'presence'
 
 
-NEWS_CATALYST_TIERS = frozenset({'tier1', 'tier2', 'tier3', 'presence'})
+NEWS_CATALYST_TIERS = frozenset({'tier1', 'tier2', 'tier3'})
 
 
 def has_news_catalyst(tier: str) -> bool:
