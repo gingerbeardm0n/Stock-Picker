@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-07-03",
+  "as_of":"2026-07-06",
   "symbols":[
     "AACPU",
     "AADX",
@@ -303,6 +303,7 @@
     "BEZ",
     "BFLY",
     "BGC",
+    "BGDE",
     "BGL",
     "BGLC",
     "BGM",
@@ -1235,6 +1236,7 @@
     "LTRN",
     "LTRX",
     "LUCD",
+    "LUCY",
     "LUD",
     "LULG",
     "LUMN",
@@ -2342,5 +2344,5 @@
     "ZVRA"
   ],
   "added":[],
-  "total":2339
+  "total":2341
 }
