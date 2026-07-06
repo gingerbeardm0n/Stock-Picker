@@ -505,6 +505,17 @@ class LiveVwapRunner:
 
             bar_min = bar_et.hour * 60 + bar_et.minute if bar_et else 0
 
+            # Unconditional completion check — must run regardless of which
+            # symbol's bar just arrived. The old logic only checked this inside
+            # `elif sym not in traded_symbols`, so once every watched symbol had
+            # been traded, no bar path ever re-evaluated it and the session
+            # polled forever (found live 2026-07-06: still running at 3:48pm ET
+            # for a 10:00-11:30 window).
+            if bar_min > window_end_min and not self.state.positions:
+                logger.info(f"Bar time {bar_et.strftime('%H:%M')} past window end, flat. Done.")
+                self.state.trade_done = True
+                break
+
             # ── Manage open position for this symbol ──────────────────────────
             if sym in self.state.positions:
                 pos = self.state.positions[sym]

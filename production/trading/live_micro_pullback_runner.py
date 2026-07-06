@@ -394,17 +394,23 @@ class LiveMicroPullbackRunner:
 
             bars_hist[sym].append(bar)
 
+            # Unconditional completion check — must run regardless of which
+            # symbol's bar just arrived. The old logic checked window-end only
+            # after skipping already-traded symbols, so once every watched
+            # symbol was exhausted no bar path ever re-evaluated it and the
+            # session polled forever (same bug found in the VWAP runner,
+            # live 2026-07-06: still running mid-afternoon for a 9:30-11:30
+            # window with nothing left to trade).
+            bar_min = bar_et.hour * 60 + bar_et.minute if bar_et else 0
+            if bar_min > window_end_min and not self.state.in_position:
+                logger.info(f"Bar time {bar_et.strftime('%H:%M')} past window end, flat. Done.")
+                self.state.trade_done = True
+                break
+
             if not self.state.in_position:
                 # Skip symbols we already traded
                 if sym in self.state.traded_symbols:
                     continue
-
-                # Check window end
-                bar_min = bar_et.hour * 60 + bar_et.minute if bar_et else 0
-                if bar_min > window_end_min:
-                    logger.info(f"Bar time {bar_et.strftime('%H:%M')} past window end. Done.")
-                    self.state.trade_done = True
-                    break
 
                 # Check active_positions blocking (don't enter if another strategy is in this symbol)
                 if not self._can_enter_symbol(sym):
