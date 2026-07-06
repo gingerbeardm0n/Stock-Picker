@@ -173,6 +173,25 @@ class TradierBroker(BrokerInterface):
                     return PositionResult(symbol=symbol, qty=qty, avg_price=avg)
         return None
 
+    def get_all_positions(self) -> list[PositionResult]:
+        url = f'{self._base}/accounts/{self._account_id}/positions'
+        r = self._session.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()['positions']
+        if not data or data == 'null':
+            return []
+        positions = data.get('position', [])
+        if isinstance(positions, dict):
+            positions = [positions]    # single position returned as dict, not list
+        result = []
+        for pos in positions:
+            qty = int(float(pos.get('quantity', 0)))
+            if qty > 0:
+                cost = float(pos.get('cost_basis', 0.0))
+                avg = cost / qty if qty > 0 else 0.0
+                result.append(PositionResult(symbol=pos.get('symbol'), qty=qty, avg_price=avg))
+        return result
+
     # ── Private helpers ───────────────────────────────────────────────────────
 
     def _submit_order(

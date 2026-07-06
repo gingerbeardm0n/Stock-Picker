@@ -199,6 +199,11 @@ class BrokerInterface(ABC):
         """Return current open position for symbol, or None if not held."""
         ...
 
+    @abstractmethod
+    def get_all_positions(self) -> list[PositionResult]:
+        """All currently open positions on the account."""
+        ...
+
     # ── Shared helpers (concrete — built on the abstract methods above) ──────────
 
     def cancel_order_and_wait(

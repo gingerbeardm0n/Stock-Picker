@@ -234,6 +234,26 @@ def _is_market_holiday_today() -> bool | None:
         return None
 
 
+def _check_orphaned_positions() -> None:
+    """Flag broker positions no runner's local state is tracking.
+
+    Read-only (never places/cancels orders) — see position_reconciliation.py.
+    Runs at session startup so a position surviving a crash/restart/holiday
+    gap (the CLRO incident, Jul 2 2026) shows up immediately instead of
+    sitting invisible until someone happens to check the broker directly.
+    """
+    try:
+        from config import Config
+        from trading.position_reconciliation import find_orphaned_positions
+        broker = Config.get_broker()
+        orphans = find_orphaned_positions(broker)
+        (STATE_DIR / "orphaned_positions.json").write_text(
+            json.dumps({"checked_at": datetime.utcnow().isoformat(), "positions": orphans})
+        )
+    except Exception as e:
+        logger.warning(f"Orphaned-position check failed ({e}) — continuing session startup")
+
+
 def run_daily_sessions():
     """Run scalp, micro-pullback, and VWAP reclaim in coordinated parallel; persist state."""
     from trading.live_scalp_runner import run_scalp_session
@@ -247,6 +267,8 @@ def run_daily_sessions():
     if _is_market_holiday_today():
         logger.warning("run_daily_sessions: market closed today (holiday) — skipping session.")
         return
+
+    _check_orphaned_positions()
 
     # Atomically claim today's session (Neon flag). This is the hard guard —
     # deploy-wiped local files can no longer cause a duplicate session.

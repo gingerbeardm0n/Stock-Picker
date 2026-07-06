@@ -50,6 +50,7 @@ class _FakeBroker(BrokerInterface):
     def place_market_sell(self, *a, **k): ...
     def get_account_balance(self): return 0.0
     def get_position(self, symbol): return None
+    def get_all_positions(self): return []
 
 
 def test_waits_through_pending_cancel():

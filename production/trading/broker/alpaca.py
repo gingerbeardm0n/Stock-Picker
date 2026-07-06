@@ -196,6 +196,19 @@ class AlpacaBroker(BrokerInterface):
         except Exception:
             return None
 
+    def get_all_positions(self) -> list[PositionResult]:
+        """All currently open positions on the account, regardless of
+        which (if any) local strategy is tracking them."""
+        positions = self._client.get_all_positions()
+        return [
+            PositionResult(
+                symbol=p.symbol,
+                qty=int(float(p.qty)),
+                avg_price=float(p.avg_entry_price),
+            )
+            for p in positions
+        ]
+
 
 # ── AlpacaDataFeed ────────────────────────────────────────────────────────────
 

@@ -438,6 +438,21 @@ def trigger_session():
     return {"triggered": True, "message": "Daily sessions started in background"}
 
 
+ORPHANED_POSITIONS_FILE = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader")) / "orphaned_positions.json"
+
+
+def _read_orphaned_positions() -> dict:
+    """Broker positions held with no local runner tracking them (CLRO incident,
+    Jul 2 2026) — written by session_job._check_orphaned_positions() at
+    session startup. Never populated by placing/cancelling orders."""
+    if ORPHANED_POSITIONS_FILE.exists():
+        try:
+            return json.loads(ORPHANED_POSITIONS_FILE.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"checked_at": None, "positions": []}
+
+
 @app.get("/dashboard")
 def get_dashboard():
     """Unified dashboard endpoint — all data in one call."""
@@ -592,6 +607,7 @@ def get_dashboard():
         },
         "session_pnl": scalp_pnl + vwap_pnl + mp_pnl,
         "trade_count": trade_count,
+        "orphaned_positions": _read_orphaned_positions(),
     }
 
 
