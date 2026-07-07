@@ -409,7 +409,7 @@ def replay_counterfactual(trade: dict, tape: list[dict]) -> dict | None:
         # the stop the runner actually used if parsable, else VWAP unavailable)
     else:
         from trading.scalp_engine import evaluate_exit
-        from trading.live_scalp_runner import TRIAL_173_CONFIG as cfg
+        from trading.live_scalp_runner import TRIAL_211_CONFIG as cfg
 
     entry_price = trade['decision_price']
     # Find the decision bar in the tape: first bar at/after decision minute

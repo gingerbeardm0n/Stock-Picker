@@ -566,7 +566,7 @@ def get_dashboard():
     mp_trades = mp_state.get("trade_count") or (1 if (mp_state.get("entry_price") or 0) > 0 else 0)
     trade_count = scalp_trades + vwap_trades + mp_trades
 
-    from trading.live_scalp_runner import TRIAL_173_CONFIG as SCALP_CONFIG
+    from trading.live_scalp_runner import TRIAL_211_CONFIG as SCALP_CONFIG
     from trading.live_vwap_runner import TRIAL_184_CONFIG as VWAP_CONFIG
     from trading.live_micro_pullback_runner import TRIAL_167_CONFIG as MP_CONFIG
 

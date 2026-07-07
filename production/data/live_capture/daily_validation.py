@@ -76,8 +76,8 @@ def run_sims(day: str, account: float):
     _print_result('vwap', res)
 
     from simulator.scalp_simulation import ScalpSimulationRunner
-    from trading.live_scalp_runner import TRIAL_173_CONFIG as SCALP_CFG
-    print('\n--- Opening-bell scalp (trial 173) ---')
+    from trading.live_scalp_runner import TRIAL_211_CONFIG as SCALP_CFG
+    print('\n--- Opening-bell scalp (trial 211) ---')
     res = ScalpSimulationRunner(day, config=SCALP_CFG, account_size=account, verbose=True).run()
     _print_result('scalp', res)
 

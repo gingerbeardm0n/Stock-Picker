@@ -57,31 +57,30 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ── Trial 173 config (trained 2021-2022, validated 2023-2025) ────────────────
+# ── Trial 211 config (scalp_v2: train 2021-2022, OOS 2023-2024, sealed 2025) ─
+# market_open entry + tight 0.5% stop + 1-bar hold (momentum pop strategy)
+# OOS: 151 trades, 25.8% WR, +$3958, PF 4.18 | Sealed: 53 trades, 26.4% WR, +$1198, PF 3.63
 
 # ── Multi-candidate config ───────────────────────────────────────────────────
 MAX_ARMED = 10      # candidates to watch simultaneously at open
 MAX_CONCURRENT = 3  # max open positions at one time (skip signal if at limit)
 
 
-TRIAL_173_CONFIG = ScalpConfig(
-    min_gap_pct=5.0,
-    min_relative_volume=3.61,
-    max_float=50_000_000,
-    max_price=24.69,
+TRIAL_211_CONFIG = ScalpConfig(
+    min_gap_pct=6.91,
+    min_relative_volume=2.02,
+    max_float=45_000_000,
+    max_price=26.34,
     require_news=True,
-    entry_mode='first_green',
-    # 2025 sim sweep: 4/10/20/30 all produce identical trade sets with first_green
-    # mode — first green bar fires in bars 1-4 every time. 10 gives a small buffer
-    # for slow starters without changing behavior. Permanent setting.
-    max_entry_bars=10,
-    min_pm_high_break_pct=0.09,
-    profit_target_pct=9.88,
-    stop_loss_pct=4.70,
-    max_hold_bars=6,
-    trailing_stop_pct=0.07,
-    risk_pct=2.63,
-    max_position_pct=48.63,
+    entry_mode='market_open',
+    max_entry_bars=5,
+    min_pm_high_break_pct=1.25,
+    profit_target_pct=9.54,
+    stop_loss_pct=0.50,
+    max_hold_bars=1,
+    trailing_stop_pct=2.70,
+    risk_pct=2.30,
+    max_position_pct=46.67,
 )
 
 
@@ -128,7 +127,7 @@ class LiveScalpRunner:
         dry_run: bool = False,
         live: bool = False,
     ):
-        self.config = config or TRIAL_173_CONFIG
+        self.config = config or TRIAL_211_CONFIG
         self.dry_run = dry_run
         self.live = live
         self.state = LiveScalpState()

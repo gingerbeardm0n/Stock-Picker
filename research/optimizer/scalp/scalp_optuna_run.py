@@ -74,7 +74,7 @@ def _build_scalp_config_from_trial(trial: optuna.Trial) -> ScalpConfig:
         profit_target_pct=trial.suggest_float('s_profit_target_pct', 1.0, 10.0),
         stop_loss_pct=trial.suggest_float('s_stop_loss_pct', 0.5, 5.0),
         max_hold_bars=trial.suggest_int('s_max_hold_bars', 1, 10),
-        trailing_stop_pct=trial.suggest_float('s_trailing_stop_pct', 0.0, 3.0),
+        trailing_stop_pct=trial.suggest_float('s_trailing_stop_pct', 1.0, 5.0),
 
         # Sizing (2)
         risk_pct=trial.suggest_float('s_risk_pct', 1.0, 5.0),
