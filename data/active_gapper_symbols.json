@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-07-06",
+  "as_of":"2026-07-07",
   "symbols":[
     "AACPU",
     "AADX",
@@ -1247,6 +1247,7 @@
     "LX",
     "LXEH",
     "LXRX",
+    "LYEL",
     "LYFT",
     "LYG",
     "LZ",
@@ -2024,6 +2025,7 @@
     "TCRX",
     "TDACW",
     "TDOC",
+    "TDTH",
     "TDUP",
     "TE",
     "TEAD",
@@ -2344,5 +2346,5 @@
     "ZVRA"
   ],
   "added":[],
-  "total":2341
+  "total":2343
 }
