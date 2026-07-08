@@ -216,24 +216,6 @@ def _persist_news(conn, run_date: str):
     return len(rows)
 
 
-def _persist_logs(conn, run_date: str):
-    try:
-        from api.dashboard import _LOG_BUFFER
-    except Exception:
-        _LOG_BUFFER = []
-
-    if not _LOG_BUFFER:
-        return 0
-
-    rows = [(run_date, e.get("t"), e.get("level"), e.get("msg")) for e in _LOG_BUFFER]
-
-    with conn.cursor() as cur:
-        execute_values(cur, """
-            INSERT INTO session_logs (run_date, logged_at, level, message)
-            VALUES %s
-        """, rows)
-    return len(rows)
-
 
 def persist_session(scalp_state: dict, vwap_state: dict,
                     micro_pullback_state: dict | None = None):
@@ -254,16 +236,10 @@ def persist_session(scalp_state: dict, vwap_state: dict,
             bar_count = _persist_bars(conn, run_date)
             news_count = _persist_news(conn, run_date)
 
-            try:
-                log_count = _persist_logs(conn, run_date)
-            except Exception as le:
-                logger.warning(f"session_persistence: log persist failed (non-fatal): {le}")
-                log_count = 0
-
             conn.commit()
             logger.info(
                 f"session_persistence: saved to DB — "
-                f"bars={bar_count}, news={news_count}, logs={log_count}"
+                f"bars={bar_count}, news={news_count}"
             )
         except Exception:
             conn.rollback()
