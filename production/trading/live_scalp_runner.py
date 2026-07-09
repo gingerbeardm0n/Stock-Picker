@@ -745,11 +745,17 @@ class LiveScalpRunner:
                             f"retry next bar", exc_info=True)
             else:
                 if len(open_positions) < MAX_CONCURRENT:
+                    # bars_since_open is 0-indexed in the engine and sim (0 = the
+                    # 9:30 bar; scalp_simulation passes enumerate() indices), but
+                    # n is a 1-based counter. Passing n unshifted meant
+                    # market_open mode's `bars_since_open == 0` check could never
+                    # match live — Trial 211 silently never entered (2026-07-09
+                    # TDTH: 5 bars watched, no order).
                     entry = evaluate_entry(
                         candidate=meta['candidate'],
                         current_bar=bar,
                         premarket_high=meta['pm_high'],
-                        bars_since_open=n,
+                        bars_since_open=n - 1,
                         config=self.config,
                     )
                     if entry:
