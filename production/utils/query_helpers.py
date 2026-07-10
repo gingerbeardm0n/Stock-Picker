@@ -924,6 +924,33 @@ class StockDataDB:
         best = min(articles, key=lambda a: tier_priority.get(a.get('news_tier', 'none'), 4))
         return best.get('news_tier', 'none')
 
+    def get_news_tier_and_confidence(self, symbol, before_time, hours_back=24):
+        """
+        Get best news tier + source agreement count for a symbol.
+
+        Returns (tier: str, sources_with_hits: int).
+        sources_with_hits counts distinct source prefixes (finnhub, alpaca, etc.)
+        that had specific articles. 2+ = corroborated catalyst.
+        """
+        articles = self.get_news_for_symbol(symbol, before_time, hours_back)
+        if not articles:
+            return 'none', 0
+
+        tier_priority = {'tier1': 0, 'tier2': 1, 'tier3': 2, 'presence': 3, 'none': 4}
+        best = min(articles, key=lambda a: tier_priority.get(a.get('news_tier', 'none'), 4))
+        tier = best.get('news_tier', 'none')
+
+        source_prefixes = set()
+        for a in articles:
+            src = a.get('source', '')
+            if src and ':' in src:
+                source_prefixes.add(src.split(':')[0])
+            elif src:
+                source_prefixes.add(src)
+        sources_with_hits = len(source_prefixes)
+
+        return tier, sources_with_hits
+
     def insert_news_batch(self, articles):
         """
         Batch-insert news articles into stock_news table.

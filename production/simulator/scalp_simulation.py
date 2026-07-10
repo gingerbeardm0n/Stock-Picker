@@ -218,20 +218,17 @@ class ScalpSimulationRunner:
             avg_vol = avg_vols.get(sym, 0)
             c['rel_vol'] = today_vol / avg_vol if avg_vol > 0 else 10.0
 
-            # News — shared sim/live gate (has_news_catalyst). Equivalent to the
-            # old any(is_specific): db tier is 'none' iff no specific article.
             try:
-                articles = db.get_news_for_symbol(sym, market_open_930, hours_back=48)
-                if articles:
-                    tier = db.get_news_tier(sym, market_open_930, hours_back=48)
-                    c['news_tier'] = tier
-                    c['has_news'] = has_news_catalyst(tier)
-                else:
-                    c['has_news'] = False
-                    c['news_tier'] = 'none'
+                tier, src_count = db.get_news_tier_and_confidence(
+                    sym, market_open_930, hours_back=48
+                )
+                c['news_tier'] = tier
+                c['has_news'] = has_news_catalyst(tier)
+                c['news_sources'] = src_count
             except Exception:
                 c['has_news'] = False
                 c['news_tier'] = 'none'
+                c['news_sources'] = 0
 
         return candidates
 

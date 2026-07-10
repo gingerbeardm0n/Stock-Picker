@@ -884,16 +884,19 @@ class LiveVwapRunner:
                 )
                 if articles:
                     tier = self.classify_news_tier(articles)
-                    c['has_news'] = has_news_catalyst(tier)  # shared sim/live gate
+                    c['has_news'] = has_news_catalyst(tier)
                     c['news_tier'] = tier
+                    c['news_sources'] = articles[0].get('sources_with_hits', 1) if articles else 0
                     record_news(c['symbol'], articles, tier)
                 else:
                     c['has_news'] = False
                     c['news_tier'] = 'none'
+                    c['news_sources'] = 0
             except Exception as e:
                 logger.warning(f"News fetch failed for {c['symbol']}: {e}")
                 c['has_news'] = False
                 c['news_tier'] = 'none'
+                c['news_sources'] = 0
             time.sleep(0.35)
 
     def _load_env(self, path: str):

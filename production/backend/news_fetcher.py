@@ -13,6 +13,8 @@ _CACHE_TTL_S = 600       # 10 minutes — covers the full scan + 9:25 refresh cy
 
 MAX_SYMBOLS_FOR_SPECIFIC_NEWS = 5
 
+_ET = ZoneInfo("America/New_York")
+
 # ── Keyword sets for news tier classification ─────────────────────────────────
 _TIER1_KEYWORDS = [
     'fda', 'approval', 'approved', 'clearance', 'cleared',
@@ -83,9 +85,13 @@ class FinnhubNewsFetcher:
             return []
         try:
             if as_of_date:
-                end_date = as_of_date
+                # Finnhub only supports date granularity. Use prior day as end
+                # to capture late-afternoon catalysts (2PM+ → next-morning gap)
+                # while eliminating any same-day post-open lookahead.
+                end_date = as_of_date - timedelta(days=1)
                 start_date = as_of_date - timedelta(hours=hours_back)
             else:
+                # Live mode: fetch up to today (real-time, no lookahead concern)
                 end_date = datetime.now().date()
                 start_date = end_date - timedelta(days=max(hours_back // 24, 2))
 
@@ -182,7 +188,7 @@ class MarketauxNewsFetcher:
             return []
 
 
-# ── Source 3: Alpaca (demoted — weak small-cap coverage) ─────────────────────
+# ── Source 3: Alpaca ───────────────────────────────────────────────────────────
 
 class AlpacaNewsFetcher:
     def __init__(self):
@@ -207,9 +213,12 @@ class AlpacaNewsFetcher:
             from alpaca.data.requests import NewsRequest
 
             if as_of_date:
-                end = datetime.combine(as_of_date, datetime.max.time())
+                # Alpaca supports datetime precision — cut off at 9:30 AM ET
+                end = datetime(as_of_date.year, as_of_date.month, as_of_date.day,
+                               9, 30, tzinfo=_ET)
                 start = end - timedelta(hours=hours_back)
             else:
+                # Live mode: fetch up to now
                 end = datetime.now()
                 start = end - timedelta(hours=hours_back)
 
@@ -246,15 +255,12 @@ class AlpacaNewsFetcher:
 
 # ── Lookahead bias filter ─────────────────────────────────────────────────────
 
-_ET = ZoneInfo("America/New_York")
-
-
 def _filter_pre_open(articles: list, as_of_date) -> list:
     """Drop articles published after 9:30 AM ET on as_of_date.
 
-    Backtest sources return full-day results (Finnhub only supports date
-    granularity). Live scanner runs premarket and can only see pre-open
-    articles, so backtests must match."""
+    Safety net for sources that can't enforce time-level cutoffs at the API
+    level. With Finnhub prior-day and Alpaca 9:30 cutoff, this should be a
+    no-op but keeps the guarantee."""
     cutoff = datetime(as_of_date.year, as_of_date.month, as_of_date.day,
                       9, 30, tzinfo=_ET)
     result = []
@@ -266,7 +272,7 @@ def _filter_pre_open(articles: list, as_of_date) -> list:
         try:
             ts = datetime.fromisoformat(ts_str)
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=_ET)  # assume ET for legacy naive timestamps
+                ts = ts.replace(tzinfo=_ET)
             if ts <= cutoff:
                 result.append(a)
         except (ValueError, TypeError):
@@ -274,17 +280,16 @@ def _filter_pre_open(articles: list, as_of_date) -> list:
     return result
 
 
-# ── Waterfall aggregator ─────────────────────────────────────────────────────
+# ── Parallel aggregator ────────────────────────────────────────────────────────
 
 class NewsFetcher:
-    """Multi-source news fetcher. Waterfall: Finnhub → Alpaca.
-    Stops at first source that returns articles."""
+    """Multi-source news fetcher. Queries ALL sources and merges results.
+    Source agreement (both Finnhub + Alpaca have articles) = higher conviction."""
 
     def __init__(self):
         self._sources = []
         self._source_names = []
 
-        # Order: Finnhub first (best small-cap coverage), Alpaca fallback
         try:
             f = FinnhubNewsFetcher()
             if f._enabled:
@@ -301,11 +306,9 @@ class NewsFetcher:
         except Exception as e:
             logger.warning(f"Failed to init Alpaca: {e}")
 
-        logger.info(f"NewsFetcher waterfall: {' → '.join(self._source_names) or 'NO SOURCES'}")
+        logger.info(f"NewsFetcher sources: {' + '.join(self._source_names) or 'NO SOURCES'}")
 
     def get_news_for_symbol(self, symbol, as_of_date=None, hours_back=48):
-        # Check process-level cache first — all three runners share this dict,
-        # so parallel scans never double-hit Finnhub for the same symbol.
         cached = _NEWS_CACHE.get(symbol)
         if cached:
             articles, fetched_at = cached
@@ -313,23 +316,34 @@ class NewsFetcher:
                 logger.debug(f"{symbol}: news from cache ({len(articles)} articles)")
                 return articles
 
+        all_articles = []
+        sources_with_hits = 0
+
         for name, source in zip(self._source_names, self._sources):
             try:
-                articles = source.get_news_for_symbol(symbol, as_of_date=as_of_date, hours_back=hours_back)
+                articles = source.get_news_for_symbol(
+                    symbol, as_of_date=as_of_date, hours_back=hours_back
+                )
                 if as_of_date:
                     articles = _filter_pre_open(articles, as_of_date)
                 specific = [a for a in articles if a.get('is_specific', True)]
                 if specific:
-                    logger.debug(f"{symbol}: news found via {name} ({len(specific)} specific articles)")
-                    _NEWS_CACHE[symbol] = (articles, _time.time())
-                    return articles
+                    sources_with_hits += 1
+                    for a in articles:
+                        a['_source_name'] = name
+                    all_articles.extend(articles)
+                    logger.debug(f"{symbol}: {name} returned {len(specific)} specific articles")
             except Exception as e:
                 logger.warning(f"{symbol}: {name} failed: {e}")
                 continue
 
-        logger.debug(f"{symbol}: no news from any source")
-        _NEWS_CACHE[symbol] = ([], _time.time())
-        return []
+        if all_articles:
+            for a in all_articles:
+                a['sources_with_hits'] = sources_with_hits
+            logger.debug(f"{symbol}: {sources_with_hits} source(s) had articles, {len(all_articles)} total")
+
+        _NEWS_CACHE[symbol] = (all_articles, _time.time())
+        return all_articles
 
     def has_catalyst(self, symbol, as_of_date=None, hours_back=48):
         articles = self.get_news_for_symbol(symbol, as_of_date=as_of_date, hours_back=hours_back)
