@@ -112,14 +112,16 @@ class FinnhubNewsFetcher:
 
             result = []
             for a in articles:
+                related = a.get('related', '')
+                symbol_count = len([t for t in related.split(',') if t.strip()]) if related else 1
                 result.append({
                     'headline': a.get('headline', ''),
                     'summary': a.get('summary', ''),
                     'url': a.get('url', ''),
                     'source': f"finnhub:{a.get('source', '')}",
                     'created_at': datetime.fromtimestamp(a['datetime'], tz=_ET).isoformat() if a.get('datetime') else None,
-                    'symbol_count': 1,
-                    'is_specific': True,
+                    'symbol_count': symbol_count,
+                    'is_specific': symbol_count <= MAX_SYMBOLS_FOR_SPECIFIC_NEWS,
                 })
             return result
 
@@ -319,6 +321,7 @@ class NewsFetcher:
         all_articles = []
         sources_with_hits = 0
 
+        any_source_failed = False
         for name, source in zip(self._source_names, self._sources):
             try:
                 articles = source.get_news_for_symbol(
@@ -326,15 +329,17 @@ class NewsFetcher:
                 )
                 if as_of_date:
                     articles = _filter_pre_open(articles, as_of_date)
-                specific = [a for a in articles if a.get('is_specific', True)]
-                if specific:
-                    sources_with_hits += 1
+                if articles:
+                    specific = [a for a in articles if a.get('is_specific', True)]
+                    if specific:
+                        sources_with_hits += 1
                     for a in articles:
                         a['_source_name'] = name
                     all_articles.extend(articles)
-                    logger.debug(f"{symbol}: {name} returned {len(specific)} specific articles")
+                    logger.debug(f"{symbol}: {name} returned {len(articles)} articles ({len(specific)} specific)")
             except Exception as e:
                 logger.warning(f"{symbol}: {name} failed: {e}")
+                any_source_failed = True
                 continue
 
         if all_articles:
@@ -342,7 +347,8 @@ class NewsFetcher:
                 a['sources_with_hits'] = sources_with_hits
             logger.debug(f"{symbol}: {sources_with_hits} source(s) had articles, {len(all_articles)} total")
 
-        _NEWS_CACHE[symbol] = (all_articles, _time.time())
+        if all_articles or not any_source_failed:
+            _NEWS_CACHE[symbol] = (all_articles, _time.time())
         return all_articles
 
     def has_catalyst(self, symbol, as_of_date=None, hours_back=48):
