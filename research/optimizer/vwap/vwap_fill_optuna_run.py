@@ -51,6 +51,7 @@ def _fill_config_from_trial(trial: optuna.Trial):
     cfg = _build_config_from_trial(trial)
     return replace(
         cfg,
+        require_news=False,
         fill_model='marketable_limit',
         entry_headroom_pct=trial.suggest_float('v_entry_headroom_pct', 0.05, 1.0),
     )
@@ -60,6 +61,7 @@ def _fill_config_from_params(params: dict):
     cfg = _config_from_params(params)
     return replace(
         cfg,
+        require_news=False,
         fill_model='marketable_limit',
         entry_headroom_pct=params['v_entry_headroom_pct'],
     )
