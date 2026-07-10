@@ -1,6 +1,7 @@
 import requests
 import time as _time
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import logging
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,7 @@ class FinnhubNewsFetcher:
                     'summary': a.get('summary', ''),
                     'url': a.get('url', ''),
                     'source': f"finnhub:{a.get('source', '')}",
-                    'created_at': datetime.fromtimestamp(a['datetime']).isoformat() if a.get('datetime') else None,
+                    'created_at': datetime.fromtimestamp(a['datetime'], tz=_ET).isoformat() if a.get('datetime') else None,
                     'symbol_count': 1,
                     'is_specific': True,
                 })
@@ -204,15 +205,9 @@ class AlpacaNewsFetcher:
             return []
         try:
             from alpaca.data.requests import NewsRequest
-            from zoneinfo import ZoneInfo
 
             if as_of_date:
-                # Cap at market open (9:30 AM ET) to prevent lookahead bias.
-                # Live scanner runs premarket so only sees pre-open articles;
-                # backtest must match that by excluding post-open news.
-                et = ZoneInfo("America/New_York")
-                end = datetime(as_of_date.year, as_of_date.month, as_of_date.day,
-                               9, 30, tzinfo=et)
+                end = datetime.combine(as_of_date, datetime.max.time())
                 start = end - timedelta(hours=hours_back)
             else:
                 end = datetime.now()
@@ -247,6 +242,36 @@ class AlpacaNewsFetcher:
         except Exception as e:
             logger.error(f"Alpaca news fetch failed for {symbol}: {e}")
             return []
+
+
+# ── Lookahead bias filter ─────────────────────────────────────────────────────
+
+_ET = ZoneInfo("America/New_York")
+
+
+def _filter_pre_open(articles: list, as_of_date) -> list:
+    """Drop articles published after 9:30 AM ET on as_of_date.
+
+    Backtest sources return full-day results (Finnhub only supports date
+    granularity). Live scanner runs premarket and can only see pre-open
+    articles, so backtests must match."""
+    cutoff = datetime(as_of_date.year, as_of_date.month, as_of_date.day,
+                      9, 30, tzinfo=_ET)
+    result = []
+    for a in articles:
+        ts_str = a.get('created_at')
+        if ts_str is None:
+            result.append(a)
+            continue
+        try:
+            ts = datetime.fromisoformat(ts_str)
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=_ET)  # assume ET for legacy naive timestamps
+            if ts <= cutoff:
+                result.append(a)
+        except (ValueError, TypeError):
+            result.append(a)
+    return result
 
 
 # ── Waterfall aggregator ─────────────────────────────────────────────────────
@@ -291,6 +316,8 @@ class NewsFetcher:
         for name, source in zip(self._source_names, self._sources):
             try:
                 articles = source.get_news_for_symbol(symbol, as_of_date=as_of_date, hours_back=hours_back)
+                if as_of_date:
+                    articles = _filter_pre_open(articles, as_of_date)
                 specific = [a for a in articles if a.get('is_specific', True)]
                 if specific:
                     logger.debug(f"{symbol}: news found via {name} ({len(specific)} specific articles)")
