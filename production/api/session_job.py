@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 STATE_DIR = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader"))
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 
+# VWAP suspended 2026-07-10: Trial 184 edge was entirely from news lookahead
+# bias (issue #14). Sealed 2025 with honest news: PF 0.59 / -$385. Without
+# news gate: PF 0.68 / -$1,165. Needs full re-optimization before re-enabling.
+VWAP_SUSPENDED = True
+
 _CANDIDATE_FIELDS = (
     'symbol', 'gap_pct', 'open_price', 'prior_close', 'rel_vol',
     'float_shares', 'has_news', 'news_tier', 'scalp_score', 'quote_volume',
@@ -336,6 +341,16 @@ def run_daily_sessions():
 
     def run_vwap_thread():
         nonlocal vwap_state_data
+        if VWAP_SUSPENDED:
+            logger.warning("=== VWAP RECLAIM SUSPENDED (issue #14: lookahead bias) ===")
+            vwap_state_data = {
+                "last_run": datetime.utcnow().isoformat(),
+                "strategy": "vwap_reclaim",
+                "last_result": "suspended",
+                "date": str(datetime.now().date()),
+            }
+            (STATE_DIR / "vwap_state.json").write_text(json.dumps(vwap_state_data))
+            return
         logger.info("=== VWAP RECLAIM SESSION STARTING ===")
         try:
             nonlocal vstate
