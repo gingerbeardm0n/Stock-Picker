@@ -206,14 +206,28 @@ def _persist_news(conn, run_date: str):
     if not rows:
         return 0
 
+    # In-memory dedup on (symbol, headline, created_at), first occurrence wins.
+    # session_news has no unique constraint (unlike session-agnostic news table
+    # in query_helpers.insert_news_batch, which uses ON CONFLICT on this same
+    # key) — adding one now would fail against the existing duplicate rows, so
+    # dedup here instead of at the DB.
+    seen = set()
+    deduped = []
+    for row in rows:
+        key = (row[1], row[2], row[5])  # symbol, headline, created_at
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+
     with conn.cursor() as cur:
         execute_values(cur, """
             INSERT INTO session_news
                 (run_date, symbol, headline, source, news_tier, created_at,
                  summary, url, symbol_count, is_specific, received_at)
             VALUES %s
-        """, rows)
-    return len(rows)
+        """, deduped)
+    return len(deduped)
 
 
 

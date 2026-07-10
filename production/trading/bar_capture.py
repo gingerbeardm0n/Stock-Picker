@@ -21,6 +21,13 @@ from pathlib import Path
 _STATE_DIR = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader"))
 _lock = threading.Lock()
 
+# Session-scoped seen-set for record_news: premarket scans re-fetch the same
+# articles every ~5min cycle, which was appending duplicate rows to the JSONL
+# (and from there into session_news with no dedup). Key: (symbol, headline,
+# created_at). Not persisted across restarts — fine, a redeploy already wipes
+# the JSONL too.
+_seen_news: set[tuple[str, str, str]] = set()
+
 
 def _capture_path(day: datetime | None = None) -> Path:
     d = (day or datetime.now(timezone.utc)).strftime("%Y%m%d")
@@ -79,20 +86,30 @@ def record_news(symbol: str, articles: list[dict], tier: str) -> None:
     """
     try:
         now = datetime.now(timezone.utc).isoformat()
-        rows = [{
-            "symbol": symbol,
-            "headline": a.get("headline", ""),
-            "source": a.get("source"),
-            "created_at": str(a.get("created_at") or ""),
-            "summary": a.get("summary"),
-            "url": a.get("url"),
-            "symbol_count": a.get("symbol_count"),
-            "is_specific": a.get("is_specific", True),
-            "news_tier": tier,
-            "received_at": now,
-        } for a in articles]
-        path = _news_path()
+        rows = []
         with _lock:
+            for a in articles:
+                headline = a.get("headline", "")
+                created_at = str(a.get("created_at") or "")
+                key = (symbol, headline, created_at)
+                if key in _seen_news:
+                    continue
+                _seen_news.add(key)
+                rows.append({
+                    "symbol": symbol,
+                    "headline": headline,
+                    "source": a.get("source"),
+                    "created_at": created_at,
+                    "summary": a.get("summary"),
+                    "url": a.get("url"),
+                    "symbol_count": a.get("symbol_count"),
+                    "is_specific": a.get("is_specific", True),
+                    "news_tier": tier,
+                    "received_at": now,
+                })
+            if not rows:
+                return
+            path = _news_path()
             path.parent.mkdir(parents=True, exist_ok=True)
             with open(path, "a", encoding="utf-8") as f:
                 for row in rows:
