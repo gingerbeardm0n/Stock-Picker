@@ -94,8 +94,8 @@ def backfill_news_for_date(db: StockDataDB, fetcher: NewsFetcher,
         if not articles_raw:
             continue
 
-        # Classify tier and prepare for DB insert
-        tier = classify_news_tier(articles_raw)
+        # Classify tier PER ARTICLE (not batch — batch classification
+        # contaminates generic articles with a sibling's tier1 keyword).
         db_articles = []
         for a in articles_raw:
             created_at = a.get('created_at')
@@ -108,6 +108,8 @@ def backfill_news_for_date(db: StockDataDB, fetcher: NewsFetcher,
             if not created_at:
                 continue
 
+            article_tier = classify_news_tier([a])
+
             db_articles.append({
                 'symbol': symbol,
                 'headline': a.get('headline', ''),
@@ -117,7 +119,7 @@ def backfill_news_for_date(db: StockDataDB, fetcher: NewsFetcher,
                 'url': a.get('url'),
                 'symbol_count': a.get('symbol_count'),
                 'is_specific': a.get('is_specific', True),
-                'news_tier': tier,
+                'news_tier': article_tier,
             })
 
         if db_articles:
