@@ -46,26 +46,37 @@ def find_gappers_for_date(db: StockDataDB, trade_date, min_gap_pct: float = 10.0
 
 def backfill_news_for_date(db: StockDataDB, fetcher: NewsFetcher,
                            trade_date, min_gap_pct: float = 10.0,
-                           dry_run: bool = False):
+                           dry_run: bool = False, force: bool = False):
     """
     Backfill news for all gappers on a single trading day.
 
     Returns (n_gappers, n_articles_inserted).
     """
-    # Skip days already backfilled (have any news entries)
     if not dry_run:
         cursor = db.conn.cursor()
-        cursor.execute("""
-            SELECT COUNT(*) FROM stock_news sn
-            JOIN daily_gappers dg ON sn.symbol = dg.symbol
-            WHERE dg.trade_date = %s AND dg.gap_pct >= %s
-              AND sn.created_at >= (%s::date - interval '48 hours')
-              AND sn.created_at <= %s::date + interval '1 day'
-        """, [trade_date, min_gap_pct, trade_date, trade_date])
-        existing = cursor.fetchone()[0]
+        if force:
+            cursor.execute("""
+                DELETE FROM stock_news
+                WHERE created_at >= (%s::date - interval '48 hours')
+                  AND created_at <= %s::date + interval '1 day'
+            """, [trade_date, trade_date])
+            deleted = cursor.rowcount
+            db.conn.commit()
+            if deleted:
+                logger.info(f"  {trade_date}: deleted {deleted} existing rows (--force)")
+        else:
+            cursor.execute("""
+                SELECT COUNT(*) FROM stock_news sn
+                JOIN daily_gappers dg ON sn.symbol = dg.symbol
+                WHERE dg.trade_date = %s AND dg.gap_pct >= %s
+                  AND sn.created_at >= (%s::date - interval '48 hours')
+                  AND sn.created_at <= %s::date + interval '1 day'
+            """, [trade_date, min_gap_pct, trade_date, trade_date])
+            existing = cursor.fetchone()[0]
+            if existing > 0:
+                cursor.close()
+                return 0, 0
         cursor.close()
-        if existing > 0:
-            return 0, 0  # Already has news data, skip
 
     gappers = find_gappers_for_date(db, trade_date, min_gap_pct)
 
@@ -125,7 +136,7 @@ def backfill_news_for_date(db: StockDataDB, fetcher: NewsFetcher,
         if db_articles:
             n = db.insert_news_batch(db_articles)
             total_inserted += n
-            logger.debug(f"  {symbol}: {n} articles (tier={tier})")
+            logger.debug(f"  {symbol}: {n} articles inserted")
 
         # Rate limit: ~3 req/sec to stay under 200/min
         time.sleep(0.35)
@@ -133,9 +144,11 @@ def backfill_news_for_date(db: StockDataDB, fetcher: NewsFetcher,
     return len(gappers), total_inserted
 
 
-def run_backfill(start_date, end_date, min_gap_pct=10.0, dry_run=False):
+def run_backfill(start_date, end_date, min_gap_pct=10.0, dry_run=False, force=False):
     """Main backfill loop across date range."""
     logger.info(f"News backfill: {start_date} → {end_date} (min gap {min_gap_pct}%)")
+    if force:
+        logger.info("[FORCE MODE — deleting existing rows before re-fetching]")
     if dry_run:
         logger.info("[DRY RUN — no API calls or DB writes]")
 
@@ -158,7 +171,7 @@ def run_backfill(start_date, end_date, min_gap_pct=10.0, dry_run=False):
 
         for trade_date in trading_days:
             n_gappers, n_articles = backfill_news_for_date(
-                db, fetcher, trade_date, min_gap_pct, dry_run
+                db, fetcher, trade_date, min_gap_pct, dry_run, force
             )
 
             days_processed += 1
@@ -207,6 +220,8 @@ if __name__ == '__main__':
                         help='Minimum gap %% to fetch news for (default 10)')
     parser.add_argument('--dry-run', action='store_true',
                         help='Show what would be fetched without calling API')
+    parser.add_argument('--force', action='store_true',
+                        help='Delete existing news rows and re-fetch (for fixing bad data)')
     parser.add_argument('--stats', action='store_true',
                         help='Show coverage stats instead of backfilling')
 
@@ -215,4 +230,4 @@ if __name__ == '__main__':
     if args.stats:
         show_stats(args.start, args.end)
     else:
-        run_backfill(args.start, args.end, args.min_gap, args.dry_run)
+        run_backfill(args.start, args.end, args.min_gap, args.dry_run, args.force)
