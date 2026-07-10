@@ -204,9 +204,15 @@ class AlpacaNewsFetcher:
             return []
         try:
             from alpaca.data.requests import NewsRequest
+            from zoneinfo import ZoneInfo
 
             if as_of_date:
-                end = datetime.combine(as_of_date, datetime.max.time())
+                # Cap at market open (9:30 AM ET) to prevent lookahead bias.
+                # Live scanner runs premarket so only sees pre-open articles;
+                # backtest must match that by excluding post-open news.
+                et = ZoneInfo("America/New_York")
+                end = datetime(as_of_date.year, as_of_date.month, as_of_date.day,
+                               9, 30, tzinfo=et)
                 start = end - timedelta(hours=hours_back)
             else:
                 end = datetime.now()
