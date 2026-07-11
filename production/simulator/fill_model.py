@@ -41,6 +41,23 @@ def resolve_limit_fill(limit: float, next_bar: dict) -> float | None:
     return None
 
 
+def resolve_market_fallback(signal_price: float, next_bar: dict, config) -> float | None:
+    """When a limit misses, check if a market retry would fill within the cap.
+
+    Live behavior: if ask ≤ signal × (1 + market_fallback_pct/100), retry
+    with market order → fills at the ask. In sim we use next bar's open as
+    the market fill price (best available proxy for "immediate market fill").
+    """
+    cap_pct = getattr(config, 'market_fallback_pct', 0.0)
+    if cap_pct <= 0:
+        return None
+    cap_price = signal_price * (1 + cap_pct / 100)
+    bar_open = float(next_bar['open'])
+    if bar_open <= cap_price:
+        return bar_open
+    return None
+
+
 def apply_slippage(fill_price: float, config) -> float:
     slip = getattr(config, 'entry_slippage_pct', 0.0)
     return fill_price * (1 + slip / 100)

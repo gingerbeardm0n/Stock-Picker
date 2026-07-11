@@ -28,7 +28,8 @@ from trading.micro_pullback_engine import evaluate_entry, evaluate_exit
 from trading.scalp_ranker import rank_candidates, screen_candidates
 from backend.news_fetcher import has_news_catalyst
 from simulator.fill_model import (
-    limit_price, resolve_limit_fill, apply_slippage, uses_marketable_limit,
+    limit_price, resolve_limit_fill, resolve_market_fallback,
+    apply_slippage, uses_marketable_limit,
 )
 from utils.query_helpers import StockDataDB
 
@@ -417,6 +418,9 @@ class MicroPullbackSimulationRunner:
             if pend is not None:
                 m['pending'] = None
                 fill = resolve_limit_fill(pend['limit'], bar)
+                if fill is None:
+                    fill = resolve_market_fallback(
+                        pend['signal_price'], bar, self.config)
                 if fill is not None:
                     entry_price = apply_slippage(fill, self.config)
                     m['position'] = {
@@ -453,6 +457,7 @@ class MicroPullbackSimulationRunner:
                         if uses_marketable_limit(self.config):
                             m['pending'] = {
                                 'limit': limit_price(signal['entry_price'], self.config),
+                                'signal_price': signal['entry_price'],
                                 'stop_price': signal['stop_price'],
                                 'reason': signal['reason'],
                             }

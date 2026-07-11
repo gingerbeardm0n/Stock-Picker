@@ -36,6 +36,7 @@ those engines, which is duplicated per side.
 | 8 | Paper rel-vol staleness | both | ⚪ inherent (paper only) | Paper data feed is 15-min delayed, so a 9:25 quote ≈ 9:10 cumulative. Live real-time is correct; only the paper-mode numerator is stale. (#3's bar-sum reconstruction sidesteps this for VWAP.) |
 | 9 | Simultaneous-signal tiebreak | vwap | 🟡 low | Sim takes earliest signal across watchlist, ties broken by rank. Live enters whichever bar pops off the poller queue first. Differs only when two symbols signal on the same minute. |
 | 10 | `max_entry_bars=30` | scalp | 📌 override | Paper-only: validated value is **4**. Extended to 30 to harvest more paper data. **MUST restore to 4 before live money.** live_scalp_runner.py:~70 |
+| 11 | Market-order fallback | MP | ⚪ immaterial | Live retries with market order when limit misses (0.5% cap). Sim now supports `market_fallback_pct` flag. Sealed 2025 comparison: 0 extra trades, $0 P&L delta — breakout entries gap past cap every time. |
 
 ---
 

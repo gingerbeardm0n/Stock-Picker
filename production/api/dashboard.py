@@ -567,7 +567,7 @@ def get_dashboard():
     trade_count = scalp_trades + vwap_trades + mp_trades
 
     from trading.live_scalp_runner import TRIAL_211_CONFIG as SCALP_CONFIG
-    from trading.live_vwap_runner import TRIAL_184_CONFIG as VWAP_CONFIG
+    from trading.live_vwap_runner import TRIAL_188_CONFIG as VWAP_CONFIG
     from trading.live_micro_pullback_runner import TRIAL_167_CONFIG as MP_CONFIG
 
     return {

@@ -79,6 +79,7 @@ class MicroPullbackConfig:
     fill_model: str = 'perfect'         # 'perfect' | 'marketable_limit'
     entry_headroom_pct: float = 0.25    # marketable-limit headroom above signal
     entry_slippage_pct: float = 0.0     # flat extra slippage on any fill
+    market_fallback_pct: float = 0.0    # 0=off; 0.5=live behavior (market retry if ask ≤ signal×1.005)
 
     def to_dict(self) -> dict:
         """Serialize to dict."""
