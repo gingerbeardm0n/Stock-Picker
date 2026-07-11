@@ -63,13 +63,33 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ── vwap_fill_v1 trial 184 (train 2021-23 w/ marketable-limit fill model,
-#    plateau-selected on 2024 [+$1,396, PF 1.77, DD $199], sealed-2025:
-#    457 trades, 79.0% WR, +$1,844, PF 1.60, DD $389).
-#    Replaced Trial 56 (2026-07-02): 56 was tuned assuming perfect fills;
-#    under realistic fills its sealed PnL halved (+$1,188, DD $587).
-#    See docs/SIM_FILL_MODEL_DESIGN.md + fill_model_diagnostic.txt. ─────────
+# ── vwap_no_news_v1 trial 188 (train 2021-23 w/ marketable-limit fill model,
+#    require_news=False, plateau-selected on 2024 [491 trades, 74.5% WR,
+#    +$4,788, PF 2.71, DD $198], sealed-2025: 403 trades, 76.7% WR,
+#    +$3,299, PF 2.19, DD $164).
+#    Replaced Trial 184 (2026-07-10): 184's edge was news-lookahead bias
+#    (issue #14). Trial 188 proves pure price/volume edge without news. ───────
 
+TRIAL_188_CONFIG = VwapReclaimConfig(
+    min_gap_pct=6.690541351134841,
+    min_relative_volume=6.6827496959282096,
+    max_price=15.118471909288788,
+    require_news=False,
+    lookback_bars=5,
+    min_bars_below=1,
+    reclaim_vol_mult=1.58094025651032,
+    entry_mode='reclaim_high_break',
+    stop_vwap_offset=0.09372192973600599,
+    profit_target_pct=14.629871548096144,
+    max_hold_bars=5,
+    trailing_stop_pct=0.0014316859424343166,
+    risk_pct=2.279389099581947,
+    max_position_pct=49.26820838249131,
+    fill_model='marketable_limit',
+    entry_headroom_pct=0.8328945963389965,
+)
+
+# Deprecated 2026-07-10 — news-lookahead bias confirmed (issue #14).
 TRIAL_184_CONFIG = VwapReclaimConfig(
     min_gap_pct=6.044448161357272,
     min_relative_volume=4.810536080054221,
@@ -146,7 +166,7 @@ class LiveVwapRunner:
         dry_run: bool = False,
         live: bool = False,
     ):
-        self.config = config or TRIAL_184_CONFIG
+        self.config = config or TRIAL_188_CONFIG
         self.dry_run = dry_run
         self.live = live
         self.state = LiveVwapState()

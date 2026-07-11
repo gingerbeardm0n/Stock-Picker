@@ -8,7 +8,7 @@ on the *same inputs*. This file is the single place that truth is tracked.
 **Status key:** ✅ fixed · 🟡 open (logic) · ⚪ inherent (cross-vendor / live-timing,
 can't be fully closed) · 📌 known override (intentional, must revert before live money)
 
-Last audited: **2026-06-13** (full read of both runners + both engines + both sims).
+Last audited: **2026-07-10** (VWAP re-enabled with Trial 188, require_news=False).
 
 ---
 
@@ -41,10 +41,10 @@ those engines, which is duplicated per side.
 
 ## Cross-cutting strategic risk (not a code gap)
 
-- **VWAP trial 173 config is STALE** — sealed-2025 +$2,669/90%WR does NOT reproduce
-  on the current DB (rerun: +$19/40%WR). Deploying it trades a config we can't
-  currently backtest. See `memory/vwap_reclaim_strategy.md`. Root-cause + re-validate
-  before any live cutover (task #20).
+- **VWAP Trial 188 deployed** (2026-07-10) — `require_news=False`, pure price/volume
+  edge. Walk-forward validated: train +$7,994/PF 2.54, select +$4,788/PF 2.71,
+  sealed +$3,299/PF 2.19. Previous trials (184, 173, 56) all deprecated due to
+  news-lookahead bias or data drift. Live validation needed (1 week).
 
 ---
 
