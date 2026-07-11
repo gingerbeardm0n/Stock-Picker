@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 STATE_DIR = Path(os.getenv("JTRADER_STATE_DIR", "/tmp/jtrader"))
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 
-# VWAP suspended 2026-07-10: Trial 184 edge was entirely from news lookahead
-# bias (issue #14). Sealed 2025 with honest news: PF 0.59 / -$385. Without
-# news gate: PF 0.68 / -$1,165. Needs full re-optimization before re-enabling.
-VWAP_SUSPENDED = True
+# VWAP re-enabled 2026-07-10: Trial 188 from vwap_no_news_v1 study.
+# require_news=False, pure price/volume edge. Sealed 2025: 403 trades,
+# 76.7% WR, +$3,299, PF 2.19, DD $164.
+VWAP_SUSPENDED = False
 
 _CANDIDATE_FIELDS = (
     'symbol', 'gap_pct', 'open_price', 'prior_close', 'rel_vol',
