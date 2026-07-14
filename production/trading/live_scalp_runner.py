@@ -833,51 +833,40 @@ class LiveScalpRunner:
         entry_order_id = ''
         stop_order_id = ''
         entry_price = round(entry_price, 2)
-        # Marketable limit: 0.25% above signal close. Exact-close limits suffer
-        # adverse selection on fast gappers — 2026-07-02: 12/15 attempts missed
-        # (price ran = the winners), the 2 fills came on falling bars and both
-        # stopped out. 0.25% keeps ~70% of the backtested edge if paid
-        # (slippage sensitivity: edge dies at ~1%; see
-        # research/analysis/outputs/slippage_sensitivity.txt). Sub-$4 names
-        # round back to the close (a penny would exceed the 0.25% budget).
-        limit_price = round(entry_price * 1.0025, 2)
+        # Market order: limit orders missed 100% of entries on paper (Jul 7-14)
+        # because Alpaca paper confirms fills on a 15-min-delayed feed. Market
+        # orders fill instantly. Sim validated edge survives 0.25% slippage;
+        # market fills on these liquid gappers are well within that budget.
         if not self.dry_run:
-            result = self.broker.place_limit_buy(symbol, shares, limit_price)
+            result = self.broker.place_market_buy(symbol, shares)
             entry_order_id = result.order_id
-            logger.info(f"    Limit: ${limit_price:.2f} (signal close ${entry_price:.2f} +0.25%)")
+            logger.info(f"    Market buy: {shares} {symbol} (signal close ${entry_price:.2f})")
             logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
 
-            time.sleep(2)
-            fill = self.broker.get_order(result.order_id)
-            if fill.status == 'filled':
-                entry_price = fill.filled_price
-                shares = fill.filled_qty
-                logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
+            # Market orders fill fast — poll up to 10s
+            for attempt in range(5):
+                time.sleep(2)
+                fill = self.broker.get_order(result.order_id)
+                if fill.status == 'filled':
+                    entry_price = fill.filled_price
+                    shares = fill.filled_qty
+                    logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
+                    break
+                logger.info(f"    Order status: {fill.status} -- waiting... ({attempt+1}/5)")
             else:
-                logger.info(f"    Order status: {fill.status} -- waiting...")
-                for _ in range(5):
-                    time.sleep(2)
-                    fill = self.broker.get_order(result.order_id)
-                    if fill.status == 'filled':
-                        entry_price = fill.filled_price
-                        shares = fill.filled_qty
-                        logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
-                        break
+                logger.warning(f"    [{symbol}] Market order not confirmed after 10s. Cancelling.")
+                cancelled = self.broker.cancel_order(result.order_id)
+                time.sleep(2)
+                fill = self.broker.get_order(result.order_id)
+                if fill.status in ('filled', 'partially_filled') and fill.filled_qty > 0:
+                    entry_price = fill.filled_price or entry_price
+                    shares = fill.filled_qty
+                    logger.warning(
+                        f"    Cancel raced fill ({fill.status}, cancel ok={cancelled}): "
+                        f"{shares} @ ${entry_price:.2f} — adopting position."
+                    )
                 else:
-                    logger.warning(f"    [{symbol}] Entry not filled after 10s. Cancelling.")
-                    cancelled = self.broker.cancel_order(result.order_id)
-                    # Cancel can race a fill — verify final state before abandoning.
-                    time.sleep(2)
-                    fill = self.broker.get_order(result.order_id)
-                    if fill.status in ('filled', 'partially_filled') and fill.filled_qty > 0:
-                        entry_price = fill.filled_price or entry_price
-                        shares = fill.filled_qty
-                        logger.warning(
-                            f"    Cancel raced fill ({fill.status}, cancel ok={cancelled}): "
-                            f"{shares} @ ${entry_price:.2f} — adopting position."
-                        )
-                    else:
-                        return None
+                    return None
 
             stop_price = round(entry_price * (1 - self.config.stop_loss_pct / 100), 2)
             try:
@@ -1087,10 +1076,12 @@ class LiveScalpRunner:
                 if len(parts) < 8:
                     continue
                 sym = parts[1]
+                name = parts[2].lower()
                 is_etf = parts[5] == 'Y'
                 is_test = parts[7] == 'Y'
-                # Keep non-ETF, non-test, normal ticker symbols
-                if (not is_etf and not is_test and sym and ' ' not in sym
+                is_derivative = any(x in name for x in ['warrant', 'right', 'unit'])
+                if (not is_etf and not is_test and not is_derivative
+                        and sym and ' ' not in sym
                         and '$' not in sym and '.' not in sym and len(sym) <= 5):
                     symbols.append(sym)
             logger.info(f"Fetched {len(symbols):,} symbols from NASDAQ trader")
