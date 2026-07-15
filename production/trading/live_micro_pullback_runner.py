@@ -136,10 +136,14 @@ class LiveMicroPullbackRunner:
 
         if not live:
             from trading.broker.alpaca import AlpacaBroker
-            self.broker = None if dry_run else AlpacaBroker(
-                api_key=Config.ALPACA_PAPER_KEY,
-                secret_key=Config.ALPACA_PAPER_SECRET,
-            )
+            if not dry_run:
+                self.broker = AlpacaBroker(
+                    api_key=Config.ALPACA_PAPER_KEY,
+                    secret_key=Config.ALPACA_PAPER_SECRET,
+                )
+                self.broker.start_trade_stream()
+            else:
+                self.broker = None
             self.data_feed = Config.get_data_feed()
             logger.info("Broker: Alpaca paper (real-time fills)")
             logger.info("Data feed: Tradier production (real-time)")
@@ -502,29 +506,24 @@ class LiveMicroPullbackRunner:
             self.state.entry_order_id = result.order_id
             logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
 
-            time.sleep(2)
-            fill = self.broker.get_order(result.order_id)
-            for _ in range(5):
-                if fill.status == 'filled':
-                    break
-                time.sleep(2)
-                fill = self.broker.get_order(result.order_id)
-            if fill.status == 'filled':
+            fill = self.broker.wait_for_fill(result.order_id, timeout=30)
+            if fill.status == 'filled' and fill.filled_qty > 0:
                 entry_price = fill.filled_price
                 shares = fill.filled_qty
                 logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
+            elif fill.status == 'partially_filled' and fill.filled_qty > 0:
+                entry_price = fill.filled_price
+                shares = fill.filled_qty
+                logger.info(f"    PARTIAL FILL: {symbol} {shares} @ ${entry_price:.2f}")
             else:
-                logger.warning("    Entry not filled after 12s. Cancelling.")
-                cancelled = self.broker.cancel_order(result.order_id)
-                time.sleep(2)
-                fill = self.broker.get_order(result.order_id)
-                if fill.status in ('filled', 'partially_filled') and fill.filled_qty > 0:
-                    entry_price = fill.filled_price or entry_price
-                    shares = fill.filled_qty
-                    logger.warning(
-                        f"    Cancel raced a fill ({fill.status}, cancel ok={cancelled}): "
-                        f"{shares} @ ${entry_price:.2f} — adopting position."
-                    )
+                logger.warning(f"    Entry not filled after 30s (status={fill.status}). Cancelling.")
+                self.broker.cancel_order(result.order_id)
+                time.sleep(1)
+                final = self.broker.get_order(result.order_id)
+                if final.filled_qty > 0:
+                    entry_price = final.filled_price or entry_price
+                    shares = final.filled_qty
+                    logger.warning(f"    Cancel raced fill: {shares} @ ${entry_price:.2f}")
                 else:
                     # Limit missed — retry immediately with market order if stock
                     # hasn't run away from the signal price (2% slippage cap).
@@ -556,14 +555,13 @@ class LiveMicroPullbackRunner:
                         f"(ask=${current_ask:.2f} ≤ cap=${slippage_cap:.2f})"
                     )
                     result2 = self.broker.place_market_buy(symbol, shares)
-                    time.sleep(3)
-                    fill2 = self.broker.get_order(result2.order_id)
-                    if fill2.status == 'filled':
+                    fill2 = self.broker.wait_for_fill(result2.order_id, timeout=30)
+                    if fill2.status == 'filled' and fill2.filled_qty > 0:
                         entry_price = fill2.filled_price
                         shares = fill2.filled_qty
                         logger.info(f"    MARKET FILLED: {symbol} {shares} @ ${entry_price:.2f}")
                     else:
-                        logger.warning(f"    [{symbol}] Market order also failed. Skipping.")
+                        logger.warning(f"    [{symbol}] Market order also failed (status={fill2.status}). Skipping.")
                         self.state.traded_symbols.append(symbol)
                         _release_position(symbol)
                         return
@@ -610,8 +608,7 @@ class LiveMicroPullbackRunner:
 
             result = self.broker.place_market_sell(symbol, self.state.shares)
             logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
-            time.sleep(2)
-            fill = self.broker.get_order(result.order_id)
+            fill = self.broker.wait_for_fill(result.order_id, timeout=30)
             if fill.status == 'filled':
                 exit_price = fill.filled_price
                 logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")

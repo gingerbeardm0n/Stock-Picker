@@ -206,6 +206,25 @@ class BrokerInterface(ABC):
 
     # ── Shared helpers (concrete — built on the abstract methods above) ──────────
 
+    def start_trade_stream(self):
+        """Start real-time trade-update stream (no-op for brokers without one)."""
+        pass
+
+    def wait_for_fill(
+        self,
+        order_id: str,
+        timeout: float = 30.0,
+    ) -> OrderResult:
+        """Wait for an order to fill via streaming, with REST poll fallback."""
+        import time as _t
+        deadline = _t.time() + timeout
+        while _t.time() < deadline:
+            _t.sleep(2)
+            order = self.get_order(order_id)
+            if order.status in ('filled', 'partially_filled', 'cancelled', 'rejected', 'expired'):
+                return order
+        return self.get_order(order_id)
+
     def cancel_order_and_wait(
         self,
         order_id: str,

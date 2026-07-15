@@ -91,7 +91,95 @@ class AlpacaBroker(BrokerInterface):
         self._client = TradingClient(
             api_key=api_key, secret_key=secret_key, paper=paper,
         )
+        self._api_key = api_key
+        self._secret_key = secret_key
+        self._paper = paper
+        self._fill_events: dict[str, threading.Event] = {}
+        self._fill_results: dict[str, OrderResult] = {}
+        self._stream_thread: Optional[threading.Thread] = None
         logger.info(f"AlpacaBroker initialized ({'paper' if paper else 'LIVE'})")
+
+    # ── Trade-updates WebSocket stream ────────────────────────────────────
+
+    def start_trade_stream(self):
+        """Start background websocket for real-time fill notifications.
+
+        Call once at session start. Trade updates arrive instantly vs the
+        REST get_order() poll which lags minutes on paper accounts.
+        """
+        if self._stream_thread and self._stream_thread.is_alive():
+            return
+        self._stream_thread = threading.Thread(
+            target=self._run_trade_stream, daemon=True, name='alpaca-trade-stream')
+        self._stream_thread.start()
+        logger.info("AlpacaBroker trade-updates stream started")
+
+    def _run_trade_stream(self):
+        from alpaca.trading.stream import TradingStream
+        stream = TradingStream(
+            self._api_key, self._secret_key, paper=self._paper)
+
+        async def _on_trade_update(data):
+            try:
+                event = data.event
+                order = data.order
+                oid = str(order.id)
+                if event in ('fill', 'partial_fill'):
+                    result = OrderResult(
+                        order_id=oid,
+                        status='filled' if event == 'fill' else 'partially_filled',
+                        filled_qty=int(float(order.filled_qty or 0)),
+                        filled_price=float(order.filled_avg_price or 0),
+                    )
+                    self._fill_results[oid] = result
+                    ev = self._fill_events.get(oid)
+                    if ev:
+                        ev.set()
+                    logger.info(
+                        f"Stream: {event} {order.symbol} {result.filled_qty} "
+                        f"@ ${result.filled_price:.2f} (order {oid[:8]})")
+                elif event in ('canceled', 'cancelled', 'rejected', 'expired'):
+                    result = OrderResult(
+                        order_id=oid,
+                        status=_normalize_alpaca_status(event),
+                        filled_qty=int(float(order.filled_qty or 0)),
+                        filled_price=float(order.filled_avg_price or 0),
+                    )
+                    self._fill_results[oid] = result
+                    ev = self._fill_events.get(oid)
+                    if ev:
+                        ev.set()
+            except Exception as e:
+                logger.warning(f"Stream handler error: {e}")
+
+        stream.subscribe_trade_updates(_on_trade_update)
+        try:
+            stream.run()
+        except Exception as e:
+            logger.error(f"Trade stream died: {e}")
+
+    def wait_for_fill(self, order_id: str, timeout: float = 30.0) -> OrderResult:
+        """Block until a fill/cancel event arrives via websocket, or timeout.
+
+        Falls back to REST get_order() if stream isn't running or times out.
+        """
+        ev = threading.Event()
+        self._fill_events[order_id] = ev
+
+        # Check if already filled (race: event arrived before we registered)
+        if order_id in self._fill_results:
+            self._fill_events.pop(order_id, None)
+            return self._fill_results.pop(order_id)
+
+        filled = ev.wait(timeout=timeout)
+        self._fill_events.pop(order_id, None)
+
+        if filled and order_id in self._fill_results:
+            return self._fill_results.pop(order_id)
+
+        # Timeout — fall back to REST poll
+        logger.warning(f"wait_for_fill timeout ({timeout}s) for {order_id[:8]} — REST fallback")
+        return self.get_order(order_id)
 
     def place_limit_buy(self, symbol: str, qty: int, limit_price: float) -> OrderResult:
         logger.info(f"LIMIT BUY: {qty} {symbol} @ ${limit_price:.2f}")

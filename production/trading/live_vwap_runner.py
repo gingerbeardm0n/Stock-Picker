@@ -182,10 +182,14 @@ class LiveVwapRunner:
         # Live mode: uses whatever BROKER= is set to in .env.live.
         if not live:
             from trading.broker.alpaca import AlpacaBroker
-            self.broker = None if dry_run else AlpacaBroker(
-                api_key=Config.ALPACA_PAPER_KEY,
-                secret_key=Config.ALPACA_PAPER_SECRET,
-            )
+            if not dry_run:
+                self.broker = AlpacaBroker(
+                    api_key=Config.ALPACA_PAPER_KEY,
+                    secret_key=Config.ALPACA_PAPER_SECRET,
+                )
+                self.broker.start_trade_stream()
+            else:
+                self.broker = None
             self.data_feed = Config.get_data_feed()
             logger.info("Broker: Alpaca paper (real-time fills)")
             logger.info("Data feed: Tradier production (real-time)")
@@ -642,32 +646,24 @@ class LiveVwapRunner:
             logger.info(f"    Limit: ${limit_buy_price:.2f} (signal ${entry_price:.2f} +{headroom:.2f}%)")
             logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
 
-            time.sleep(2)
-            fill = self.broker.get_order(result.order_id)
-            for _ in range(5):
-                if fill.status == 'filled':
-                    break
-                time.sleep(2)
-                fill = self.broker.get_order(result.order_id)
-            if fill.status == 'filled':
+            fill = self.broker.wait_for_fill(result.order_id, timeout=30)
+            if fill.status == 'filled' and fill.filled_qty > 0:
                 entry_price = fill.filled_price
                 shares = fill.filled_qty
                 logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
+            elif fill.status == 'partially_filled' and fill.filled_qty > 0:
+                entry_price = fill.filled_price
+                shares = fill.filled_qty
+                logger.info(f"    PARTIAL FILL: {symbol} {shares} @ ${entry_price:.2f}")
             else:
-                logger.warning("    Entry not filled after 12s. Cancelling.")
-                cancelled = self.broker.cancel_order(result.order_id)
-                # A cancel can race a fill — a failed cancel usually means the
-                # order already executed. Verify final state; adopt any filled
-                # shares rather than leaving an orphan position with no stop.
-                time.sleep(2)
-                fill = self.broker.get_order(result.order_id)
-                if fill.status in ('filled', 'partially_filled') and fill.filled_qty > 0:
-                    entry_price = fill.filled_price or entry_price
-                    shares = fill.filled_qty
-                    logger.warning(
-                        f"    Cancel raced a fill ({fill.status}, cancel ok={cancelled}): "
-                        f"{shares} @ ${entry_price:.2f} — adopting position."
-                    )
+                logger.warning(f"    Entry not filled after 30s (status={fill.status}). Cancelling.")
+                self.broker.cancel_order(result.order_id)
+                time.sleep(1)
+                final = self.broker.get_order(result.order_id)
+                if final.filled_qty > 0:
+                    entry_price = final.filled_price or entry_price
+                    shares = final.filled_qty
+                    logger.warning(f"    Cancel raced fill: {shares} @ ${entry_price:.2f}")
                 else:
                     # Limit missed — retry with a market order ONLY if the ask is
                     # still within the tuned headroom (the sealed backtest's
@@ -697,14 +693,13 @@ class LiveVwapRunner:
                         f"(ask=${current_ask:.2f} ≤ cap=${slippage_cap:.2f})"
                     )
                     result2 = self.broker.place_market_buy(symbol, shares)
-                    time.sleep(3)
-                    fill2 = self.broker.get_order(result2.order_id)
-                    if fill2.status == 'filled':
+                    fill2 = self.broker.wait_for_fill(result2.order_id, timeout=30)
+                    if fill2.status == 'filled' and fill2.filled_qty > 0:
                         entry_price = fill2.filled_price
                         shares = fill2.filled_qty
                         logger.info(f"    MARKET FILLED: {symbol} {shares} @ ${entry_price:.2f}")
                     else:
-                        logger.warning(f"    [{symbol}] Market order also failed. Skipping.")
+                        logger.warning(f"    [{symbol}] Market order also failed (status={fill2.status}). Skipping.")
                         self.state.traded_symbols.append(symbol)
                         _release_position(symbol)
                         return
@@ -722,8 +717,7 @@ class LiveVwapRunner:
                     f"    [{symbol}] STOP ORDER FAILED: {e} — attempting emergency market exit")
                 try:
                     mkt_result = self.broker.place_market_sell(symbol, shares)
-                    time.sleep(2)
-                    mkt_fill = self.broker.get_order(mkt_result.order_id)
+                    mkt_fill = self.broker.wait_for_fill(mkt_result.order_id, timeout=30)
                     if mkt_fill.status == 'filled':
                         logger.warning(
                             f"    [{symbol}] Emergency market exit FILLED: "
@@ -794,27 +788,24 @@ class LiveVwapRunner:
                 result = self.broker.place_limit_sell(
                     symbol, pos['shares'], round(exit_price, 2))
                 logger.info(f"    Limit sell order: {result.order_id} Status: {result.status}")
-                time.sleep(5)
-                fill = self.broker.get_order(result.order_id)
+                fill = self.broker.wait_for_fill(result.order_id, timeout=10)
                 if fill.status == 'filled':
                     exit_price = fill.filled_price
                     logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
                 else:
                     logger.warning(
-                        f"    Limit sell unfilled after 5s (status={fill.status}) — "
+                        f"    Limit sell unfilled after 10s (status={fill.status}) — "
                         f"cancelling, market fallback")
                     self.broker.cancel_order(result.order_id)
                     result2 = self.broker.place_market_sell(symbol, pos['shares'])
-                    time.sleep(2)
-                    fill2 = self.broker.get_order(result2.order_id)
+                    fill2 = self.broker.wait_for_fill(result2.order_id, timeout=30)
                     if fill2.status == 'filled':
                         exit_price = fill2.filled_price
                         logger.info(f"    Market fallback FILLED: {symbol} {fill2.filled_qty} @ ${exit_price:.2f}")
             else:
                 result = self.broker.place_market_sell(symbol, pos['shares'])
                 logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
-                time.sleep(2)
-                fill = self.broker.get_order(result.order_id)
+                fill = self.broker.wait_for_fill(result.order_id, timeout=30)
                 if fill.status == 'filled':
                     exit_price = fill.filled_price
                     logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
