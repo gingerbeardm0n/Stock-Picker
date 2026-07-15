@@ -149,6 +149,7 @@ class LiveScalpRunner:
                     api_key=Config.ALPACA_PAPER_KEY,
                     secret_key=Config.ALPACA_PAPER_SECRET,
                 )
+                self.broker.start_trade_stream()
             else:
                 self.broker = None
             # Data feed stays on Tradier production (real-time, free)
@@ -833,38 +834,34 @@ class LiveScalpRunner:
         entry_order_id = ''
         stop_order_id = ''
         entry_price = round(entry_price, 2)
-        # Market order: limit orders missed 100% of entries on paper (Jul 7-14)
-        # because Alpaca paper confirms fills on a 15-min-delayed feed. Market
-        # orders fill instantly. Sim validated edge survives 0.25% slippage;
-        # market fills on these liquid gappers are well within that budget.
+        # Market order with websocket fill notification. REST polling missed
+        # 100% of entries (Jul 7-15) because Alpaca paper confirms via a
+        # delayed feed. The trade_updates websocket pushes fill events in
+        # real time, bypassing the delay entirely.
         if not self.dry_run:
             result = self.broker.place_market_buy(symbol, shares)
             entry_order_id = result.order_id
             logger.info(f"    Market buy: {shares} {symbol} (signal close ${entry_price:.2f})")
             logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
 
-            # Market orders fill fast — poll up to 10s
-            for attempt in range(5):
-                time.sleep(2)
-                fill = self.broker.get_order(result.order_id)
-                if fill.status == 'filled':
-                    entry_price = fill.filled_price
-                    shares = fill.filled_qty
-                    logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
-                    break
-                logger.info(f"    Order status: {fill.status} -- waiting... ({attempt+1}/5)")
+            fill = self.broker.wait_for_fill(result.order_id, timeout=30)
+            if fill.status == 'filled' and fill.filled_qty > 0:
+                entry_price = fill.filled_price
+                shares = fill.filled_qty
+                logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
+            elif fill.status == 'partially_filled' and fill.filled_qty > 0:
+                entry_price = fill.filled_price
+                shares = fill.filled_qty
+                logger.info(f"    PARTIAL FILL: {symbol} {shares} @ ${entry_price:.2f}")
             else:
-                logger.warning(f"    [{symbol}] Market order not confirmed after 10s. Cancelling.")
-                cancelled = self.broker.cancel_order(result.order_id)
-                time.sleep(2)
-                fill = self.broker.get_order(result.order_id)
-                if fill.status in ('filled', 'partially_filled') and fill.filled_qty > 0:
-                    entry_price = fill.filled_price or entry_price
-                    shares = fill.filled_qty
-                    logger.warning(
-                        f"    Cancel raced fill ({fill.status}, cancel ok={cancelled}): "
-                        f"{shares} @ ${entry_price:.2f} — adopting position."
-                    )
+                logger.warning(f"    [{symbol}] No fill after 30s (status={fill.status}). Cancelling.")
+                self.broker.cancel_order(result.order_id)
+                time.sleep(1)
+                final = self.broker.get_order(result.order_id)
+                if final.filled_qty > 0:
+                    entry_price = final.filled_price or entry_price
+                    shares = final.filled_qty
+                    logger.warning(f"    Cancel raced fill: {shares} @ ${entry_price:.2f}")
                 else:
                     return None
 
@@ -882,8 +879,7 @@ class LiveScalpRunner:
                     f"    [{symbol}] STOP ORDER FAILED: {e} — attempting emergency market exit")
                 try:
                     mkt_result = self.broker.place_market_sell(symbol, shares)
-                    time.sleep(2)
-                    mkt_fill = self.broker.get_order(mkt_result.order_id)
+                    mkt_fill = self.broker.wait_for_fill(mkt_result.order_id, timeout=30)
                     if mkt_fill.status == 'filled':
                         exit_price = mkt_fill.filled_price
                         pnl = (exit_price - entry_price) * shares
@@ -958,8 +954,7 @@ class LiveScalpRunner:
             result = self.broker.place_market_sell(symbol, pos['shares'])
             logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
 
-            time.sleep(2)
-            fill = self.broker.get_order(result.order_id)
+            fill = self.broker.wait_for_fill(result.order_id, timeout=30)
             if fill.status == 'filled':
                 exit_price = fill.filled_price
                 logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
