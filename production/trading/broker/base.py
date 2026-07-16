@@ -210,6 +210,14 @@ class BrokerInterface(ABC):
         """Start real-time trade-update stream (no-op for brokers without one)."""
         pass
 
+    def check_fill(self, order_id: str) -> Optional[OrderResult]:
+        """Non-blocking order-state check. Brokers with a real-time stream
+        return the latest streamed snapshot; default falls back to REST."""
+        try:
+            return self.get_order(order_id)
+        except Exception:
+            return None
+
     def wait_for_fill(
         self,
         order_id: str,

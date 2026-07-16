@@ -625,7 +625,27 @@ class LiveScalpRunner:
         }
 
         open_positions = {}   # {sym: position_dict}
+        pending_entries = {}  # {sym: pending-entry dict} — in-flight buy orders
         completed_trades = []
+
+        def _apply_entry_results(results):
+            """Fold confirmed/failed entry fills back into loop state."""
+            for rsym, pos in results:
+                if pos and pos.get('_already_exited'):
+                    trade = pos['trade']
+                    completed_trades.append(trade)
+                    self.state.pnl += trade['pnl']
+                    self.state.trade_count += 1
+                    sym_meta[rsym]['done'] = True
+                    self.state.completed_trades = completed_trades
+                    self._write_live_state()
+                elif pos:
+                    open_positions[rsym] = pos
+                    self.state.in_position = True
+                    self.state.positions[rsym] = pos
+                    self._write_live_state()
+                # pos None → no fill; symbol may re-signal on a later bar
+                # (max_entry_bars still caps how long it stays watched)
 
         # Start bar poller for all symbols
         from trading.broker.tradier import TradierBarPoller
@@ -645,8 +665,11 @@ class LiveScalpRunner:
         monitor_start = datetime.now(ET)
         max_entry_wait = timedelta(minutes=self.config.max_entry_bars)
 
+        last_bar_at = time.time()
+
         while True:
-            if all(m['done'] for m in sym_meta.values()) and not open_positions:
+            if (all(m['done'] for m in sym_meta.values())
+                    and not open_positions and not pending_entries):
                 break
 
             # Wall-clock fallback: a symbol whose bar-count timeout never
@@ -665,9 +688,30 @@ class LiveScalpRunner:
                         meta['done'] = True
 
             try:
-                bar = self._bar_queue.get(timeout=180)
+                # Short timeout while entries are in flight so pending fills
+                # get swept promptly even between bars.
+                q_timeout = 3 if pending_entries else 180
+                bar = self._bar_queue.get(timeout=q_timeout)
             except queue.Empty:
+                if pending_entries:
+                    _apply_entry_results(self._check_pending_entries(pending_entries))
+                if time.time() - last_bar_at < 180:
+                    continue
                 logger.warning("No bar received in 180s -- timeout")
+                # Kill in-flight entry orders BEFORE exiting — an order that
+                # fills after this loop breaks would be an orphan with no stop.
+                for psym, pend in list(pending_entries.items()):
+                    if pend.get('order_id'):
+                        logger.warning(f"  [{psym}] Cancelling in-flight entry (bar timeout)")
+                        try:
+                            final = self.broker.cancel_order_and_wait(pend['order_id'])
+                            if final.filled_qty > 0:
+                                _apply_entry_results([(psym, self._finalize_entry(
+                                    pend, final.filled_price or pend['signal_price'],
+                                    final.filled_qty))])
+                        except Exception as e:
+                            logger.error(f"  [{psym}] Cancel failed: {e}")
+                    del pending_entries[psym]
                 if open_positions:
                     logger.warning(f"Timeout with {len(open_positions)} open position(s) — emergency exit all")
                     for sym, pos in list(open_positions.items()):
@@ -686,6 +730,10 @@ class LiveScalpRunner:
                             # Don't let one symbol's failure skip the rest.
                             logger.error(f"  [{sym}] Emergency exit failed: {e}", exc_info=True)
                 break
+
+            last_bar_at = time.time()
+            if pending_entries:
+                _apply_entry_results(self._check_pending_entries(pending_entries))
 
             sym = bar.get('symbol')
             if sym not in sym_meta or sym_meta[sym]['done']:
@@ -745,7 +793,10 @@ class LiveScalpRunner:
                             f"  [{sym}] EXIT FAILED: {e} — keeping position, "
                             f"retry next bar", exc_info=True)
             else:
-                if len(open_positions) < MAX_CONCURRENT:
+                # Pending entries occupy concurrency slots so a burst of
+                # signals can't over-commit capital while fills are in flight.
+                if (sym not in pending_entries
+                        and len(open_positions) + len(pending_entries) < MAX_CONCURRENT):
                     # bars_since_open is 0-indexed in the engine and sim (0 = the
                     # 9:30 bar; scalp_simulation passes enumerate() indices), but
                     # n is a 1-based counter. Passing n unshifted meant
@@ -761,30 +812,20 @@ class LiveScalpRunner:
                     )
                     if entry:
                         try:
-                            pos = self._place_entry_multi(sym, bar, entry)
+                            pend = self._submit_entry_order(sym, bar, entry)
                         except Exception as e:
                             logger.error(
                                 f"  [{sym}] ENTRY FAILED: {e} — skipping symbol",
                                 exc_info=True)
                             meta['done'] = True
-                            pos = None
-                        if pos and pos.get('_already_exited'):
-                            trade = pos['trade']
-                            completed_trades.append(trade)
-                            self.state.pnl += trade['pnl']
-                            self.state.trade_count += 1
-                            meta['done'] = True
-                            self.state.completed_trades = completed_trades
-                            self._write_live_state()
-                        elif pos:
-                            open_positions[sym] = pos
-                            self.state.in_position = True
-                            self.state.positions[sym] = pos
-                            self._write_live_state()
-                elif n == 1:
+                            pend = None
+                        if pend:
+                            pending_entries[sym] = pend
+                elif sym not in pending_entries and n == 1:
                     logger.info(f"  [{sym}] Concurrent limit ({MAX_CONCURRENT}) reached — watching only")
 
-                if n >= self.config.max_entry_bars and sym not in open_positions:
+                if (n >= self.config.max_entry_bars
+                        and sym not in open_positions and sym not in pending_entries):
                     logger.info(f"  [{sym}] Max entry bars ({self.config.max_entry_bars}) reached, no entry")
                     meta['done'] = True
 
@@ -800,8 +841,17 @@ class LiveScalpRunner:
 
     # ── Order placement ──────────────────────────────────────────────────────
 
-    def _place_entry_multi(self, symbol: str, bar: dict, entry: dict) -> dict | None:
-        """Place entry order. Returns position dict on success, None on failure."""
+    ENTRY_FILL_TIMEOUT = 30.0  # seconds before an unfilled entry is cancelled
+
+    def _submit_entry_order(self, symbol: str, bar: dict, entry: dict) -> dict | None:
+        """Size and submit a market entry order WITHOUT waiting for the fill.
+
+        Returns a pending-entry dict, or None if sizing failed. Non-blocking:
+        on 2026-07-16 five zero-IEX-volume symbols each blocked the bar loop
+        30s waiting on fills that never came, delaying the one real entry
+        (ATPC) by 2.5 min and costing +2.1% slippage. Fills are now collected
+        asynchronously via _check_pending_entries().
+        """
         entry_price = bar['close']
         account_balance = 5000.0
 
@@ -831,40 +881,89 @@ class LiveScalpRunner:
         logger.info(f"    Reason: {entry.get('reason', '?')}")
         logger.info(f"    Risk: ${risk_amount:.2f} | Position: ${shares * entry_price:.2f}")
 
-        entry_order_id = ''
-        stop_order_id = ''
         entry_price = round(entry_price, 2)
-        # Market order with websocket fill notification. REST polling missed
-        # 100% of entries (Jul 7-15) because Alpaca paper confirms via a
-        # delayed feed. The trade_updates websocket pushes fill events in
-        # real time, bypassing the delay entirely.
-        if not self.dry_run:
-            result = self.broker.place_market_buy(symbol, shares)
-            entry_order_id = result.order_id
-            logger.info(f"    Market buy: {shares} {symbol} (signal close ${entry_price:.2f})")
-            logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
+        pending = {
+            'symbol': symbol,
+            'order_id': '',
+            'shares': shares,
+            'signal_price': entry_price,
+            'bar_high': bar['high'],
+            'placed_at': time.time(),
+        }
+        if self.dry_run:
+            return pending  # finalized immediately at signal price
 
-            fill = self.broker.wait_for_fill(result.order_id, timeout=30)
-            if fill.status == 'filled' and fill.filled_qty > 0:
-                entry_price = fill.filled_price
-                shares = fill.filled_qty
-                logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
-            elif fill.status == 'partially_filled' and fill.filled_qty > 0:
-                entry_price = fill.filled_price
-                shares = fill.filled_qty
-                logger.info(f"    PARTIAL FILL: {symbol} {shares} @ ${entry_price:.2f}")
-            else:
-                logger.warning(f"    [{symbol}] No fill after 30s (status={fill.status}). Cancelling.")
-                self.broker.cancel_order(result.order_id)
-                time.sleep(1)
-                final = self.broker.get_order(result.order_id)
-                if final.filled_qty > 0:
-                    entry_price = final.filled_price or entry_price
-                    shares = final.filled_qty
-                    logger.warning(f"    Cancel raced fill: {shares} @ ${entry_price:.2f}")
+        result = self.broker.place_market_buy(symbol, shares)
+        pending['order_id'] = result.order_id
+        logger.info(f"    Market buy: {shares} {symbol} (signal close ${entry_price:.2f})")
+        logger.info(f"    Order ID: {result.order_id} Status: {result.status}")
+        return pending
+
+    def _check_pending_entries(self, pending_entries: dict) -> list[tuple[str, dict | None]]:
+        """Non-blocking sweep of in-flight entry orders.
+
+        Returns [(symbol, position_dict | already_exited_dict | None), ...] for
+        every pending entry that reached a terminal state this sweep. None =
+        no fill (symbol may re-signal on a later bar). Entries older than
+        ENTRY_FILL_TIMEOUT are cancelled; a cancel that races a fill adopts
+        the filled shares.
+        """
+        results: list[tuple[str, dict | None]] = []
+        for sym, pending in list(pending_entries.items()):
+            if self.dry_run or not pending['order_id']:
+                del pending_entries[sym]
+                results.append((sym, self._finalize_entry(
+                    pending, pending['signal_price'], pending['shares'])))
+                continue
+
+            oid = pending['order_id']
+            snap = self.broker.check_fill(oid)
+            status = snap.status if snap else None
+
+            if status == 'filled' and snap.filled_qty > 0:
+                del pending_entries[sym]
+                results.append((sym, self._finalize_entry(
+                    pending, snap.filled_price, snap.filled_qty)))
+            elif status in ('cancelled', 'rejected', 'expired'):
+                del pending_entries[sym]
+                if snap.filled_qty > 0:
+                    logger.warning(
+                        f"    [{sym}] Terminal {status} with {snap.filled_qty} filled — adopting.")
+                    results.append((sym, self._finalize_entry(
+                        pending, snap.filled_price or pending['signal_price'], snap.filled_qty)))
                 else:
-                    return None
+                    logger.warning(f"    [{sym}] Entry order {status}, no fill.")
+                    results.append((sym, None))
+            elif time.time() - pending['placed_at'] >= self.ENTRY_FILL_TIMEOUT:
+                logger.warning(
+                    f"    [{sym}] No fill after {self.ENTRY_FILL_TIMEOUT:.0f}s "
+                    f"(status={status or 'no events'}). Cancelling.")
+                del pending_entries[sym]
+                self.broker.cancel_order(oid)
+                # Stream pushes the terminal event (canceled OR fill if the
+                # cancel raced one) — wait briefly on it instead of trusting a
+                # laggy REST get_order snapshot.
+                final = self.broker.wait_for_fill(oid, timeout=10)
+                if final.filled_qty > 0:
+                    logger.warning(
+                        f"    [{sym}] Cancel raced fill: {final.filled_qty} "
+                        f"@ ${final.filled_price:.2f} — adopting position.")
+                    results.append((sym, self._finalize_entry(
+                        pending, final.filled_price or pending['signal_price'],
+                        final.filled_qty)))
+                else:
+                    results.append((sym, None))
+            # else: still cooking — check again next sweep
+        return results
 
+    def _finalize_entry(self, pending: dict, entry_price: float, shares: int) -> dict | None:
+        """Confirmed fill → place protective stop and build the position dict."""
+        symbol = pending['symbol']
+        entry_order_id = pending['order_id']
+        stop_order_id = ''
+        logger.info(f"    FILLED: {symbol} {shares} @ ${entry_price:.2f}")
+
+        if not self.dry_run:
             stop_price = round(entry_price * (1 - self.config.stop_loss_pct / 100), 2)
             try:
                 stop_result = self.broker.place_stop_sell(symbol, shares, stop_price)
@@ -879,7 +978,7 @@ class LiveScalpRunner:
                     f"    [{symbol}] STOP ORDER FAILED: {e} — attempting emergency market exit")
                 try:
                     mkt_result = self.broker.place_market_sell(symbol, shares)
-                    mkt_fill = self.broker.wait_for_fill(mkt_result.order_id, timeout=30)
+                    mkt_fill = self.broker.wait_for_fill(mkt_result.order_id, timeout=120)
                     if mkt_fill.status == 'filled':
                         exit_price = mkt_fill.filled_price
                         pnl = (exit_price - entry_price) * shares
@@ -912,7 +1011,7 @@ class LiveScalpRunner:
             'entry_order_id': entry_order_id,
             'stop_order_id': stop_order_id,
             'stop_price': round(entry_price * (1 - self.config.stop_loss_pct / 100), 2),
-            'highest_since_entry': bar['high'],
+            'highest_since_entry': max(pending['bar_high'], entry_price),
             'bars_held': 0,
             'entry_time': datetime.now(ET).isoformat(),
         }
@@ -954,10 +1053,18 @@ class LiveScalpRunner:
             result = self.broker.place_market_sell(symbol, pos['shares'])
             logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
 
-            fill = self.broker.wait_for_fill(result.order_id, timeout=30)
-            if fill.status == 'filled':
+            # 120s: Alpaca paper streams partials over ~2 min before the
+            # terminal fill (2026-07-16 ATPC sell: 111s). Booking the signal
+            # price after a 30s timeout recorded -$3.97 vs the real -$18.38.
+            fill = self.broker.wait_for_fill(result.order_id, timeout=120)
+            if fill.filled_qty > 0 and fill.filled_price > 0:
                 exit_price = fill.filled_price
-                logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
+                logger.info(f"    FILLED ({fill.status}): {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
+            else:
+                logger.warning(
+                    f"    [{symbol}] Exit fill unconfirmed after 120s "
+                    f"(status={fill.status}) — booking signal price ${exit_price:.2f}, "
+                    f"P&L may be approximate")
 
         pnl = (exit_price - pos['entry_price']) * pos['shares']
         logger.info(f"    P&L: ${pnl:+.2f}")

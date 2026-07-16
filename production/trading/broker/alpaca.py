@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+import time as _time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -124,10 +125,25 @@ class AlpacaBroker(BrokerInterface):
                 event = data.event
                 order = data.order
                 oid = str(order.id)
-                if event in ('fill', 'partial_fill'):
+                if event == 'partial_fill':
+                    # Record progress but do NOT wake waiters — Alpaca paper
+                    # streams many partials over ~1-2 min before the terminal
+                    # 'fill'. Returning on the first partial recorded the wrong
+                    # exit price on 2026-07-16 (ATPC: booked $3.33, real $3.27).
+                    self._fill_results[oid] = OrderResult(
+                        order_id=oid,
+                        status='partially_filled',
+                        filled_qty=int(float(order.filled_qty or 0)),
+                        filled_price=float(order.filled_avg_price or 0),
+                    )
+                    logger.info(
+                        f"Stream: partial_fill {order.symbol} "
+                        f"{self._fill_results[oid].filled_qty} "
+                        f"@ ${self._fill_results[oid].filled_price:.2f} (order {oid[:8]})")
+                elif event in ('fill', 'canceled', 'cancelled', 'rejected', 'expired'):
                     result = OrderResult(
                         order_id=oid,
-                        status='filled' if event == 'fill' else 'partially_filled',
+                        status='filled' if event == 'fill' else _normalize_alpaca_status(event),
                         filled_qty=int(float(order.filled_qty or 0)),
                         filled_price=float(order.filled_avg_price or 0),
                     )
@@ -138,17 +154,6 @@ class AlpacaBroker(BrokerInterface):
                     logger.info(
                         f"Stream: {event} {order.symbol} {result.filled_qty} "
                         f"@ ${result.filled_price:.2f} (order {oid[:8]})")
-                elif event in ('canceled', 'cancelled', 'rejected', 'expired'):
-                    result = OrderResult(
-                        order_id=oid,
-                        status=_normalize_alpaca_status(event),
-                        filled_qty=int(float(order.filled_qty or 0)),
-                        filled_price=float(order.filled_avg_price or 0),
-                    )
-                    self._fill_results[oid] = result
-                    ev = self._fill_events.get(oid)
-                    if ev:
-                        ev.set()
             except Exception as e:
                 logger.warning(f"Stream handler error: {e}")
 
@@ -158,28 +163,53 @@ class AlpacaBroker(BrokerInterface):
         except Exception as e:
             logger.error(f"Trade stream died: {e}")
 
-    def wait_for_fill(self, order_id: str, timeout: float = 30.0) -> OrderResult:
-        """Block until a fill/cancel event arrives via websocket, or timeout.
+    _TERMINAL = ('filled', 'cancelled', 'rejected', 'expired')
 
-        Falls back to REST get_order() if stream isn't running or times out.
+    def check_fill(self, order_id: str) -> Optional[OrderResult]:
+        """Non-blocking peek at streamed order state. None = no events yet.
+
+        May return a 'partially_filled' snapshot; callers that need the final
+        average price should keep waiting for a terminal status.
+        """
+        return self._fill_results.get(order_id)
+
+    def wait_for_fill(self, order_id: str, timeout: float = 30.0) -> OrderResult:
+        """Block until a TERMINAL event (fill/cancel/reject/expire) arrives via
+        websocket, or timeout.
+
+        On timeout, returns the latest streamed partial-fill snapshot if one
+        exists (so callers see real filled_qty/avg price progress), otherwise
+        falls back to REST get_order().
         """
         ev = threading.Event()
         self._fill_events[order_id] = ev
+        try:
+            # Race check: terminal event may have arrived before we registered
+            cached = self._fill_results.get(order_id)
+            if cached and cached.status in self._TERMINAL:
+                return cached
 
-        # Check if already filled (race: event arrived before we registered)
-        if order_id in self._fill_results:
+            deadline = _time.time() + timeout
+            while _time.time() < deadline:
+                ev.wait(timeout=max(0.0, deadline - _time.time()))
+                cached = self._fill_results.get(order_id)
+                if cached and cached.status in self._TERMINAL:
+                    return cached
+                if not ev.is_set():
+                    break  # timed out
+                ev.clear()
+
+            # Timeout — best-known stream state beats a laggy REST poll
+            cached = self._fill_results.get(order_id)
+            if cached:
+                logger.warning(
+                    f"wait_for_fill timeout ({timeout}s) for {order_id[:8]} — "
+                    f"stream shows {cached.status} {cached.filled_qty} filled")
+                return cached
+            logger.warning(f"wait_for_fill timeout ({timeout}s) for {order_id[:8]} — REST fallback")
+            return self.get_order(order_id)
+        finally:
             self._fill_events.pop(order_id, None)
-            return self._fill_results.pop(order_id)
-
-        filled = ev.wait(timeout=timeout)
-        self._fill_events.pop(order_id, None)
-
-        if filled and order_id in self._fill_results:
-            return self._fill_results.pop(order_id)
-
-        # Timeout — fall back to REST poll
-        logger.warning(f"wait_for_fill timeout ({timeout}s) for {order_id[:8]} — REST fallback")
-        return self.get_order(order_id)
 
     def place_limit_buy(self, symbol: str, qty: int, limit_price: float) -> OrderResult:
         logger.info(f"LIMIT BUY: {qty} {symbol} @ ${limit_price:.2f}")
