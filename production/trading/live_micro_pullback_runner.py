@@ -518,8 +518,9 @@ class LiveMicroPullbackRunner:
             else:
                 logger.warning(f"    Entry not filled after 30s (status={fill.status}). Cancelling.")
                 self.broker.cancel_order(result.order_id)
-                time.sleep(1)
-                final = self.broker.get_order(result.order_id)
+                # Stream pushes the terminal event (canceled, or fill if the
+                # cancel raced one) — REST get_order lags minutes on paper.
+                final = self.broker.wait_for_fill(result.order_id, timeout=10)
                 if final.filled_qty > 0:
                     entry_price = final.filled_price or entry_price
                     shares = final.filled_qty
@@ -608,10 +609,15 @@ class LiveMicroPullbackRunner:
 
             result = self.broker.place_market_sell(symbol, self.state.shares)
             logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
-            fill = self.broker.wait_for_fill(result.order_id, timeout=30)
-            if fill.status == 'filled':
+            # 120s: paper partials stream ~2 min before terminal fill
+            fill = self.broker.wait_for_fill(result.order_id, timeout=120)
+            if fill.filled_qty > 0 and fill.filled_price > 0:
                 exit_price = fill.filled_price
-                logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
+                logger.info(f"    FILLED ({fill.status}): {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
+            else:
+                logger.warning(
+                    f"    [{symbol}] Exit fill unconfirmed after 120s "
+                    f"(status={fill.status}) — booking signal price ${exit_price:.2f}")
 
         self._record_trade(exit_price, exit_signal.get('reason', '?'))
         self._clear_active_position(symbol)

@@ -658,8 +658,9 @@ class LiveVwapRunner:
             else:
                 logger.warning(f"    Entry not filled after 30s (status={fill.status}). Cancelling.")
                 self.broker.cancel_order(result.order_id)
-                time.sleep(1)
-                final = self.broker.get_order(result.order_id)
+                # Stream pushes the terminal event (canceled, or fill if the
+                # cancel raced one) — REST get_order lags minutes on paper.
+                final = self.broker.wait_for_fill(result.order_id, timeout=10)
                 if final.filled_qty > 0:
                     entry_price = final.filled_price or entry_price
                     shares = final.filled_qty
@@ -717,7 +718,7 @@ class LiveVwapRunner:
                     f"    [{symbol}] STOP ORDER FAILED: {e} — attempting emergency market exit")
                 try:
                     mkt_result = self.broker.place_market_sell(symbol, shares)
-                    mkt_fill = self.broker.wait_for_fill(mkt_result.order_id, timeout=30)
+                    mkt_fill = self.broker.wait_for_fill(mkt_result.order_id, timeout=120)
                     if mkt_fill.status == 'filled':
                         logger.warning(
                             f"    [{symbol}] Emergency market exit FILLED: "
@@ -798,17 +799,22 @@ class LiveVwapRunner:
                         f"cancelling, market fallback")
                     self.broker.cancel_order(result.order_id)
                     result2 = self.broker.place_market_sell(symbol, pos['shares'])
-                    fill2 = self.broker.wait_for_fill(result2.order_id, timeout=30)
-                    if fill2.status == 'filled':
+                    # 120s: paper partials stream ~2 min before terminal fill
+                    fill2 = self.broker.wait_for_fill(result2.order_id, timeout=120)
+                    if fill2.filled_qty > 0 and fill2.filled_price > 0:
                         exit_price = fill2.filled_price
-                        logger.info(f"    Market fallback FILLED: {symbol} {fill2.filled_qty} @ ${exit_price:.2f}")
+                        logger.info(f"    Market fallback FILLED ({fill2.status}): {symbol} {fill2.filled_qty} @ ${exit_price:.2f}")
             else:
                 result = self.broker.place_market_sell(symbol, pos['shares'])
                 logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
-                fill = self.broker.wait_for_fill(result.order_id, timeout=30)
-                if fill.status == 'filled':
+                fill = self.broker.wait_for_fill(result.order_id, timeout=120)
+                if fill.filled_qty > 0 and fill.filled_price > 0:
                     exit_price = fill.filled_price
-                    logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
+                    logger.info(f"    FILLED ({fill.status}): {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
+                else:
+                    logger.warning(
+                        f"    [{symbol}] Exit fill unconfirmed after 120s "
+                        f"(status={fill.status}) — booking signal price ${exit_price:.2f}")
 
         self._record_trade(symbol, exit_price, exit_signal.get('reason', '?'))
 
