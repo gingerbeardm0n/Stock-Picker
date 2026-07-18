@@ -1193,7 +1193,14 @@ class LiveScalpRunner:
                 name = parts[2].lower()
                 is_etf = parts[5] == 'Y'
                 is_test = parts[7] == 'Y'
-                is_derivative = any(x in name for x in ['warrant', 'right', 'unit'])
+                # 'adw' = American Depositary Warrant — some warrants carry only
+                # the abbreviation, e.g. PSNYW "Class C-1 ADS (ADW)" (armed
+                # 2026-07-17 despite the warrant filter). Parenthesized/suffix
+                # match only: bare 'adw' substring would hit e.g. "Broadway".
+                is_derivative = (
+                    any(x in name for x in ['warrant', 'right', 'unit'])
+                    or '(adw)' in name or name.endswith(' adw')
+                )
                 if (not is_etf and not is_test and not is_derivative
                         and sym and ' ' not in sym
                         and '$' not in sym and '.' not in sym and len(sym) <= 5):
