@@ -213,10 +213,15 @@ class ScalpSimulationRunner:
             fund = fundamentals.get(sym, {})
             c['float_shares'] = fund.get('float_shares')
 
-            # Relative volume (from rel_vol_cum_cache)
+            # Relative volume (from rel_vol_cum_cache). No 30-day baseline →
+            # EXCLUDE (0.0 fails the min_relative_volume gate), matching the
+            # live runner: no-baseline symbols are the zero-IEX-volume tickers
+            # Alpaca paper never fills, so their sim P&L was phantom. Issue #23
+            # ablation (2025 + 2026 YTD): PF 2.70->3.31 / 3.45->5.04, maxDD
+            # -64%/-77%. Was `else 10.0` (fail-open) before 2026-07-17.
             today_vol = today_vols.get(sym, 0)
             avg_vol = avg_vols.get(sym, 0)
-            c['rel_vol'] = today_vol / avg_vol if avg_vol > 0 else 10.0
+            c['rel_vol'] = today_vol / avg_vol if avg_vol > 0 else 0.0
 
             try:
                 tier, src_count = db.get_news_tier_and_confidence(

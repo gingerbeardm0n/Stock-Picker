@@ -222,30 +222,42 @@ class LiveScalpRunner:
     # ── Phase 1: Premarket scan (9:00 - 9:25) ───────────────────────────────
 
     def _assign_rel_vol(self, candidates: list[dict]) -> None:
-        """Set c['rel_vol'] for each candidate via Tradier single-feed rel-vol.
+        """Set c['rel_vol'] for each candidate via hybrid rel-vol. Mutates in place.
 
-        Tradier (numerator = today cumulative premarket vol, denominator = 5-day avg at
-        same minute). None → DEFAULT_REL_VOL=10.0 fallback. Mutates in place.
+        Per-symbol missing data → EXCLUDE (0.0 fails the min_relative_volume
+        gate). A symbol with no premarket prints is a zero-IEX-volume ticker
+        Alpaca can never fill anyway; the old 10.0 fallback armed that junk
+        with a fake top-tier rel-vol (issue #23 ablation: excluding lifts PF
+        2.70->3.31 and cuts maxDD 64% on 2025; sim updated in lockstep).
+
+        Whole-system failure (HybridRelVol never initialized) stays FAIL-OPEN
+        at DEFAULT_REL_VOL=10.0 — an infra blip shouldn't zero the whole scan.
         """
         now = datetime.now(ET)
-        fallbacks = 0
+        if self._relvol is None:
+            for c in candidates:
+                c['rel_vol'] = DEFAULT_REL_VOL
+            if candidates:
+                logger.warning(
+                    f"Rel-vol system unavailable — ALL {len(candidates)} candidates "
+                    f"at fail-open {DEFAULT_REL_VOL:.1f}x, filter is a no-op this scan")
+            return
+
+        excluded = 0
         for c in candidates:
             rv = None
-            if self._relvol is not None:
-                try:
-                    self._relvol.invalidate(c['symbol'])  # numerator grows intraday
-                    rv = self._relvol.compute(c['symbol'], now)
-                except Exception as e:
-                    logger.warning(f"  rel-vol compute raised for {c['symbol']}: {e}")
+            try:
+                self._relvol.invalidate(c['symbol'])  # numerator grows intraday
+                rv = self._relvol.compute(c['symbol'], now)
+            except Exception as e:
+                logger.warning(f"  rel-vol compute raised for {c['symbol']}: {e}")
             if rv is None:
-                fallbacks += 1
-            c['rel_vol'] = rv if rv is not None else DEFAULT_REL_VOL
-        if candidates and fallbacks:
-            log = logger.warning if fallbacks == len(candidates) else logger.info
-            log(f"Rel-vol: {len(candidates) - fallbacks}/{len(candidates)} computed, "
-                f"{fallbacks} fell back to {DEFAULT_REL_VOL:.1f}x"
-                + (" — ALL candidates on fallback, filter is a no-op this scan"
-                   if fallbacks == len(candidates) else ""))
+                excluded += 1
+            c['rel_vol'] = rv if rv is not None else 0.0
+        if candidates and excluded:
+            logger.info(
+                f"Rel-vol: {len(candidates) - excluded}/{len(candidates)} computed, "
+                f"{excluded} excluded (no premarket prints — unfillable on paper)")
 
     def scan_premarket(self):
         """
