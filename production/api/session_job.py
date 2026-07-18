@@ -175,9 +175,19 @@ def _start_heartbeat() -> "threading.Event":
                 conn = _neon_conn()
                 if conn is not None:
                     with conn, conn.cursor() as cur:
+                        # UPSERT, not UPDATE: if this session claimed via the
+                        # file fallback because Neon was briefly unreachable at
+                        # claim time, no session_flags row exists — and a later
+                        # deploy (which wipes the fallback file) would let a
+                        # second instance claim cleanly and double-run the day
+                        # (2026-07-17: duplicate PSNYW/RBKB/SDOT orders from
+                        # exactly this sequence). The heartbeat self-heals the
+                        # missing claim within 60s.
                         cur.execute(
-                            "UPDATE session_flags SET heartbeat = NOW() "
-                            "WHERE run_date = %s", (datetime.now().date(),))
+                            "INSERT INTO session_flags (run_date, heartbeat) "
+                            "VALUES (%s, NOW()) "
+                            "ON CONFLICT (run_date) DO UPDATE SET heartbeat = NOW()",
+                            (datetime.now().date(),))
                     conn.close()
             except Exception:
                 pass  # transient Neon failure — next beat retries
