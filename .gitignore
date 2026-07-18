@@ -289,3 +289,4 @@ research/session_logs_*.txt
 temp_*.txt
 research/optimizer/optimizer/
 research/data/cache/
+research/optimizer/scalp/*.out
