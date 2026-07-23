@@ -82,7 +82,13 @@ TRIAL_188_CONFIG = VwapReclaimConfig(
     stop_vwap_offset=0.09372192973600599,
     profit_target_pct=14.629871548096144,
     max_hold_bars=5,
-    trailing_stop_pct=0.0014316859424343166,
+    # 2026-07-23 MANUAL OVERRIDE (paper): optimizer value 0.00143% was a
+    # confirmed overfit — near-zero trail captures each 1-min sim-bar peak but
+    # scratches every winner on live tick noise (live winners avg +$13 vs sim
+    # +$19-79). 2.0% is a sane hand-set interim while the structural-exit
+    # rebuild (scale-at-resistance + prior-candle-low trail) is built + sealed.
+    # NOT backtested — interim only; real validation is the structural re-opt.
+    trailing_stop_pct=2.0,
     risk_pct=2.279389099581947,
     max_position_pct=49.26820838249131,
     fill_model='marketable_limit',
