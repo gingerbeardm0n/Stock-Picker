@@ -80,7 +80,12 @@ TRIAL_167_CONFIG = MicroPullbackConfig(
     resume_vol_mult=1.6836625745936113,
     profit_target_pct=8.673296419697865,
     max_hold_bars=14,
-    trailing_stop_pct=0.003027022522226367,
+    # 2026-07-23 MANUAL OVERRIDE (paper): optimizer value 0.00303% was a
+    # confirmed overfit (near-zero trail → scratches winners on live tick
+    # noise; Jul 20 BIYA/ADVB/ZYBT trail-exits lost -$142 vs sim -$36).
+    # 2.0% sane hand-set interim; NOT backtested — real fix is the structural
+    # exit rebuild (trail above EMA-9 per corpus). Keeps MP running meanwhile.
+    trailing_stop_pct=2.0,
     risk_pct=2.298919549411626,
     max_position_pct=49.895184791981684,
 )
