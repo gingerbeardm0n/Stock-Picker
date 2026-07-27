@@ -560,6 +560,7 @@ class LiveVwapRunner:
                     current_bar=bar,
                     bars_held=pos['bars_held'],
                     config=self.config,
+                    bars=bars_hist[sym],
                 )
                 if exit_signal or bar_min > window_end_min:
                     sig = exit_signal or {'exit_price': float(bar['close']),
@@ -800,16 +801,48 @@ class LiveVwapRunner:
                     exit_price = fill.filled_price
                     logger.info(f"    FILLED: {symbol} {fill.filled_qty} @ ${exit_price:.2f}")
                 else:
+                    # BUG (2026-07-20, BIYA): the market fallback used to request
+                    # pos['shares'] (the ORIGINAL full size) even when the limit
+                    # order had already partially filled. Alpaca rejected the
+                    # oversell ("insufficient qty available: requested 114,
+                    # available 7") every retry, forever — the position never
+                    # closed and 7 shares sat orphaned for a week. Must sell only
+                    # the REMAINING (unfilled) quantity, and blend the exit price
+                    # across both fills for correct P&L.
+                    filled_so_far = max(0, int(fill.filled_qty or 0))
+                    proceeds_so_far = filled_so_far * (fill.filled_price or 0.0)
+                    remaining = pos['shares'] - filled_so_far
                     logger.warning(
-                        f"    Limit sell unfilled after 10s (status={fill.status}) — "
-                        f"cancelling, market fallback")
+                        f"    Limit sell {'partially ' if filled_so_far else ''}unfilled "
+                        f"after 10s (status={fill.status}, {filled_so_far}/{pos['shares']} filled) — "
+                        f"cancelling, market fallback for remaining {remaining}")
                     self.broker.cancel_order(result.order_id)
-                    result2 = self.broker.place_market_sell(symbol, pos['shares'])
-                    # 120s: paper partials stream ~2 min before terminal fill
-                    fill2 = self.broker.wait_for_fill(result2.order_id, timeout=120)
-                    if fill2.filled_qty > 0 and fill2.filled_price > 0:
-                        exit_price = fill2.filled_price
-                        logger.info(f"    Market fallback FILLED ({fill2.status}): {symbol} {fill2.filled_qty} @ ${exit_price:.2f}")
+                    if remaining <= 0:
+                        # Limit fill completed the position during the cancel race.
+                        exit_price = fill.filled_price
+                    else:
+                        result2 = self.broker.place_market_sell(symbol, remaining)
+                        # 120s: paper partials stream ~2 min before terminal fill
+                        fill2 = self.broker.wait_for_fill(result2.order_id, timeout=120)
+                        if fill2.filled_qty > 0 and fill2.filled_price > 0:
+                            total_qty = filled_so_far + fill2.filled_qty
+                            exit_price = (
+                                (proceeds_so_far + fill2.filled_qty * fill2.filled_price) / total_qty
+                                if total_qty > 0 else fill2.filled_price
+                            )
+                            logger.info(
+                                f"    Market fallback FILLED ({fill2.status}): {symbol} "
+                                f"{fill2.filled_qty} @ ${fill2.filled_price:.2f} "
+                                f"(blended exit ${exit_price:.2f} across {total_qty} shares)")
+                        elif filled_so_far > 0:
+                            # Market fallback itself failed/unfilled — at least book
+                            # the partial limit fill instead of losing it entirely.
+                            exit_price = fill.filled_price
+                            logger.error(
+                                f"    [{symbol}] Market fallback for remaining {remaining} "
+                                f"shares failed (status={fill2.status}) — booking partial "
+                                f"limit fill only ({filled_so_far} shares); "
+                                f"{remaining} shares may still be open on the broker")
             else:
                 result = self.broker.place_market_sell(symbol, pos['shares'])
                 logger.info(f"    Sell order: {result.order_id} Status: {result.status}")
