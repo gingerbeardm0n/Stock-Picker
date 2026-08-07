@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-08-05",
+  "as_of":"2026-08-07",
   "symbols":[
     "AACI",
     "AACOU",
@@ -236,6 +236,7 @@
     "ASMG",
     "ASMU",
     "ASPI",
+    "ASPN",
     "ASPS",
     "ASRT",
     "ASST",
@@ -261,6 +262,7 @@
     "ATPC",
     "ATRA",
     "ATYR",
+    "AUC",
     "AUDC",
     "AUID",
     "AUNA",
@@ -770,6 +772,7 @@
     "DSC",
     "DSGN",
     "DSGX",
+    "DSWL",
     "DSX",
     "DSY",
     "DTCX",
@@ -830,6 +833,7 @@
     "ELWT",
     "EMAT",
     "EMBC",
+    "EMPD",
     "ENGN",
     "ENHA",
     "ENLT",
@@ -874,6 +878,7 @@
     "EVC",
     "EVER",
     "EVGO",
+    "EVH",
     "EVI",
     "EVLV",
     "EVTL",
@@ -914,6 +919,7 @@
     "FEED",
     "FEMY",
     "FENC",
+    "FERA",
     "FETH",
     "FGBI",
     "FGI",
@@ -1346,6 +1352,7 @@
     "KITT",
     "KLAG",
     "KLAR",
+    "KLRA",
     "KLTR",
     "KLXE",
     "KMDA",
@@ -1363,6 +1370,7 @@
     "KRAQ",
     "KRMN",
     "KRNT",
+    "KRNY",
     "KRRO",
     "KRSP",
     "KRWX",
@@ -2189,6 +2197,7 @@
     "SDHC",
     "SDOT",
     "SDST",
+    "SEAT",
     "SEDG",
     "SEED",
     "SEER",
@@ -2473,6 +2482,7 @@
     "TRC",
     "TRDA",
     "TRGS",
+    "TRIB",
     "TRIN",
     "TRIP",
     "TRNR",
@@ -2772,5 +2782,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":2769
+  "total":2779
 }
