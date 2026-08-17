@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-08-14",
+  "as_of":"2026-08-17",
   "symbols":[
     "AACI",
     "AACOU",
@@ -132,6 +132,7 @@
     "ALOT",
     "ALOY",
     "ALT",
+    "ALTG",
     "ALTI",
     "ALTO",
     "ALTY",
@@ -867,6 +868,7 @@
     "ENR",
     "ENRD",
     "ENSC",
+    "ENTA",
     "ENTX",
     "ENVB",
     "ENVX",
@@ -884,6 +886,8 @@
     "ERNA",
     "EROC",
     "ERY",
+    "ESCA",
+    "ESLA",
     "ESOA",
     "ESPR",
     "ESTC",
@@ -1128,6 +1132,7 @@
     "GSIW",
     "GSM",
     "GSOL",
+    "GSRF",
     "GSRVU",
     "GSUI",
     "GT",
@@ -1525,6 +1530,7 @@
     "LSH",
     "LSTA",
     "LTBR",
+    "LTGO",
     "LTRN",
     "LTRX",
     "LUCD",
@@ -1976,6 +1982,7 @@
     "PFL",
     "PFLT",
     "PFN",
+    "PFSA",
     "PFXF",
     "PGAC",
     "PGEN",
@@ -2310,6 +2317,7 @@
     "SHLS",
     "SHMD",
     "SHNY",
+    "SHO",
     "SHPH",
     "SHPU",
     "SI",
@@ -2712,6 +2720,7 @@
     "VIVO",
     "VIVS",
     "VLN",
+    "VLRS",
     "VLY",
     "VMAR",
     "VMET",
@@ -2891,5 +2900,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":2888
+  "total":2897
 }
