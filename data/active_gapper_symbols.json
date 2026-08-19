@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-08-18",
+  "as_of":"2026-08-19",
   "symbols":[
     "AACI",
     "AACOU",
@@ -87,6 +87,7 @@
     "AGQ",
     "AGYS",
     "AHCO",
+    "AHG",
     "AHMA",
     "AHR",
     "AI",
@@ -1085,6 +1086,7 @@
     "GLIBA",
     "GLIBK",
     "GLL",
+    "GLMD",
     "GLND",
     "GLNK",
     "GLOO",
@@ -1228,6 +1230,7 @@
     "HSCS",
     "HSDT",
     "HSHP",
+    "HSLV",
     "HST",
     "HTCO",
     "HTCR",
@@ -1926,6 +1929,7 @@
     "ORLA",
     "ORMP",
     "OSCR",
+    "OSG",
     "OSS",
     "OSTX",
     "OSUR",
@@ -2494,6 +2498,7 @@
     "SVRA",
     "SVRE",
     "SVRN",
+    "SVV",
     "SWAG",
     "SWBI",
     "SWIM",
@@ -2542,6 +2547,7 @@
     "TGEN",
     "TGHL",
     "TH",
+    "THCH",
     "THH",
     "THM",
     "THRY",
@@ -2575,6 +2581,7 @@
     "TNDM",
     "TNGX",
     "TNMG",
+    "TNON",
     "TNXP",
     "TOI",
     "TOMZ",
@@ -2742,6 +2749,7 @@
     "VOXR",
     "VOYG",
     "VRA",
+    "VRAX",
     "VREX",
     "VRRM",
     "VRXA",
@@ -2911,5 +2919,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":2908
+  "total":2916
 }
