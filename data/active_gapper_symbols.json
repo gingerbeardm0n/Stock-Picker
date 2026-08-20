@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-08-19",
+  "as_of":"2026-08-20",
   "symbols":[
     "AACI",
     "AACOU",
@@ -490,6 +490,7 @@
     "BWLP",
     "BXMT",
     "BYAH",
+    "BYFC",
     "BYND",
     "BZ",
     "BZAI",
@@ -768,6 +769,7 @@
     "DKI",
     "DKNG",
     "DKNX",
+    "DLHC",
     "DLLL",
     "DLO",
     "DLTH",
@@ -976,6 +978,7 @@
     "FJET",
     "FLG",
     "FLKR",
+    "FLL",
     "FLNA",
     "FLNC",
     "FLO",
@@ -1218,6 +1221,7 @@
     "HPAI",
     "HPE",
     "HPK",
+    "HPP",
     "HPQ",
     "HPS",
     "HQ",
@@ -1526,6 +1530,7 @@
     "LODE",
     "LOKV",
     "LONA",
+    "LOOP",
     "LOT",
     "LPCN",
     "LPTH",
@@ -1563,6 +1568,7 @@
     "LZMH",
     "M",
     "MACIU",
+    "MAGN",
     "MAKO",
     "MAMA",
     "MAMO",
@@ -1754,6 +1760,7 @@
     "NEWT",
     "NEXA",
     "NEXM",
+    "NEXN",
     "NEXR",
     "NEXT",
     "NFBK",
@@ -2919,5 +2926,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":2916
+  "total":2923
 }
