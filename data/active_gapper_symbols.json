@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-08-24",
+  "as_of":"2026-08-25",
   "symbols":[
     "AACI",
     "AACOU",
@@ -263,6 +263,7 @@
     "ATER",
     "ATGL",
     "ATHE",
+    "ATHR",
     "ATII",
     "ATIIU",
     "ATLN",
@@ -359,6 +360,7 @@
     "BCYC",
     "BDCI",
     "BDMD",
+    "BDRX",
     "BDRY",
     "BDSX",
     "BDTX",
@@ -451,6 +453,7 @@
     "BRKH",
     "BRKHU",
     "BRKR",
+    "BRNX",
     "BRR",
     "BRT",
     "BRTX",
@@ -1133,6 +1136,7 @@
     "GRDX",
     "GREE",
     "GRFS",
+    "GRML",
     "GRND",
     "GRNQ",
     "GRO",
@@ -2465,6 +2469,7 @@
     "SQQQ",
     "SRAD",
     "SRFM",
+    "SRG",
     "SRL",
     "SRPT",
     "SRTA",
@@ -2527,6 +2532,7 @@
     "SWBI",
     "SWIM",
     "SWMR",
+    "SWVL",
     "SXC",
     "SXTC",
     "SXTP",
@@ -2536,6 +2542,7 @@
     "TAC",
     "TACO",
     "TACOW",
+    "TACT",
     "TAK",
     "TAL",
     "TALK",
@@ -2623,6 +2630,7 @@
     "TRAW",
     "TRC",
     "TRDA",
+    "TREO",
     "TRGS",
     "TRIB",
     "TRIN",
@@ -2683,6 +2691,7 @@
     "UEC",
     "UEIC",
     "UFG",
+    "UFI",
     "UFO",
     "UGP",
     "UGRO",
@@ -2945,5 +2954,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":2942
+  "total":2951
 }
