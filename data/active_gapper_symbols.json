@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-08-26",
+  "as_of":"2026-08-28",
   "symbols":[
     "AACI",
     "AACOU",
@@ -317,6 +317,7 @@
     "AYA",
     "AYTU",
     "AZI",
+    "AZIO",
     "AZTA",
     "AZUL",
     "BABX",
@@ -728,6 +729,7 @@
     "CUPR",
     "CURI",
     "CURR",
+    "CV",
     "CVGI",
     "CVKD",
     "CVM",
@@ -1080,6 +1082,7 @@
     "GEVG",
     "GEVO",
     "GEVX",
+    "GFAI",
     "GFS",
     "GGB",
     "GGLS",
@@ -1320,6 +1323,7 @@
     "IMVT",
     "IMXI",
     "INAB",
+    "INBS",
     "INCR",
     "INDI",
     "INDO",
@@ -1356,6 +1360,7 @@
     "IOYY",
     "IPCX",
     "IPDN",
+    "IPEX",
     "IPFX",
     "IPFXW",
     "IPHA",
@@ -1640,6 +1645,7 @@
     "MGNI",
     "MGNX",
     "MGRX",
+    "MGTX",
     "MGYR",
     "MHH",
     "MICC",
@@ -1866,6 +1872,7 @@
     "NVTS",
     "NVTX",
     "NVVE",
+    "NVX",
     "NWAX",
     "NWBI",
     "NWG",
@@ -2968,5 +2975,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":2965
+  "total":2972
 }
