@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-08-29",
+  "as_of":"2026-09-01",
   "symbols":[
     "AACI",
     "AACOU",
@@ -681,6 +681,7 @@
     "CPSH",
     "CPZ",
     "CRAC",
+    "CRAQ",
     "CRBP",
     "CRCA",
     "CRCD",
@@ -757,6 +758,7 @@
     "DARE",
     "DAVEW",
     "DBGI",
+    "DBI",
     "DBO",
     "DBVT",
     "DC",
@@ -1221,6 +1223,7 @@
     "HLLY",
     "HLMN",
     "HLN",
+    "HLXC",
     "HMR",
     "HMY",
     "HNNA",
@@ -1633,6 +1636,7 @@
     "MDXG",
     "MDXH",
     "MEC",
+    "MEDS",
     "MEGL",
     "MEI",
     "MENS",
@@ -1990,6 +1994,7 @@
     "OXSQ",
     "P",
     "PACB",
+    "PACK",
     "PAGS",
     "PAII",
     "PAL",
@@ -2147,6 +2152,7 @@
     "PYPG",
     "PYXS",
     "PZG",
+    "QADR",
     "QBTS",
     "QBTX",
     "QBTZ",
@@ -2168,6 +2174,7 @@
     "QNTM",
     "QPUX",
     "QQQD",
+    "QRED",
     "QRHC",
     "QS",
     "QSEA",
@@ -2856,6 +2863,7 @@
     "WGRX",
     "WHF",
     "WHLR",
+    "WHLRP",
     "WHWK",
     "WIMI",
     "WIT",
@@ -2985,5 +2993,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":2982
+  "total":2990
 }
