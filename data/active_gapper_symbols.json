@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-09-01",
+  "as_of":"2026-09-02",
   "symbols":[
     "AACI",
     "AACOU",
@@ -2787,6 +2787,7 @@
     "VBIO",
     "VBNK",
     "VCIG",
+    "VECA",
     "VEEE",
     "VELO",
     "VERI",
@@ -2839,6 +2840,7 @@
     "VSME",
     "VSTL",
     "VSTM",
+    "VSTS",
     "VSXY",
     "VTAK",
     "VTGN",
@@ -2852,6 +2854,7 @@
     "WAFU",
     "WAI",
     "WALD",
+    "WATR",
     "WAVE",
     "WAY",
     "WB",
@@ -3002,5 +3005,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":2999
+  "total":3002
 }
