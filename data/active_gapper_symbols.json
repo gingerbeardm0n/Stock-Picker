@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-09-03",
+  "as_of":"2026-09-04",
   "symbols":[
     "AACI",
     "AACOU",
@@ -822,6 +822,7 @@
     "DSC",
     "DSGN",
     "DSGX",
+    "DSS",
     "DSWL",
     "DSX",
     "DSY",
@@ -1007,6 +1008,7 @@
     "FLNC",
     "FLO",
     "FLTW",
+    "FLUX",
     "FLWS",
     "FLY",
     "FLYE",
@@ -1185,6 +1187,7 @@
     "GTN",
     "GTX",
     "GUACU",
+    "GURE",
     "GUT",
     "GVH",
     "GWAV",
@@ -1789,6 +1792,7 @@
     "NBIZ",
     "NBP",
     "NCEL",
+    "NCEW",
     "NCI",
     "NCIQ",
     "NCLH",
@@ -2926,6 +2930,7 @@
     "XBIO",
     "XBP",
     "XBTY",
+    "XCH",
     "XFLH",
     "XFLT",
     "XFOR",
@@ -3013,5 +3018,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":3010
+  "total":3015
 }
