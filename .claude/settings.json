@@ -39,5 +39,6 @@
       "WebFetch(domain:www.trustpilot.com)",
       "Bash(psql -h localhost -U postgres -d stockdata -c \"SELECT 1;\")"
     ]
-  }
+  },
+  "defaultSubagentModel": "sonnet"
 }

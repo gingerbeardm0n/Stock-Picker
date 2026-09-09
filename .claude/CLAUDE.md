@@ -196,3 +196,37 @@ research/new_analysis/cache/    # Cache files
 - All imports tested and working ✓
 
 See `REORGANIZATION_COMPLETE.md` for full details.
+
+---
+
+## Agent Delegation & Model Routing (Sep 9, 2026)
+
+Subagents start **cold** — they re-derive context the main thread already has.
+Delegation therefore pays only on **big input → small output** work, and loses
+money on everything else.
+
+### Delegate when
+- Searching/mapping a large surface and returning a short answer → `cavecrew-investigator` (haiku)
+- Running a long backtest/sweep/query that emits thousands of lines → `quant-runner` (sonnet)
+- Reviewing money-touching code before a live deploy → `trade-logic-reviewer` (opus)
+- A high-stakes judgment call worth deep reasoning → `strategy-architect` (fable)
+
+### Do NOT delegate
+- Anything under ~3 tool calls — just do it inline
+- Work needing conversation context the subagent would have to rebuild
+- Iterative back-and-forth (each round-trip pays the cold-start cost again)
+- Status checks answerable from `STATUS.md` or memory
+
+### Model tiers
+| Model | Use for |
+|---|---|
+| haiku | search, file location, mechanical greps |
+| sonnet | implementation, backtests, DB queries, summarization (**default**) |
+| opus | correctness review of order/fill/P&L paths, hard debugging |
+| fable | strategy direction, validation methodology, go/no-go calls |
+
+`defaultSubagentModel` is `sonnet` — agents without an explicit `model:` run cheap.
+
+**Cost discipline:** the top budget risk is not model choice, it is *thrash* —
+re-deriving state that is already written down. Read `STATUS.md` and
+`docs/PROJECT_HISTORY.md` before exploring; write durable findings back to them.
