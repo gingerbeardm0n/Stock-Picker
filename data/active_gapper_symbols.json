@@ -1,7 +1,8 @@
 {
-  "as_of":"2026-09-08",
+  "as_of":"2026-09-09",
   "symbols":[
     "AACI",
+    "AACO",
     "AACOU",
     "AACP",
     "AACPU",
@@ -736,6 +737,7 @@
     "CTOR",
     "CTOS",
     "CTRE",
+    "CULP",
     "CUPR",
     "CURI",
     "CURR",
@@ -908,6 +910,7 @@
     "ENVX",
     "EOLS",
     "EOSE",
+    "EP",
     "EPM",
     "EPSM",
     "EPV",
@@ -1181,6 +1184,7 @@
     "GSRVU",
     "GSUI",
     "GT",
+    "GTBP",
     "GTE",
     "GTEC",
     "GTEN",
@@ -1928,6 +1932,7 @@
     "OBAI",
     "OBE",
     "OBIO",
+    "OBX",
     "OCC",
     "OCFC",
     "OCG",
@@ -2401,6 +2406,7 @@
     "SGLY",
     "SGML",
     "SGP",
+    "SGRX",
     "SHAZ",
     "SHBI",
     "SHC",
@@ -2478,6 +2484,7 @@
     "SNDU",
     "SNDX",
     "SNES",
+    "SNFCA",
     "SNGX",
     "SNOA",
     "SNOU",
@@ -2750,6 +2757,7 @@
     "UCL",
     "UCO",
     "UCTT",
+    "UE",
     "UEC",
     "UEIC",
     "UFG",
@@ -3028,5 +3036,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":3025
+  "total":3033
 }
