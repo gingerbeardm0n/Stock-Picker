@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-09-15",
+  "as_of":"2026-09-16",
   "symbols":[
     "AACI",
     "AACO",
@@ -811,6 +811,7 @@
     "DLO",
     "DLTH",
     "DLTR",
+    "DLXY",
     "DMAA",
     "DMII",
     "DMRC",
@@ -983,6 +984,7 @@
     "FAMI",
     "FATE",
     "FATN",
+    "FBDT",
     "FBIO",
     "FBIOP",
     "FBLA",
@@ -1567,6 +1569,7 @@
     "LFMD",
     "LFS",
     "LFST",
+    "LFT",
     "LFVN",
     "LGCL",
     "LGCY",
@@ -1628,6 +1631,7 @@
     "LUNG",
     "LUNL",
     "LUNR",
+    "LUXE",
     "LVLU",
     "LVO",
     "LVWR",
@@ -1929,6 +1933,7 @@
     "NVNI",
     "NVNO",
     "NVOX",
+    "NVRI",
     "NVTS",
     "NVTX",
     "NVVE",
@@ -2738,6 +2743,7 @@
     "TRSG",
     "TRT",
     "TRUG",
+    "TRVI",
     "TRX",
     "TSDD",
     "TSHA",
@@ -3021,6 +3027,7 @@
     "YDES",
     "YETH",
     "YEXT",
+    "YFOR",
     "YI",
     "YJ",
     "YMAT",
@@ -3068,5 +3075,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":3065
+  "total":3072
 }
