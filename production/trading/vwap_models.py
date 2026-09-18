@@ -60,7 +60,21 @@ class VwapReclaimConfig:
     stop_vwap_offset: float = 0.02      # Stop = entry-time VWAP minus this ($)
     profit_target_pct: float = 5.0      # Take profit at X% gain
     max_hold_bars: int = 30             # Force exit after N bars (reclaims hold 5-30 min)
-    trailing_stop_pct: float = 0.0      # 0 = disabled
+    trailing_stop_pct: float = 0.0      # 0 = disabled (used when trail_mode='pct')
+
+    # ── Trail mode (issue #24) ──────────────────────────────────────────────
+    # 'pct' trailing_stop_pct is an Optuna-searchable float with no interior
+    # optimum on 1-min bars: the sim always prefers it tighter (a near-zero
+    # trail perfectly captures each bar's peak in backtest), so the optimizer
+    # converges to ~0% — which scratches every live winner on tick noise
+    # instead of protecting a real move. See issue #24 for the corpus finding
+    # (Ross uses no % trail at all) and the sweep proving the sim's monotonic
+    # preference for tighter trails on both 2025 and 2026 data.
+    # 'structural' trails at the prior N-bar low (concept_stop_management
+    # §6.2: "trailing at prior 5-min candle low") — not Optuna-tunable by
+    # design; a candle-low doesn't have the same degenerate optimum.
+    trail_mode: str = 'pct'             # 'pct' | 'structural'
+    trail_lookback_bars: int = 5        # structural mode: N-bar low (proxy for "prior 5-min candle")
 
     # ── Position sizing ────────────────────────────────────────────────────
     risk_pct: float = 2.0               # % of account to risk

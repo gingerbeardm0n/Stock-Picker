@@ -67,7 +67,18 @@ class MicroPullbackConfig:
     # ── Exit ───────────────────────────────────────────────────────────────
     profit_target_pct: float = 5.0      # Take profit at X% gain
     max_hold_bars: int = 20             # Force exit after N bars
-    trailing_stop_pct: float = 0.0      # 0 = disabled
+    trailing_stop_pct: float = 0.0      # 0 = disabled (used when trail_mode='pct')
+
+    # ── Trail mode (issue #24) ──────────────────────────────────────────────
+    # 'pct' is an Optuna-searchable float with no interior optimum on 1-min
+    # bars — the sim always prefers it tighter (a near-zero trail captures
+    # each bar's peak), so the optimizer converges to ~0%, which scratches
+    # every live winner on tick noise. See issue #24 (corpus: Ross uses no %
+    # trail; "trail above EMA-9 if momentum is exceptional" instead) and the
+    # sweep proving the sim's monotonic preference for tighter % trails.
+    # 'structural' reuses the entry gate's EMA-9 — not Optuna-tunable by
+    # design; an EMA doesn't have the same degenerate optimum.
+    trail_mode: str = 'pct'             # 'pct' | 'structural'
 
     # ── Position sizing ────────────────────────────────────────────────────
     risk_pct: float = 2.0               # % of account to risk

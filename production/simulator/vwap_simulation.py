@@ -192,6 +192,7 @@ class VwapSimulationRunner:
             exit_signal = evaluate_exit(
                 entry_price, stop_price, highest, bar,
                 bars_held=j - entry_idx, config=self.config,
+                bars=market_bars[:j + 1],
             )
             if exit_signal:
                 exit_idx = j
@@ -444,7 +445,8 @@ class VwapSimulationRunner:
                 bars_held = i - pos['entry_idx']
                 exit_signal = evaluate_exit(
                     pos['entry_price'], pos['stop_price'], pos['highest'],
-                    bar, bars_held=bars_held, config=self.config)
+                    bar, bars_held=bars_held, config=self.config,
+                    bars=m['bars_so_far'])
                 if exit_signal:
                     trades.append(self._close_multi(m, pos, bar, i, exit_signal))
                     m['position'] = None

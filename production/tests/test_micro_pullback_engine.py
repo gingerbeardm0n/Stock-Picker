@@ -6,6 +6,7 @@ import os
 import sys
 from datetime import datetime
 
+import pytest
 import pytz
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -166,4 +167,43 @@ def test_exit_time_stop():
 def test_exit_none_when_holding():
     cfg = MicroPullbackConfig(max_hold_bars=20, profit_target_pct=99.0, trailing_stop_pct=0.0)
     sig = evaluate_exit(10.0, 9.5, 10.2, _bar(0, 10.1, 10.2, 10.05, 10.15, 100), 2, cfg)
+    assert sig is None
+
+
+def _uptrend_bars(n=9, start=10.0, step=0.05):
+    """n bars each a bit higher than the last (steady uptrend for EMA-9 calc)."""
+    bars = []
+    price = start
+    for i in range(n):
+        bars.append(_bar(i, price, price + 0.03, price - 0.01, price + 0.02, 1000))
+        price += step
+    return bars
+
+
+def test_structural_trail_exit_breaks_ema9():
+    cfg = MicroPullbackConfig(trail_mode='structural', profit_target_pct=99.0, max_hold_bars=99)
+    bars = _uptrend_bars()
+    approx_ema9 = ema([float(b['close']) for b in bars], 9)
+    assert approx_ema9 is not None
+    # Final bar's low undercuts the (approx) EMA-9
+    crash_bar = _bar(len(bars), bars[-1]['close'], bars[-1]['close'],
+                      approx_ema9 - 0.05, approx_ema9 - 0.02, 1000)
+    bars_with_crash = bars + [crash_bar]
+    # exact EMA-9 the engine computes — includes the crash bar's own close
+    exact_ema9 = ema([float(b['close']) for b in bars_with_crash], 9)
+    sig = evaluate_exit(bars[0]['close'], bars[0]['close'] - 1.0, bars[-1]['high'],
+                         crash_bar, 5, cfg, bars=bars_with_crash)
+    assert sig['exit_type'] == 'trailing_stop'
+    assert sig['exit_price'] == pytest.approx(exact_ema9)
+
+
+def test_structural_trail_holds_above_ema9():
+    cfg = MicroPullbackConfig(trail_mode='structural', profit_target_pct=99.0, max_hold_bars=99)
+    bars = _uptrend_bars()
+    ema9 = ema([float(b['close']) for b in bars], 9)
+    hold_bar = _bar(len(bars), bars[-1]['close'], bars[-1]['close'] + 0.05,
+                     ema9 + 0.05, bars[-1]['close'] + 0.02, 1000)
+    bars_with_hold = bars + [hold_bar]
+    sig = evaluate_exit(bars[0]['close'], bars[0]['close'] - 1.0, bars[-1]['high'],
+                         hold_bar, 5, cfg, bars=bars_with_hold)
     assert sig is None

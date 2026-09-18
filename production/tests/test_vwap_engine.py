@@ -238,6 +238,35 @@ class TestEvaluateExit:
         bar = et_bar(10, 10, 10.20, 10.25, 10.15, 10.22, 50_000)
         assert evaluate_exit(self.ENTRY, self.STOP, 10.25, bar, 5, self._cfg()) is None
 
+    def test_structural_trail_exit(self):
+        """trail_mode='structural': exits when bar low breaks the prior N-bar low."""
+        cfg = self._cfg(trail_mode='structural', trail_lookback_bars=3, profit_target_pct=50.0)
+        bars = [
+            et_bar(10, 10, 10.20, 10.30, 10.15, 10.25, 50_000),
+            et_bar(10, 11, 10.25, 10.60, 10.20, 10.55, 50_000),  # 3-bar low = 10.15
+            et_bar(10, 12, 10.55, 10.70, 10.40, 10.65, 50_000),
+            et_bar(10, 13, 10.65, 10.68, 10.10, 10.20, 50_000),  # breaks 10.15
+        ]
+        sig = evaluate_exit(self.ENTRY, self.STOP, 10.70, bars[-1], 5, cfg, bars=bars)
+        assert sig['exit_type'] == 'trailing_stop'
+        assert sig['exit_price'] == pytest.approx(10.15)
+
+    def test_structural_trail_no_exit_above_prior_low(self):
+        cfg = self._cfg(trail_mode='structural', trail_lookback_bars=3, profit_target_pct=50.0)
+        bars = [
+            et_bar(10, 10, 10.20, 10.30, 10.15, 10.25, 50_000),
+            et_bar(10, 11, 10.25, 10.60, 10.20, 10.55, 50_000),
+            et_bar(10, 12, 10.55, 10.70, 10.40, 10.65, 50_000),
+            et_bar(10, 13, 10.65, 10.68, 10.30, 10.60, 50_000),  # stays above 10.15
+        ]
+        assert evaluate_exit(self.ENTRY, self.STOP, 10.70, bars[-1], 5, cfg, bars=bars) is None
+
+    def test_structural_trail_falls_back_without_bars(self):
+        """No bars kwarg + structural mode -> no structural exit (can't compute it)."""
+        cfg = self._cfg(trail_mode='structural', trail_lookback_bars=3, profit_target_pct=50.0)
+        bar = et_bar(10, 13, 10.65, 10.68, 10.10, 10.20, 50_000)
+        assert evaluate_exit(self.ENTRY, self.STOP, 10.70, bar, 5, cfg) is None
+
 
 # ── Config serialization ─────────────────────────────────────────────────────
 

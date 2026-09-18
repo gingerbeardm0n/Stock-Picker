@@ -166,6 +166,19 @@ def evaluate_entry(
     }
 
 
+def structural_trail_price(bars: list[dict], lookback_bars: int) -> float | None:
+    """Prior-N-minute-candle-low trail (concept_stop_management §6.2: 'stop is
+    now trailing at prior 5-min candle low'). Excludes the current (last) bar
+    — the trail is set from what's already printed, not the bar being tested
+    against it. None if there's no history yet."""
+    if len(bars) < 2:
+        return None
+    window = bars[-(lookback_bars + 1):-1]
+    if not window:
+        return None
+    return min(float(b['low']) for b in window)
+
+
 def evaluate_exit(
     entry_price: float,
     stop_price: float,
@@ -173,6 +186,7 @@ def evaluate_exit(
     current_bar: dict,
     bars_held: int,
     config: VwapReclaimConfig,
+    bars: list[dict] | None = None,
 ) -> dict | None:
     """
     Decide whether to exit on this bar.
@@ -184,8 +198,12 @@ def evaluate_exit(
     Exit priority:
         1. Stop loss (bar low touches the VWAP-anchored stop)
         2. Profit target
-        3. Trailing stop (if enabled)
+        3. Trailing stop (percent OR structural, per config.trail_mode)
         4. Time stop (max_hold_bars)
+
+    Args:
+        bars: session bars so far INCLUDING current_bar, oldest->newest.
+              Required only when config.trail_mode == 'structural'.
 
     Returns exit signal {exit_price, reason, exit_type} or None.
     """
@@ -211,7 +229,18 @@ def evaluate_exit(
         }
 
     # 3. Trailing stop
-    if config.trailing_stop_pct > 0 and highest_since_entry > entry_price:
+    if config.trail_mode == 'structural' and highest_since_entry > entry_price and bars:
+        trail_price = structural_trail_price(bars, config.trail_lookback_bars)
+        if trail_price is not None and bar_low <= trail_price:
+            return {
+                'exit_price': trail_price,
+                'reason': (
+                    f"TRAILING_STOP at {trail_price:.2f} "
+                    f"(structural: prior {config.trail_lookback_bars}-bar low)"
+                ),
+                'exit_type': 'trailing_stop',
+            }
+    elif config.trailing_stop_pct > 0 and highest_since_entry > entry_price:
         trail_price = highest_since_entry * (1 - config.trailing_stop_pct / 100)
         if bar_low <= trail_price:
             return {

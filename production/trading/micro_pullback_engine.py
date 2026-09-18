@@ -175,6 +175,7 @@ def evaluate_exit(
     current_bar: dict,
     bars_held: int,
     config: MicroPullbackConfig,
+    bars: list[dict] | None = None,
 ) -> dict | None:
     """
     Decide whether to exit on this bar.
@@ -185,8 +186,12 @@ def evaluate_exit(
     Exit priority:
         1. Stop loss (bar low touches the pullback-low stop)
         2. Profit target
-        3. Trailing stop (if enabled)
+        3. Trailing stop (percent OR structural EMA-9, per config.trail_mode)
         4. Time stop (max_hold_bars)
+
+    Args:
+        bars: session bars so far INCLUDING current_bar, oldest->newest.
+              Required only when config.trail_mode == 'structural'.
 
     Returns exit signal {exit_price, reason, exit_type} or None.
     """
@@ -211,8 +216,19 @@ def evaluate_exit(
             'exit_type': 'profit_target',
         }
 
-    # 3. Trailing stop
-    if config.trailing_stop_pct > 0 and highest_since_entry > entry_price:
+    # 3. Trailing stop — corpus: "trail above EMA-9 if momentum is exceptional"
+    # (concept_micro_pullback.md). Reuses the same EMA-9 the entry gate checks,
+    # so the pattern's "hold the EMA-9" thesis carries through to the exit.
+    if config.trail_mode == 'structural' and highest_since_entry > entry_price and bars:
+        closes = [float(b['close']) for b in bars]
+        ema9 = ema(closes, EMA_PERIOD)
+        if ema9 is not None and bar_low <= ema9:
+            return {
+                'exit_price': ema9,
+                'reason': f"TRAILING_STOP at {ema9:.2f} (structural: EMA-{EMA_PERIOD} break)",
+                'exit_type': 'trailing_stop',
+            }
+    elif config.trailing_stop_pct > 0 and highest_since_entry > entry_price:
         trail_price = highest_since_entry * (1 - config.trailing_stop_pct / 100)
         if bar_low <= trail_price:
             return {

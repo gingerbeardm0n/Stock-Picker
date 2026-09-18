@@ -447,6 +447,7 @@ class LiveMicroPullbackRunner:
                     current_bar=bar,
                     bars_held=self.state.bars_held,
                     config=self.config,
+                    bars=bars_hist[sym],
                 )
                 if exit_signal:
                     try:
