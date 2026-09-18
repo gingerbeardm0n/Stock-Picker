@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-09-17",
+  "as_of":"2026-09-18",
   "symbols":[
     "AACI",
     "AACO",
@@ -690,6 +690,7 @@
     "COYA",
     "COYY",
     "CPB",
+    "CPHC",
     "CPHI",
     "CPIX",
     "CPNG",
@@ -841,6 +842,7 @@
     "DSC",
     "DSGN",
     "DSGX",
+    "DSP",
     "DSS",
     "DSWL",
     "DSX",
@@ -1360,6 +1362,7 @@
     "ILAG",
     "ILPT",
     "IMC",
+    "IMCC",
     "IMMP",
     "IMMX",
     "IMPP",
@@ -1368,6 +1371,7 @@
     "IMSR",
     "IMSRW",
     "IMTX",
+    "IMUX",
     "IMVT",
     "IMXI",
     "INAB",
@@ -2054,6 +2058,7 @@
     "OXM",
     "OXSQ",
     "P",
+    "PAAI",
     "PACB",
     "PACH",
     "PACK",
@@ -2666,6 +2671,7 @@
     "TBRG",
     "TC",
     "TCPC",
+    "TCRT",
     "TCRX",
     "TCX",
     "TDACW",
@@ -3083,5 +3089,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":3080
+  "total":3086
 }
