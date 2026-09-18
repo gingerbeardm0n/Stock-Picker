@@ -4,18 +4,39 @@
 History goes in `docs/PROJECT_HISTORY.md`; durable facts in `memory/`; this file is
 the "what's true today / what's next / what's blocking" snapshot an agent reads first.
 
-_Updated: 2026-09-18 (Fri)_
+_Updated: 2026-09-18 (Fri) — post deep review_
 
 ---
 
 ## ⚠️ The headline
 
-**The system has not placed a trade since 2026-07-20 — 60 days.** Sessions start on
-schedule every trading day, run their full window, log ~4,000 lines, and complete
-cleanly with `NO TRADE`. This is not a quiet market: the premarket data feed is dead
-and every candidate is being silently excluded. See Blockers.
+**Deep review (2026-09-18) verdict: the sealed backtests are not evidence of an edge.**
+Full write-up in `docs/DEEP_REVIEW_2026_09.md`. The simulator fills every stop at the
+exact stop price with no gap-through; scalp Trial 211's whole sealed edge lives in that
+assumption. Under the most live-favorable realistic fill model (V5: resting broker stop
+with gap-through, other exits at next bar open):
 
-Total live trades ever recorded: **49** (43 after removing one duplicated session).
+| | Sealed (V0) | Honest (V5) | Live (43 trades) |
+|---|--:|--:|--:|
+| Scalp 211, 2025 | +$4,675 / PF 3.31 | **−$6,163 / PF 0.58** | — |
+| Scalp 211, 2026 YTD | +$1,013 / PF 5.04 | −$573 / PF 0.71 | — |
+| VWAP 188, 2025 | +$13 / PF 1.00 (seal 2.19 no longer reproduces) | −$851 / PF 0.91 | — |
+| avg loser | −$3.82 | −$28 | **−$32.15** |
+
+Live losers match the honest sim, not the sealed one. The sim→live gap indicts the
+simulator, then the strategy. Execution is a distant third.
+
+**Decisions taken by the review (owner to confirm or override):**
+1. Do **not** fund Tradier yet. Zero-dollar work first.
+2. Retire Trial 211 / 188 / 167 as live configs (stopping needs no backtest gate).
+3. Gate 0 by **2026-10-09**: make the honest fill model the sim default, re-score.
+4. Gate 1 by **2026-11-20**: re-optimize under it with structural stops; nothing passes
+   → stop jTrader. Kill criteria and gate bars are in the review §4.
+5. Fund Tradier and go live with tiny real money only after Gate 1 passes.
+
+Secondary: the system has not placed a trade since 2026-07-20 (Tradier data feed dead,
+see Blockers). Total live trades ever recorded: **49** (43 after removing one duplicated
+session).
 
 ## Deployed / live (paper)
 
@@ -39,6 +60,9 @@ Total live trades ever recorded: **49** (43 after removing one duplicated sessio
 - **Micro-Pullback**: Trial 167. UNDER REVIEW — worst live performer.
 - All three carry a hand-set **2.0% trailing stop** (`d01a7d5`), replacing Optuna's
   near-zero values. **This config has never executed a single live trade.**
+  (Discrepancy: `live_scalp_runner.py:69-84` shows `trailing_stop_pct=2.70` — reconcile.)
+- **All three are slated for retirement** per the deep review; none survives a realistic
+  exit-fill model. Do not deploy or re-tune them under the current simulator.
 
 ## Blockers
 
@@ -83,12 +107,32 @@ from "broken execution."
 
 ## Known-bad tooling (do not trust these)
 
+- **The simulator's exit fill model is structurally optimistic (deep review §1).**
+  Stops, targets, and trails all fill at the exact trigger level on an intra-bar touch,
+  no gap-through, no exit slippage, trail peak taken from the same bar being tested.
+  98% of the sealed scalp edge is stop fills at par (518 stops avg −$3.88; realistic
+  −$28). **No P&L number from the current sim is evidence until Gate 0 ships the honest
+  fill model.** The earlier trail-width finding below is one instance of this.
 - **The simulator cannot rank trailing-stop width.** It scores exits against 1-minute
   bars with perfect hindsight of each bar's peak, so it monotonically prefers tighter
   trails with no interior optimum — verified across both 2025 (250d) and 2026 YTD,
   and again against the structural-exit variant. Its P&L verdict on any exit-width
   question is not evidence.
+- **VWAP Trial 188 sealed number (PF 2.19 / +$3,299) does not reproduce** on the current
+  DB (PF 1.00 / +$13). Check `research/optimizer/vwap/fp_2025_sealed.json` before citing.
 - **Dashboard DEMO mode** silently serves fabricated symbols when the API is down.
+
+## Next actions (from deep review, in order)
+
+1. **Gate 0 (≤ 2026-10-09, $0):** promote `research/maintenance/diagnostics/_scratch/`
+   V5/V6 logic into `production/simulator/fill_model.py` as the default exit model;
+   trail peak from completed prior bars only; re-score 211/188/167; ship loud auth
+   failure in `_fetch_timesales`.
+2. **Owner, 5 min:** run the `live_trades` counterfactual query in review §5 on a machine
+   with the SOPS age key; export the 49 rows to `research/analysis/outputs/` (gitignored).
+3. **Gate 1 (≤ 2026-11-20, $0):** walk-forward re-opt under honest sim, structural stops,
+   ≤ 15 params, no % trail. Pass bar in review §4.
+4. Close orphaned BIYA; reconcile scalp trail 2.70 vs 2.0.
 
 ## Open issues
 
