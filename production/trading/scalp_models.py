@@ -55,6 +55,15 @@ class ScalpConfig:
     entry_headroom_pct: float = 0.25    # marketable-limit headroom above signal
     entry_slippage_pct: float = 0.0     # flat extra slippage on any fill
 
+    # ── Sim EXIT fill model (Gate 0, docs/DEEP_REVIEW_2026_09.md §1/§4) ─────
+    # 'par' reproduces the legacy exact-level fill (regression anchor only).
+    # 'honest' (default) books stops at min(stop, next-bar open) with
+    # gap-through, and target/trail/time exits at next-bar open — the
+    # most live-favorable realistic model. Ignored by the live runners,
+    # which already fill this way via the broker.
+    exit_fill_mode: str = 'honest'      # 'par' | 'honest'
+    exit_slippage_pct: float = 0.3      # adverse slippage applied to 'honest' exit fills only
+
     def to_dict(self) -> dict:
         """Serialize to dict."""
         return asdict(self)

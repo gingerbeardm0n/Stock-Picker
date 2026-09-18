@@ -31,6 +31,7 @@ from trading.scalp_engine import get_premarket_high, evaluate_entry, evaluate_ex
 from backend.news_fetcher import has_news_catalyst
 from simulator.fill_model import (
     limit_price, resolve_limit_fill, apply_slippage, uses_marketable_limit,
+    uses_honest_exit_fill, resolve_honest_exit_fill,
 )
 from utils.query_helpers import StockDataDB
 
@@ -59,6 +60,8 @@ class ScalpTrade:
     rel_vol: float = 0.0
     news_tier: str = 'none'
     scalp_score: float = 0.0
+    trigger_price: float = 0.0          # exit level evaluate_exit fired at
+    fill_price: float = 0.0             # actual booked exit price (== exit_price)
 
 
 class ScalpSimulationRunner:
@@ -348,6 +351,10 @@ class ScalpSimulationRunner:
         shares = max(1, min(shares_by_risk, shares_by_cap))
 
         # ── Simulate exit bar by bar ──────────────────────────────────────
+        # honest mode: the trail peak tested on bar j comes from bars
+        # through j-1 only; bar j's own high updates the peak AFTER the
+        # exit check (par mode keeps the legacy same-bar peak update).
+        honest = uses_honest_exit_fill(self.config)
         highest_since_entry = entry_price
         exit_signal = None
         exit_bar_idx = entry_bar_idx
@@ -355,13 +362,22 @@ class ScalpSimulationRunner:
         for j in range(entry_bar_idx + 1, len(market_bars)):
             bar = market_bars[j]
             bar_high = float(bar['high'])
-            highest_since_entry = max(highest_since_entry, bar_high)
             bars_held = j - entry_bar_idx
 
+            if honest:
+                trail_peak = highest_since_entry
+            else:
+                highest_since_entry = max(highest_since_entry, bar_high)
+                trail_peak = highest_since_entry
+
             exit_signal = evaluate_exit(
-                entry_price, highest_since_entry,
+                entry_price, trail_peak,
                 bar, bars_held, self.config,
             )
+
+            if honest:
+                highest_since_entry = max(highest_since_entry, bar_high)
+
             if exit_signal:
                 exit_bar_idx = j
                 break
@@ -376,8 +392,17 @@ class ScalpSimulationRunner:
                 'exit_type': 'end_of_data',
             }
 
+        # ── Resolve fill price ─────────────────────────────────────────────
+        trigger_price = float(exit_signal['exit_price'])
+        if honest:
+            trigger_bar = market_bars[exit_bar_idx]
+            next_bar = market_bars[exit_bar_idx + 1] if exit_bar_idx + 1 < len(market_bars) else None
+            trigger_price, exit_price = resolve_honest_exit_fill(
+                exit_signal, trigger_bar, next_bar, self.config)
+        else:
+            exit_price = trigger_price
+
         # ── Build trade result ────────────────────────────────────────────
-        exit_price = exit_signal['exit_price']
         pnl = (exit_price - entry_price) * shares
         pnl_pct = ((exit_price - entry_price) / entry_price) * 100
 
@@ -399,6 +424,8 @@ class ScalpSimulationRunner:
             rel_vol=candidate.get('rel_vol', 0),
             news_tier=candidate.get('news_tier', 'none'),
             scalp_score=candidate.get('scalp_score', 0),
+            trigger_price=round(trigger_price, 4),
+            fill_price=round(exit_price, 4),
         )
 
         if self.verbose:
@@ -516,13 +543,15 @@ class ScalpSimulationRunner:
         per-symbol bar counters, one entry per symbol per day)."""
         # Load bars per symbol; a symbol with no bars is 'done' immediately
         # (sim equivalent of live's wall-clock bar-starvation fallback).
+        honest = uses_honest_exit_fill(self.config)
         meta: dict[str, dict] = {}
         events: list[tuple] = []   # (et, symbol, bar_index_within_symbol, bar)
         for c in armed:
             sym = c['symbol']
             bars, pm_high = self._load_symbol_bars(db, sym)
             meta[sym] = {'candidate': c, 'pm_high': pm_high, 'done': not bars,
-                         'position': None, 'pending': None, 'bars': bars}
+                         'position': None, 'pending': None, 'pending_exit': None,
+                         'bars': bars}
             for i, b in enumerate(bars):
                 events.append((b['_et'], sym, i, b))
         events.sort(key=lambda e: e[0])
@@ -533,6 +562,22 @@ class ScalpSimulationRunner:
         for et, sym, i, bar in events:
             m = meta[sym]
             if m['done']:
+                continue
+
+            # Resolve a pending HONEST exit (trigger fired on a prior bar;
+            # this is the next bar it books its fill against) first.
+            pend_exit = m['pending_exit']
+            if pend_exit is not None:
+                m['pending_exit'] = None
+                trig_price, fill_price = resolve_honest_exit_fill(
+                    pend_exit['exit_signal'], pend_exit['trigger_bar'], bar, self.config)
+                resolved = dict(pend_exit['exit_signal'])
+                resolved['exit_price'] = fill_price
+                resolved['trigger_price'] = trig_price
+                trades.append(self._close_multi(m, pend_exit['pos'], bar, i, resolved))
+                m['position'] = None
+                m['done'] = True
+                open_count -= 1
                 continue
 
             # Resolve a pending marketable-limit order against this (next) bar.
@@ -557,17 +602,30 @@ class ScalpSimulationRunner:
 
             pos = m['position']
             if pos is not None:
-                # Manage the open position on its own bars
+                # Manage the open position on its own bars. honest mode:
+                # test against the peak through the PRIOR bar only, then
+                # roll this bar's high into the peak for the next test.
                 bar_high = float(bar['high'])
-                pos['highest'] = max(pos['highest'], bar_high)
+                if honest:
+                    trail_peak = pos['highest']
+                else:
+                    pos['highest'] = max(pos['highest'], bar_high)
+                    trail_peak = pos['highest']
                 bars_held = i - pos['entry_idx']
                 exit_signal = evaluate_exit(
-                    pos['entry_price'], pos['highest'], bar, bars_held, self.config)
+                    pos['entry_price'], trail_peak, bar, bars_held, self.config)
+                if honest:
+                    pos['highest'] = max(pos['highest'], bar_high)
                 if exit_signal:
-                    trades.append(self._close_multi(m, pos, bar, i, exit_signal))
-                    m['position'] = None
-                    m['done'] = True
-                    open_count -= 1
+                    if honest:
+                        m['pending_exit'] = {'exit_signal': exit_signal,
+                                              'trigger_bar': bar, 'trigger_idx': i, 'pos': pos}
+                        # slot stays reserved until the pending exit resolves
+                    else:
+                        trades.append(self._close_multi(m, pos, bar, i, exit_signal))
+                        m['position'] = None
+                        m['done'] = True
+                        open_count -= 1
             else:
                 if open_count < max_concurrent:
                     signal = evaluate_entry(
@@ -600,6 +658,23 @@ class ScalpSimulationRunner:
                         open_count -= 1
                     m['done'] = True
 
+        # Resolve any pending honest exit that never got a following bar
+        # (trigger fired on the symbol's last available bar) — fall back to
+        # the trigger bar's own close, per resolve_honest_exit_fill(next_bar=None).
+        for sym, m in meta.items():
+            pend_exit = m['pending_exit']
+            if pend_exit is not None:
+                trig_price, fill_price = resolve_honest_exit_fill(
+                    pend_exit['exit_signal'], pend_exit['trigger_bar'], None, self.config)
+                resolved = dict(pend_exit['exit_signal'])
+                resolved['exit_price'] = fill_price
+                resolved['trigger_price'] = trig_price
+                trig_bar = pend_exit['trigger_bar']
+                trades.append(self._close_multi(
+                    m, pend_exit['pos'], trig_bar, pend_exit['trigger_idx'], resolved))
+                m['position'] = None
+                m['pending_exit'] = None
+
         # Force-exit anything still open at its last available bar (live's
         # END_OF_DATA equivalent — max_hold_bars exit normally fires first).
         for sym, m in meta.items():
@@ -621,6 +696,7 @@ class ScalpSimulationRunner:
         c = m['candidate']
         entry_price = pos['entry_price']
         exit_price = exit_signal['exit_price']
+        trigger_price = exit_signal.get('trigger_price', exit_price)
         shares = pos['shares']
         pnl = (exit_price - entry_price) * shares
         return ScalpTrade(
@@ -640,6 +716,8 @@ class ScalpSimulationRunner:
             gap_pct=c.get('gap_pct', 0),
             rel_vol=c.get('rel_vol', 0),
             news_tier=c.get('news_tier', 'none'),
+            trigger_price=round(trigger_price, 4),
+            fill_price=round(exit_price, 4),
             scalp_score=c.get('scalp_score', 0),
         )
 

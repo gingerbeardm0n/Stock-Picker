@@ -30,6 +30,7 @@ from backend.news_fetcher import has_news_catalyst
 from simulator.fill_model import (
     limit_price, resolve_limit_fill, resolve_market_fallback,
     apply_slippage, uses_marketable_limit,
+    uses_honest_exit_fill, resolve_honest_exit_fill,
 )
 from utils.query_helpers import StockDataDB
 
@@ -57,6 +58,8 @@ class MicroPullbackTrade:
     gap_pct: float = 0.0
     rel_vol: float = 0.0
     news_tier: str = 'none'
+    trigger_price: float = 0.0          # exit level evaluate_exit fired at
+    fill_price: float = 0.0             # actual booked exit price (== exit_price)
 
 
 class MicroPullbackSimulationRunner:
@@ -178,17 +181,25 @@ class MicroPullbackSimulationRunner:
         shares = max(1, min(int(risk_amount / risk_per_share),
                             int(max_position_value / entry_price)))
 
+        honest = uses_honest_exit_fill(self.config)
         highest = entry_price
         exit_signal = None
         exit_idx = entry_idx
         for j in range(entry_idx + 1, len(market_bars)):
             bar = market_bars[j]
-            highest = max(highest, float(bar['high']))
+            bar_high = float(bar['high'])
+            if honest:
+                trail_peak = highest
+            else:
+                highest = max(highest, bar_high)
+                trail_peak = highest
             exit_signal = evaluate_exit(
-                entry_price, stop_price, highest, bar,
+                entry_price, stop_price, trail_peak, bar,
                 bars_held=j - entry_idx, config=self.config,
                 bars=market_bars[:j + 1],
             )
+            if honest:
+                highest = max(highest, bar_high)
             if exit_signal:
                 exit_idx = j
                 break
@@ -201,7 +212,14 @@ class MicroPullbackSimulationRunner:
                 'exit_type': 'end_of_data',
             }
 
-        exit_price = exit_signal['exit_price']
+        trigger_price = float(exit_signal['exit_price'])
+        if honest:
+            trigger_bar = market_bars[exit_idx]
+            next_bar = market_bars[exit_idx + 1] if exit_idx + 1 < len(market_bars) else None
+            trigger_price, exit_price = resolve_honest_exit_fill(
+                exit_signal, trigger_bar, next_bar, self.config)
+        else:
+            exit_price = trigger_price
         pnl = (exit_price - entry_price) * shares
         pnl_pct = (exit_price - entry_price) / entry_price * 100
 
@@ -222,6 +240,8 @@ class MicroPullbackSimulationRunner:
             gap_pct=candidate.get('gap_pct', 0),
             rel_vol=candidate.get('rel_vol', 0),
             news_tier=candidate.get('news_tier', 'none'),
+            trigger_price=round(trigger_price, 4),
+            fill_price=round(exit_price, 4),
         )
 
         if self.verbose:
@@ -399,11 +419,13 @@ class MicroPullbackSimulationRunner:
             meta[sym] = {
                 'candidate': c, 'bars': market_bars, 'done': not market_bars,
                 'bars_so_far': [], 'position': None, 'pending': None,
+                'pending_exit': None,
             }
             for i, b in enumerate(market_bars):
                 events.append((b['_et'], sym, i, b))
         events.sort(key=lambda e: e[0])
 
+        honest = uses_honest_exit_fill(self.config)
         open_count = 0
         trades: list[MicroPullbackTrade] = []
 
@@ -413,6 +435,21 @@ class MicroPullbackSimulationRunner:
                 continue
 
             m['bars_so_far'].append(bar)
+
+            # Resolve a pending HONEST exit (trigger fired on a prior bar)
+            pend_exit = m['pending_exit']
+            if pend_exit is not None:
+                m['pending_exit'] = None
+                trig_price, fill_price = resolve_honest_exit_fill(
+                    pend_exit['exit_signal'], pend_exit['trigger_bar'], bar, self.config)
+                resolved = dict(pend_exit['exit_signal'])
+                resolved['exit_price'] = fill_price
+                resolved['trigger_price'] = trig_price
+                trades.append(self._close_multi(m, pend_exit['pos'], bar, i, resolved))
+                m['position'] = None
+                m['done'] = True
+                open_count -= 1
+                continue
 
             # Resolve a pending marketable-limit order against this (next) bar
             pend = m['pending']
@@ -440,17 +477,27 @@ class MicroPullbackSimulationRunner:
             pos = m['position']
             if pos is not None:
                 bar_high = float(bar['high'])
-                pos['highest'] = max(pos['highest'], bar_high)
+                if honest:
+                    trail_peak = pos['highest']
+                else:
+                    pos['highest'] = max(pos['highest'], bar_high)
+                    trail_peak = pos['highest']
                 bars_held = i - pos['entry_idx']
                 exit_signal = evaluate_exit(
-                    pos['entry_price'], pos['stop_price'], pos['highest'],
+                    pos['entry_price'], pos['stop_price'], trail_peak,
                     bar, bars_held=bars_held, config=self.config,
                     bars=m['bars_so_far'])
+                if honest:
+                    pos['highest'] = max(pos['highest'], bar_high)
                 if exit_signal:
-                    trades.append(self._close_multi(m, pos, bar, i, exit_signal))
-                    m['position'] = None
-                    m['done'] = True
-                    open_count -= 1
+                    if honest:
+                        m['pending_exit'] = {'exit_signal': exit_signal,
+                                              'trigger_bar': bar, 'trigger_idx': i, 'pos': pos}
+                    else:
+                        trades.append(self._close_multi(m, pos, bar, i, exit_signal))
+                        m['position'] = None
+                        m['done'] = True
+                        open_count -= 1
             else:
                 if open_count < max_concurrent:
                     signal = evaluate_entry(
@@ -485,6 +532,21 @@ class MicroPullbackSimulationRunner:
                 elif et_time.hour >= 11:
                     m['done'] = True
 
+        # Resolve any pending honest exit that never got a following bar.
+        for sym, m in meta.items():
+            pend_exit = m['pending_exit']
+            if pend_exit is not None:
+                trig_price, fill_price = resolve_honest_exit_fill(
+                    pend_exit['exit_signal'], pend_exit['trigger_bar'], None, self.config)
+                resolved = dict(pend_exit['exit_signal'])
+                resolved['exit_price'] = fill_price
+                resolved['trigger_price'] = trig_price
+                trades.append(self._close_multi(
+                    m, pend_exit['pos'], pend_exit['trigger_bar'],
+                    pend_exit['trigger_idx'], resolved))
+                m['position'] = None
+                m['pending_exit'] = None
+
         for sym, m in meta.items():
             pos = m['position']
             if pos is not None and m['bars']:
@@ -504,6 +566,7 @@ class MicroPullbackSimulationRunner:
         c = m['candidate']
         entry_price = pos['entry_price']
         exit_price = exit_signal['exit_price']
+        trigger_price = exit_signal.get('trigger_price', exit_price)
         shares = pos['shares']
         pnl = (exit_price - entry_price) * shares
         return MicroPullbackTrade(
@@ -523,6 +586,8 @@ class MicroPullbackSimulationRunner:
             gap_pct=c.get('gap_pct', 0),
             rel_vol=c.get('rel_vol', 0),
             news_tier=c.get('news_tier', 'none'),
+            trigger_price=round(trigger_price, 4),
+            fill_price=round(exit_price, 4),
         )
 
 

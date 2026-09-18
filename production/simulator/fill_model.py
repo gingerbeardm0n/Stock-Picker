@@ -65,3 +65,65 @@ def apply_slippage(fill_price: float, config) -> float:
 
 def uses_marketable_limit(config) -> bool:
     return getattr(config, 'fill_model', 'perfect') == 'marketable_limit'
+
+
+# ── Exit fill model (Gate 0, docs/DEEP_REVIEW_2026_09.md §1/§4) ────────────
+#
+# All three engines' evaluate_exit() return the TRIGGER level (the stop /
+# target / trail price the bar touched, or the bar close for a time_stop /
+# end_of_data forced exit) — unchanged, so the live runners (which share
+# evaluate_exit) are untouched by any of this.
+#
+# The simulator decides how that trigger becomes a booked fill:
+#   'par'    — legacy: fill AT the trigger level (today's numbers, bit for
+#              bit). Never apply exit slippage in this mode.
+#   'honest' — NEW DEFAULT:
+#     stop_loss:            fill = min(trigger, next_bar_open); if the
+#                            TRIGGER bar's own open already gapped through
+#                            the stop, fill at that open instead.
+#     target/trail/time/EOD: fill = next_bar_open; falls back to the
+#                            trigger bar's close if there is no next bar.
+#     exit_slippage_pct applied adversely (price * (1 - pct/100)) to every
+#     'honest' fill, stop included.
+
+def uses_honest_exit_fill(config) -> bool:
+    return getattr(config, 'exit_fill_mode', 'honest') == 'honest'
+
+
+def apply_exit_slippage(price: float, config) -> float:
+    slip = getattr(config, 'exit_slippage_pct', 0.3)
+    return price * (1 - slip / 100)
+
+
+def resolve_honest_exit_fill(
+    exit_signal: dict, trigger_bar: dict, next_bar: dict | None, config,
+) -> tuple[float, float]:
+    """Resolve a triggered exit_signal to (trigger_price, fill_price) under
+    'honest' fill rules.
+
+    exit_signal:  dict returned by an engine's evaluate_exit() — must carry
+                  'exit_price' (the trigger level) and 'exit_type'.
+    trigger_bar:  the bar on which evaluate_exit fired.
+    next_bar:     the bar immediately after trigger_bar, or None if the
+                  trigger bar was the last available bar for the symbol.
+    """
+    trigger_price = float(exit_signal['exit_price'])
+    reason = exit_signal.get('exit_type')
+
+    if reason == 'stop_loss':
+        trig_open = float(trigger_bar['open'])
+        if trig_open <= trigger_price:
+            raw_fill = trig_open  # gap at open: already through the stop
+        elif next_bar is not None:
+            raw_fill = min(trigger_price, float(next_bar['open']))
+        else:
+            raw_fill = float(trigger_bar['close'])
+    else:
+        # profit_target / trailing_stop / time_stop / end_of_data / other
+        if next_bar is not None:
+            raw_fill = float(next_bar['open'])
+        else:
+            raw_fill = float(trigger_bar['close'])
+
+    fill_price = apply_exit_slippage(raw_fill, config)
+    return trigger_price, fill_price

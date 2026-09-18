@@ -139,6 +139,30 @@ before any future seal.
   pulled: the subagent sandbox had no SOPS age key. It would corroborate, not overturn.
   See §5 for the five-minute query the owner can run.
 
+### 1.7 Addendum (same day): live counterfactual data pulled, hypothesis supported
+
+The Neon `live_trades` pull ran after the draft above (49 rows; the six rows stamped
+2026-07-07 are a re-insert of the 07-06 session, leaving 43). Export at
+`research/analysis/outputs/live_trades_2026-07.csv` (gitignored).
+
+- **Real stop-outs:** on the rows where paper actually exited via a stop (STOP_LOSS n=7,
+  STOP_FILLED_SERVER n=2, STOP_REJECTED_MARKET_EXIT n=1), paper lost **−$48.88 /
+  −$62.90 / −$24.60** on average while the sim replay of the same tape lost **−$23.39 /
+  −$18.55 / −$9.02**. Decomposition: exit-side gap −$41.64 per trade vs entry-side +$5.63.
+  The sim's stop fill is better than the realized stop fill by roughly $25–45 per trade,
+  and the gap is on the exit, not the entry. This is the live fingerprint of §1.3, and it
+  is *larger* than the honest sim's −$28 estimate.
+- **Trail scratches:** most live exits (25 of 43) were TRAILING_STOP under the old
+  near-zero trail, averaging −$3.89. That config no longer exists; those rows say
+  nothing about the current 2.0% configs and are the previously documented
+  trail-overfit effect, not a counter-signal.
+- **Sim cannot predict the same trade on the same tape:** 22 of 43 trades (51%) have
+  opposite-sign paper vs counterfactual P&L. Whatever the strategy's true expectancy, a
+  replay that disagrees with reality on direction half the time is not a validation
+  instrument.
+- Per-strategy paper vs cf totals (43 trades): scalp −$138 vs −$51, VWAP −$147 vs −$409,
+  MP −$366 vs −$140. Small samples; directional only.
+
 ---
 
 ## 2. Q2 — Does the sim→live gap indict the strategy or the execution?
@@ -227,7 +251,10 @@ config passes Gate 1, and it should be real rather than paper. Not before.
 A project without these ends by exhaustion. These are proposed as defaults the owner can
 tighten but should not loosen without writing down why.
 
-**Gate 0 — Honest simulator. Deadline 2026-10-09.**
+**Gate 0 — Honest simulator. Deadline 2026-10-09. → DONE 2026-09-18.** Event-loop
+implementation (not post-hoc) re-scores 2025: scalp 211 −$5,137 / PF 0.61, VWAP 188
+−$4,039 / PF 0.66, MP 167 −$636 / PF 0.93. `par` mode reproduces the sealed anchors
+bit-for-bit. All three configs retired. 13 new tests.
 - Ship: stops fill at `min(stop, next bar open)`; target/trail/time exits fill at next bar
   open; exit slippage ≥ 0.3%; trail peak computed from *completed prior* bars only.
 - Re-score the three deployed configs. Retire any with sealed-2025 PF < 1.3 (expected: all).

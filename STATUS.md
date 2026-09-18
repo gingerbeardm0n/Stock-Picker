@@ -124,10 +124,20 @@ from "broken execution."
 
 ## Next actions (from deep review, in order)
 
-1. **Gate 0 (≤ 2026-10-09, $0):** promote `research/maintenance/diagnostics/_scratch/`
-   V5/V6 logic into `production/simulator/fill_model.py` as the default exit model;
-   trail peak from completed prior bars only; re-score 211/188/167; ship loud auth
-   failure in `_fetch_timesales`.
+1. **Gate 0 — DONE 2026-09-18 (same day).** `exit_fill_mode='honest'` is now the sim
+   default (`fill_model.py::resolve_honest_exit_fill`, wired in all three simulators;
+   `'par'` = legacy, bit-identical). Re-score, 2025 full year:
+
+   | config | par | honest |
+   |---|--:|--:|
+   | Scalp 211 | +$4,675 / PF 3.31 | **−$5,137 / PF 0.61** |
+   | VWAP 188 | +$13 / PF 1.00 | **−$4,039 / PF 0.66** |
+   | MP 167 | +$1,640 / PF 1.28 | **−$636 / PF 0.93** |
+
+   All three retired. Optimizer scripts pass configs through, so they inherit honest
+   mode with no change. Still open from Gate 0: loud auth failure in `_fetch_timesales`;
+   `test_scalp_engine.py::test_param_count` is stale (pre-existing, expects 14, config
+   has 19 fields incl. non-tunables) — fix by counting tunables only.
 2. **Owner, 5 min:** run the `live_trades` counterfactual query in review §5 on a machine
    with the SOPS age key; export the 49 rows to `research/analysis/outputs/` (gitignored).
 3. **Gate 1 (≤ 2026-11-20, $0):** walk-forward re-opt under honest sim, structural stops,
