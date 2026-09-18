@@ -4,7 +4,7 @@ Living record of what was built, when, why — plus a component index and file-h
 Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pass written manually
 2026-05-31 from git history + session context; incremental passes append from `git log`.
 
-**History watermark (last commit folded in):** `8053170` (2026-07-01)
+**History watermark (last commit folded in):** `b1d18f8` (2026-07-17)
 
 ---
 
@@ -199,6 +199,53 @@ Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pa
 **2026-07-01**
 - `46c0c50` — fix(orders): **emergency market-exit on stop rejection** — Alpaca error 42210000 (stop price > current = price crashed past stop). Now immediately sells at market instead of leaving orphaned position. Also fixes VWAP `stop_order_id` `UnboundLocalError` crash-then-orphan bug.
 - `8053170` — fix(float): **live yfinance fetch for new gappers** missing from weekly Neon baseline. `fetch_missing_floats()` in `rel_vol_live.py`; writes back to Neon so nightly job picks it up. Closes max_float filter no-op gap for brand-new tickers.
+
+### Phase 16 — Live-state pipeline, fill model, news-lookahead purge (2026-07-01 → 07-11)
+
+**2026-07-01 (overnight run, 10/10 tasks)**
+- `2a6bdba`/`9412848` — micro-pullback market-fallback retry + dashboard section.
+- `322b148`/`8877566`/`ef541b5`/`147372a`/`774dc85` — **trade-visibility thread**: live state written incrementally as trades happen; `/trades` served from Neon `live_trades`; session_report parser rewritten for concurrent multi-strategy trades; journal wrapper + Neon log reads fixed. Dashboard now shows real trades in real time.
+- `a9c2e3e` — **daily post-session report via GitHub Actions** (12:15 PM ET) — manual `session_report.py` no longer needed.
+- `5a1f0e0` — scalp wall-clock fallback for bar-starved symbols (loop could hang forever).
+- `1d960ee` — hygiene: untracked 83 analysis CSVs + fixed `.gitignore` inline-comment bug.
+- docs: short-squeeze survey, corporate-actions survey, session-resilience options, data lessons.
+
+**2026-07-02**
+- `524381d`/`31397d5`/`7bd92d5`/`73722e0` — **multi-candidate sim mode (arm 10 / max 3)** for all 3 strategies + **marketable-limit fill model** in sims + fill-aware Optuna studies.
+- `2a11234` — VWAP fill-aware **Trial 184** deployed (headroom-capped entries).
+- `811b7c7` — **double-fire fix**: Neon `session_flags` atomic claim (deploy at 11:55 had launched a 2nd live session) + parser attribution + MP persistence.
+- `ccae5d1`/`0c5ddce` — live bug fixes (prior-close retry, persistence dict, trade_count); MP → HybridRelVol.
+
+**2026-07-03 → 07-06**
+- `206b2ea` — holiday guard (Tradier calendar) + rel-vol fallback visibility logging.
+- `f9e6ede` — weekend audit fixes (parity + resilience).
+- `2eb65a6` — **news 'presence' tier dropped as catalyst** (generic movers-roundup articles were a false signal).
+- `9164851`/`86e0a3c` — orphaned-position detection after runner crash; VWAP/MP session-termination fix.
+
+**2026-07-07 → 07-10 (news lookahead purge, issues #14/#19/#21)**
+- `f85772b` — **scalp Trial 211 deployed** (market_open momentum pop).
+- `f99771b` — off-by-one fix: `bars_since_open` 1-based vs 0-based — Trial 211 never fired live.
+- `a5968f8`/`9c3643c`/`79889fe`/`6ddfd72`/`c673704` — **news lookahead purge**: 9:30 AM cap at backtest + aggregator + per-article tier layers; dedup; Finnhub related-tickers cache poison fix.
+- `c766488`/`a8b319f`/`eb13bc6` — #14 verdict applied: **scalp edge real without news (PF 3.40) → require_news=False; VWAP edge was lookahead artifact → suspended, re-opted, Trial 188 deployed** (sealed PF 2.19 / +$3,299).
+- `465280e` — parallel news source queries + conviction scoring.
+
+**2026-07-11**
+- `a4a47b2` — MP sim `market_fallback_pct` parity (#8); VWAP config import fix.
+
+### Phase 17 — Alpaca fill pipeline actually works (2026-07-14 → 07-17)
+
+**2026-07-14**
+- `b59c02e` — scalp **market orders** (limit entries missed 100% on paper Jul 7-14) + **filter warrants/rights/units** from NASDAQ universe (878 junk symbols; QETAR Tradier 400s, fake 10.0x warrants).
+
+**2026-07-15**
+- `6ef4b51` — **WebSocket `trade_updates` stream** in AlpacaBroker (`wait_for_fill`); REST `get_order` lags minutes on paper — root cause of the 0%-fill drought. All 3 runners stream-aware.
+
+**2026-07-16**
+- `dc78541` — first live fill (ATPC) exposed 3 bugs, all fixed: `wait_for_fill` returned on first partial (paper streams partials ~2 min); exits booked signal price on timeout (recorded −$3.97 vs real −$18.38); serial 30s entry blocks (5 unfillable symbols delayed the real entry 2.5 min, +2.1% slippage) → **non-blocking pending-entry state machine**.
+
+**2026-07-17**
+- `b1d18f8` — root README added.
+- (worktree `6b881fe`, pending merge) — **issue #23 ablation**: rel-vol fallback exclusion. PF 2.70→3.31 (2025), 3.45→5.04 (2026 YTD), maxDD −64/−77%; removed P&L is phantom (zero-IEX-volume symbols never fill live). Filter implemented in sim + live scalp runner, verification rerun pending.
 
 ---
 
@@ -462,3 +509,11 @@ These files belong to the pre-pivot 126-param monolith. None are imported by `li
 - ⚠️ **Dead rel-vol classes**: `TradierRelVol`, `RealtimeRelVolCache`, `compute_rel_vol()` in `rel_vol_live.py` — superseded by `HybridRelVol`. Still importable. Safe to delete after confirming no external callers.
 - ⚠️ **Parity audit known failures (2 pre-existing)**: `scalp sim uses rank_candidates()` and `VWAP sim checks max_float` — accepted gaps, not regressions. No new failures introduced in Phase 15.
 - ℹ️ **NOTE — `bash.exe.stackdump` + `.playwright-mcp/`** from prior passes no longer present (cleaned up).
+
+## Hygiene flags — custodian pass 2026-07-17 (FLAG ONLY — nothing deleted/moved)
+
+- `FILE_ORGANIZATION_SETUP.md` (root, untracked) — Mar 3 one-off session artifact; remove or gitignore.
+- `research/maintenance/parity_results.json` — modified in working tree; regenerated by the
+  pre-commit parity audit; candidate for .gitignore (regenerable run-state).
+- Root-level `.py`: clean (config.py only). Tracked CSV/db/log/out under research/: clean
+  (83 CSVs untracked in `1d960ee`).

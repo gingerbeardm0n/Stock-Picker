@@ -54,7 +54,7 @@
   - **Premarket timesales** — production token; ONLY source with same-day premarket volume data (Alpaca returns volume=0). Used as HybridRelVol numerator.
   - **NOT used for orders anymore** — switched to Alpaca paper 2026-06-17
   - **NOT**: minute/hourly historical bars (timesales returns null without funded brokerage)
-- **Critical for rel-vol**: `HybridRelVol` uses Tradier production timesales as numerator (real-time cumulative volume) + Alpaca 30-day historical minute bars as denominator. Without Tradier production token, rel-vol falls back to 10.0× default.
+- **Critical for rel-vol**: `HybridRelVol` uses Tradier production timesales as numerator (real-time cumulative volume) + Alpaca 30-day historical minute bars as denominator. Fallback semantics changed 2026-07-17 (issue #23): a symbol with no computable rel-vol is **EXCLUDED** (0.0 — zero premarket prints = zero-IEX-volume ticker Alpaca can't fill anyway); the fail-open 10.0× default now applies only when the whole rel-vol system fails to initialize.
 - **Last verified working**: 2026-07-01 (premarket timesales via production token; HybridRelVol live-tested)
 - **MUST set `TRADIER_PRODUCTION_TOKEN` on Render** — sandbox token has no real-time premarket data
 - **Scripts that use it**:

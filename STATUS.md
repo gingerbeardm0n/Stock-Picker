@@ -94,19 +94,21 @@ from "broken execution."
 
 | # | Title | State |
 |---|---|---|
-| 24 | Structural Ross exits (scale-out + candle-low/EMA-9 trail) | stage-1 code written, **uncommitted**, backtest inconclusive |
+| 24 | Structural Ross exits (scale-out + candle-low/EMA-9 trail) | stage 1 **merged, inert** (`trail_mode` opt-in); stage 2 (scale-out) not started; backtest inconclusive |
 | 16 | Off-by-one `bars_since_open` live validation | needs 3 clean trading days |
 | 13 | Audit backlog: remaining known TODOs | open |
 | 10 | Trial 211 live fill-parity check | needs 1 week of live fills |
 
 Note: #16 and #10 both require live trading days, which are blocked on Tradier.
 
-## Uncommitted work
+## Structural-exit work (issue #24 stage 1) — merged, inert
 
-Issue #24 stage 1 sits modified-but-uncommitted in the worktree: structural trail
-(prior-N-bar low for VWAP, EMA-9 for MP) behind an opt-in `trail_mode` config,
-wired through both engines, both sims, both live runners, with 8 passing tests.
-Backtest was inconclusive **because the sim can't judge this class of change.**
+Structural trail (prior-N-bar low for VWAP, EMA-9 for MP) is on main behind an opt-in
+`trail_mode` config, wired through both engines, both sims, both live runners, 8 tests.
+**No deployed config sets `trail_mode='structural'`, so it changes no live behavior.**
+The sim cannot judge this class of change, so its worse-than-2% result is not evidence
+either way — only live data can settle it. Stage 2 (scale-out at resistance) needs
+partial-position accounting across sim and live and has not been started.
 
 ## Agent roster (added Sep 9)
 
