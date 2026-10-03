@@ -123,6 +123,7 @@
     "AKAN",
     "AKBA",
     "AKR",
+    "AKTS",
     "AKTX",
     "ALAR",
     "ALBG",
@@ -167,6 +168,7 @@
     "AMKL",
     "AMKR",
     "AMLX",
+    "AMOD",
     "AMPG",
     "AMPGR",
     "AMPGZ",
@@ -198,6 +200,7 @@
     "ANTA",
     "ANVS",
     "ANY",
+    "AORT",
     "AOSL",
     "AOUT",
     "APAC",
@@ -401,6 +404,7 @@
     "BGMS",
     "BGS",
     "BHFAO",
+    "BHR",
     "BHST",
     "BHYP",
     "BIAF",
@@ -877,6 +881,7 @@
     "DYAI",
     "DYN",
     "DYNC",
+    "DYOR",
     "EAF",
     "EARN",
     "EBMT",
@@ -2842,6 +2847,7 @@
     "TXG",
     "TXXS",
     "TYGO",
+    "TYRA",
     "TZA",
     "UAA",
     "UAE",
@@ -3139,5 +3145,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":3136
+  "total":3142
 }
