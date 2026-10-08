@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-10-06",
+  "as_of":"2026-10-08",
   "symbols":[
     "AACI",
     "AACO",
@@ -1239,6 +1239,7 @@
     "GTM",
     "GTN",
     "GTX",
+    "GUAC",
     "GUACU",
     "GURE",
     "GUT",
@@ -3102,6 +3103,7 @@
     "XZO",
     "YAAS",
     "YANG",
+    "YARW",
     "YCY",
     "YDDL",
     "YDES",
@@ -3155,5 +3157,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":3152
+  "total":3154
 }
