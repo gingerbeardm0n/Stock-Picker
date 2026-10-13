@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-10-10",
+  "as_of":"2026-10-13",
   "symbols":[
     "AACI",
     "AACO",
@@ -200,6 +200,7 @@
     "ANPA",
     "ANSC",
     "ANTA",
+    "ANTX",
     "ANVS",
     "ANY",
     "AORT",
@@ -359,6 +360,7 @@
     "BBCQ",
     "BBCQU",
     "BBD",
+    "BBDO",
     "BBGI",
     "BBLG",
     "BBOT",
@@ -1163,6 +1165,7 @@
     "GILT",
     "GIPR",
     "GIW",
+    "GIXI",
     "GIXXU",
     "GLBS",
     "GLDG",
@@ -1782,6 +1785,7 @@
     "MMT",
     "MMTX",
     "MNDO",
+    "MNDR",
     "MNDY",
     "MNKD",
     "MNOV",
@@ -2444,6 +2448,7 @@
     "RYLD",
     "RYM",
     "RYOJ",
+    "RZAI",
     "RZLT",
     "RZLV",
     "S",
@@ -3160,5 +3165,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":3157
+  "total":3162
 }
