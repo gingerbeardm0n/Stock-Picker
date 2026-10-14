@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-10-13",
+  "as_of":"2026-10-14",
   "symbols":[
     "AACI",
     "AACO",
@@ -263,6 +263,7 @@
     "ASBP",
     "ASLE",
     "ASM",
+    "ASMB",
     "ASMG",
     "ASMU",
     "ASPI",
@@ -1042,6 +1043,7 @@
     "FERA",
     "FETH",
     "FF",
+    "FFAI",
     "FGBI",
     "FGI",
     "FGII",
@@ -1965,6 +1967,7 @@
     "NPB",
     "NPKI",
     "NPT",
+    "NPWR",
     "NRC",
     "NRDS",
     "NRDY",
@@ -3175,5 +3178,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":3172
+  "total":3175
 }
