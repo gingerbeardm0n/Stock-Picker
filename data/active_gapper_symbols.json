@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-10-14",
+  "as_of":"2026-10-15",
   "symbols":[
     "AACI",
     "AACO",
@@ -314,6 +314,7 @@
     "AVGG",
     "AVGU",
     "AVGX",
+    "AVIR",
     "AVL",
     "AVPT",
     "AVR",
@@ -583,6 +584,7 @@
     "CELU",
     "CELZ",
     "CENN",
+    "CEPL",
     "CEPT",
     "CEPV",
     "CERS",
@@ -1628,6 +1630,7 @@
     "LFST",
     "LFT",
     "LFVN",
+    "LFWD",
     "LGCL",
     "LGCY",
     "LGHL",
@@ -2014,6 +2017,7 @@
     "NVX",
     "NWAX",
     "NWBI",
+    "NWCL",
     "NWG",
     "NWGL",
     "NWL",
@@ -2695,6 +2699,7 @@
     "STLU",
     "STM",
     "STNE",
+    "STRO",
     "STSS",
     "STTK",
     "STUB",
@@ -2983,6 +2988,7 @@
     "VLRS",
     "VLY",
     "VMAR",
+    "VMD",
     "VMET",
     "VMO",
     "VNCE",
@@ -3021,6 +3027,7 @@
     "WAI",
     "WALD",
     "WATR",
+    "WATT",
     "WAVE",
     "WAY",
     "WB",
@@ -3178,5 +3185,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":3175
+  "total":3182
 }
