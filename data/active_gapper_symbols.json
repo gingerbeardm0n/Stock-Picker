@@ -1,5 +1,5 @@
 {
-  "as_of":"2026-10-15",
+  "as_of":"2026-10-16",
   "symbols":[
     "AACI",
     "AACO",
@@ -60,6 +60,7 @@
     "ADMA",
     "ADNT",
     "ADPT",
+    "ADRX",
     "ADT",
     "ADTN",
     "ADTX",
@@ -1451,6 +1452,7 @@
     "INTZ",
     "INUV",
     "INV",
+    "INVE",
     "IONL",
     "IONQ",
     "IONR",
@@ -1815,6 +1817,7 @@
     "MP",
     "MPAA",
     "MPG",
+    "MPLT",
     "MPU",
     "MQ",
     "MRAL",
@@ -2789,6 +2792,7 @@
     "TIGR",
     "TII",
     "TILL",
+    "TIPT",
     "TIPX",
     "TISI",
     "TJGC",
@@ -3185,5 +3189,5 @@
     "ZYBT"
   ],
   "added":[],
-  "total":3182
+  "total":3186
 }
