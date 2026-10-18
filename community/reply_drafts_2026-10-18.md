@@ -7,7 +7,7 @@ post those today too. Post them yourself, spread out, directly under each person
 
 ## 1. u/keeganm181 (most useful new comment)
 
-this is super helpful keeganm181. I did test buying a stock when it breaks its premarket high after getting flagged and it lost money pretty consistently, but now that I read this thats not what you're describing, you wait for the pullback first and then the next green candle to a new high, and I havent tested that one premarket yet so gonna try it. the 3 candle flush thing makes a lot of sense too, I think thats been wrecking my exits. do you use a hard stop or are you actually watching the tape to get out? and ha, same boat on the AI built bot, mine has found a lot of creative ways to lose money lol
+keeganm181 I went and tested the pullback thing since you brought it up, waited for 1 to 4 red candles and then bought the first candle to make a new high, on every premarket mover my scanner flagged over about 500 mornings, and it lost about the same as just buying the flag lol. with a stop right under the pullback low it got stopped out more than half the time, and it only got to roughly breakeven on the stocks Ross actually picked. so I think the edge is more which stock he picks than the entry, but I'm honestly not sure. do you use a hard stop or are you actually watching the tape to get out? and ha, same boat on the AI built bot
 
 ---
 
@@ -29,6 +29,6 @@ thanks Most_Atmosphere8365, that kinda answers all three of my questions at once
 - u/O-L_1337: nothing new (L2 consensus). A one-line "ha fair, hopefully not quantum" is fine if you want, not needed.
 
 ## Facts behind the drafts
-- Premarket breakout test (new high after the flag): lost for all hits and for Ross look-alikes (ross_confirmation_news_test.py). Micro-pullback premarket: never tested (our MP strategy only trades from 9:30).
+- Premarket pullback test (premarket_pullback_test.py, Oct 18): 1-4 red 1-min candles, depth 2-20%, then a bar whose high exceeds the last red bar's high; buy the next bar's open, 0.3%/side. 3,292 trades over 515 days: -0.69% at 10 min, -1.03% at 30 min; buying at the flag was -0.77% / -1.04%. With stop = pullback low - $0.01, 2R target, 30 min limit: -0.41R/trade, stopped out 55%. Ross's picks (hindsight selection): -0.10R (CI -0.28 to +0.09); other hits -0.46R.
 - Ledger: ~1,800 transcripts, summaries of 1,787 entries, 5,261 trades, 1,771 losses (33.7%) per RC_STRATEGY_STATISTICS.md. Entry times are estimated from price touches.
 - Tape: Alpaca historical trades on the free key is assumed free but not yet confirmed (minute bars with feed=SIP older than 15 minutes did work), hence "I think its free".
