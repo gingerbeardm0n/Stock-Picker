@@ -8,6 +8,11 @@ _Updated: 2026-09-18 (Fri) — post deep review_
 
 ---
 
+> **Oct 18, 2026 update:** 14 Ross Cameron tests (Oct 2-18) found no mechanical rule that beats
+> realistic costs; the only signal is his own premarket stock selection (~+1%, about the size of costs).
+> Decision pending: **`docs/DECISION_2026_10_ROSS_EDGE.md`** (tape test with a pre-registered rule by
+> Nov 1, otherwise pause jTrader). The rest of this file is still the Sep 18 snapshot.
+
 ## ⚠️ The headline
 
 **Deep review (2026-09-18) verdict: the sealed backtests are not evidence of an edge.**
