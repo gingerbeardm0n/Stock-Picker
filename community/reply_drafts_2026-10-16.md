@@ -8,7 +8,7 @@ directly under each person's comment.
 
 ## 1. u/Partnikl (execution / the 3.40 → 3.48 example)
 
-the 3.40 to 3.48 thing is exactly what bit me on the exit side Partnikl lol, my sim was filling every stop at exactly the stop price and when I fixed that the whole backtest went from amazing to losing money. havent done the same check on entries yet but I think Alpaca lets you pull the actual historical prints so my plan is to line up my entry times against what really traded and see how far off I am. do you trade premarket with limit orders or is there some way to get market orders through? Alpaca makes me use limits before the open and I honestly have no idea how many I'd miss
+the 3.40 to 3.48 thing is exactly what bit me on the exit side Partnikl lol, my sim was filling every stop at exactly the stop price and when I fixed that the whole backtest went from amazing to losing money. I just pulled the actual quotes for about 1,300 of the premarket movers my scanner flagged and the median spread right after the flag was around 0.7% with a third of them over 1%, so my 0.3% slippage was probably too low, especially for the wide ones. havent lined my fills up against the actual prints yet but thats next. do you trade premarket with limit orders or is there some way to get market orders through? Alpaca makes me use limits before the open and I honestly have no idea how many I'd miss
 
 ---
 
@@ -44,6 +44,7 @@ fair, I have read a ton of what he says about it, I turned about 1,800 of his vi
 
 ## Facts behind each draft (so you can defend them if someone pushes back)
 
+- Spread check (premarket_spread_check.py, Oct 18): 1,304 sampled flagged stock-mornings, Alpaca SIP quotes in the 2 min after the flag. Median relative spread 0.71% (half-spread 0.35%, mean 0.53%), 34% of quotes wider than 1%, 13% wider than 2%. Same stocks at 09:45: median 0.54%, 19% wider than 1%. 98% had a valid quote.
 - Sim exit fix: stops used to fill exactly at the stop price; honest fills took the sealed 2025 test from profit factor 3.31 to 0.58 (docs/DEEP_REVIEW_2026_09.md).
 - Alpaca premarket = limit orders only (docs.alpaca.markets/docs/orders-at-alpaca).
 - His picks vs other premarket movers, same morning, random entry from his pick time to 9:30: +0.96% (10 min), +1.76% (30 min), both with confidence ranges above zero. After 9:30: no difference.
