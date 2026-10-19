@@ -111,6 +111,29 @@ Hard stop for jTrader stays 2027-03-31.
   sensitivity: 10-minute hold, 1.0% per side.
 - **Any failure ends the Ross-replication line.**
 
+### 5a. Addendum (2026-10-19, written BEFORE any tape feature was computed)
+
+Only an access probe has been run: 5 random flagged stock-mornings, trade counts only. It confirmed
+Alpaca SIP historical trades are free on our key, fast (0.1-0.5 s per call), and show 5 to 2,339
+trades in the 5 minutes before a flag, from 6 to 11 exchanges, with about 40-60% of trades odd lots
+(under 100 shares). Data handling, frozen now:
+
+- **Trades kept:** only those whose condition codes are all within {' ', '@', 'T', 'F', 'I', 'E'}
+  (regular, extended-hours, intermarket sweep, odd lot, automatic execution). Everything else
+  (out-of-sequence, bunched, average-price, contingent, cash, next-day, etc.) is dropped.
+- **Odd lots** stay in trade counts and volume totals (they are real trades); the "big print"
+  feature is unaffected (it needs >= 10,000 shares).
+- **Buy/sell classification:** quote rule against the last quote at or before the trade timestamp
+  (price >= ask is a buy, <= bid is a sell). Anything in between uses the tick rule against the
+  previous kept trade. Trades with no quote in the preceding 60 seconds are left out of the
+  buy-pressure feature only.
+- **Liquidity floor:** a stock-morning with fewer than 20 kept trades in the 5 minutes before the
+  flag cannot be traded and is excluded from scoring; the count is reported.
+- **No imputation:** stock-mornings with any missing feature are excluded and counted.
+- **Minimum training set:** a test year is scored only if at least 400 earlier stock-mornings
+  with complete features exist.
+- Everything else in section 5 stands unchanged.
+
 ## 6. Housekeeping (whatever is chosen)
 
 1. Switch off the daily live session on Render (retired configs, no data feed). Needs Joel's OK;
