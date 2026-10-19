@@ -134,6 +134,32 @@ trades in the 5 minutes before a flag, from 6 to 11 exchanges, with about 40-60%
   with complete features exist.
 - Everything else in section 5 stands unchanged.
 
+### 5b. Addendum (2026-10-19, still before any tape feature was computed)
+
+Details that section 5 left open, fixed now. The implementation is `research/analysis/scripts/tape_feature_test.py`,
+committed together with this note.
+
+- **Features as model inputs:** log(tape speed ratio), buy share, big-print share, log(relative spread),
+  bid-size share, standardized on the training years. Tape speed ratio = (trades in the last 2 minutes + 1)
+  divided by (trades in the 3 minutes before that + 1). Buy share = buy volume / (buy + sell volume) over classified
+  trades in the last 2 minutes.
+- **Classifier:** logistic regression, C = 0.3, balanced class weights (same as `ross_pick_model_test.py`).
+- **Label and outcome:** net 30-minute return after 0.5% per side > 0. Entry = open of the first 1-minute bar at or after
+  the flag; exit = close of the last bar within 29 minutes of that bar's start.
+- **Selection:** highest predicted probability per morning among stock-mornings that pass the liquidity floor and have
+  all five features.
+- **Criterion (d) comparator:** the same one-trade-per-morning rule with no tape information, i.e. the average net
+  return of all qualified hits that morning (the exact expectation of a random pick). The bar-feature pick model is
+  reported for context only and does not enter the verdict.
+- **"3 most recent test years"** = the three latest years that were scored.
+- **Confidence interval:** day-clustered bootstrap, 3,000 resamples.
+
+### Note on costs in the earlier tests (correction, 2026-10-19)
+
+Tests 2, 4-7 and 9-12 in the table above charged the 0.3% slippage on the **exit only**, so their *absolute* returns are
+about 0.3% too generous. Paired comparisons (tests 6, 9, 12) are unaffected. Tests 8 and 13 charged both sides. This
+makes the absolute results look slightly better than they should; it does not change any conclusion.
+
 ## 6. Housekeeping (whatever is chosen)
 
 1. Switch off the daily live session on Render (retired configs, no data feed). Needs Joel's OK;
