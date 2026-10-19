@@ -426,7 +426,11 @@ def get_news_dump(date: str | None = Query(None, description="YYYY-MM-DD; omit f
 def trigger_session():
     """Manually trigger the daily sessions (scalp + VWAP reclaim) in background."""
     import threading
-    from api.session_job import run_daily_sessions, is_session_started_today
+    from api.session_job import run_daily_sessions, is_session_started_today, SESSIONS_SUSPENDED
+
+    if SESSIONS_SUSPENDED:
+        return {"triggered": False,
+                "message": "Sessions suspended (docs/DECISION_2026_10_ROSS_EDGE.md)"}
 
     if is_session_started_today():
         logger.info("Trigger received but session already started today — skipping")

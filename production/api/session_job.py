@@ -27,6 +27,13 @@ STATE_DIR.mkdir(parents=True, exist_ok=True)
 # 76.7% WR, +$3,299, PF 2.19, DD $164.
 VWAP_SUSPENDED = False
 
+# Daily live sessions suspended 2026-10-19 (docs/DECISION_2026_10_ROSS_EDGE.md): the retired
+# Trial 211/188/167 configs have no edge under the honest simulator, and the Tradier data
+# feed has been dead since Jul 22 (no trades since Jul 20). Every entry point (cron,
+# startup auto-trigger, POST /trigger, --run-now) goes through run_daily_sessions(), so
+# this one flag stops all of them. Set to False and redeploy to resume.
+SESSIONS_SUSPENDED = True
+
 _CANDIDATE_FIELDS = (
     'symbol', 'gap_pct', 'open_price', 'prior_close', 'rel_vol',
     'float_shares', 'has_news', 'news_tier', 'scalp_score', 'quote_volume',
@@ -271,6 +278,11 @@ def _check_orphaned_positions() -> None:
 
 def run_daily_sessions():
     """Run scalp, micro-pullback, and VWAP reclaim in coordinated parallel; persist state."""
+    if SESSIONS_SUSPENDED:
+        logger.warning("run_daily_sessions: sessions SUSPENDED (SESSIONS_SUSPENDED in "
+                       "api/session_job.py) — nothing started.")
+        return
+
     from trading.live_scalp_runner import run_scalp_session
     from trading.live_vwap_runner import run_vwap_session
     from trading.live_micro_pullback_runner import run_micro_pullback_session
