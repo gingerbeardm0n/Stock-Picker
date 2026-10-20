@@ -77,3 +77,12 @@ statistics and exits by type; a sample of real quoted spreads at the entry minut
 Alpaca's inactive asset list misses some delisted tickers, so there is some survivorship, though much
 less than for small caps. The headline classifier is keyword-based. Benzinga coverage of large caps
 is good but not complete.
+
+## Addendum (2026-10-19, before any data was pulled)
+
+- Raw (unadjusted) prices are used throughout, so a reverse split looks like a +100% or larger gap.
+  **Gaps above +60% are excluded** as split artifacts. Dollar volume is unaffected by splits.
+- Alpaca's daily open was checked against the 09:30 minute-bar open on four large caps: they match
+  exactly. So daily bars pre-screen gaps of 2% or more (the smallest report-only threshold), and
+  minute bars and news are pulled only for those stock-days.
+- Implementation: `research/analysis/scripts/liquid_gap_orb_test.py`, committed with this addendum.
