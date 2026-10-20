@@ -16,7 +16,14 @@
   - News API (real-time + historical, 200 req/min) — **FREE**
   - Trading calendar (`/v2/calendar`) — **FREE**
 - **Rate limit**: 200 calls/min (free plan)
-- **Last verified working**: 2026-06-09 (minute bars for Jan 2025 - Jun 2026)
+- **Last verified working**: 2026-10-20 (SIP minute/daily bars 2017-2026, SIP historical quotes and trades, news, asset lists)
+- **Also free on this key (verified Oct 2026):** full **SIP** history older than 15 minutes, including
+  **historical quotes** (NBBO, `get_stock_quotes`) and **historical trades / time & sales**
+  (`get_stock_trades`, with condition codes and exchange). Delisted tickers are served too (SMFL, SYTA, LLAP).
+  The **daily bar open equals the 09:30 official opening print** (checked on AAPL, TSLA, SMCI, PLTR).
+- **Asset list gotcha (2026-10-19):** Alpaca now returns exchange `TXSE` (Texas Stock Exchange), which
+  alpaca-py's `Asset` enum rejects (`ValidationError`). Read `/assets` via raw REST
+  (`TradingClient.get('/assets', {...})`) until alpaca-py is upgraded.
 - **Key history**:
   - `AK42...` — original key, used for all 2021-2026 backfill. Died when new keys generated 2026-06-09.
   - `AKIJ...` — new live key, generated 2026-06-09. Works for data + news.
@@ -46,7 +53,12 @@
   - `production/trading/broker/alpaca.py` — `AlpacaBroker(paper=True)`
 - **NOTE**: Alpaca paper reset button was removed in 2023-2025 UI redesign. No API endpoint. See `research/reset_paper_account.py`.
 
-### Tradier (Data Feed — Real-time Quotes + Premarket Timesales)
+### Tradier (Data Feed — DEAD since 2026-07-22)
+- **Status:** production login inactive ("Your Login Is Inactive") since 2026-07-22: unfunded account below
+  Tradier's balance/activity threshold. Not funded by decision (deep review 2026-09-18). Live sessions are
+  suspended (`SESSIONS_SUSPENDED`, 2026-10-19), so nothing depends on it right now.
+
+### Tradier (historical notes — Real-time Quotes + Premarket Timesales)
 - **Account**: Dual-token setup — production token for real-time data, sandbox token for paper orders (15-min delayed, blind premarket)
 - **Env vars**: `TRADIER_PAPER_TOKEN`, `TRADIER_ACCOUNT_ID`, `TRADIER_PRODUCTION_TOKEN` in `production/.env.paper` + SOPS-encrypted `production/.env.render`
 - **Provides**:
@@ -72,6 +84,15 @@
 - **Status**: Key valid but Basic tier too limited for minute bars. Was used for Mar 7-15 2026 gap fill.
 - **To unlock minute bars**: Starter plan = $29/mo
 - **Script**: `production/data/backfill/backfill_polygon.py`
+
+### SEC EDGAR (point-in-time shares outstanding) — added 2026-10-14
+- **Free.** `https://www.sec.gov/files/company_tickers.json` (current ticker → CIK) and
+  `https://data.sec.gov/api/xbrl/companyconcept/CIK##########/dei/EntityCommonStockSharesOutstanding.json`
+  (falls back to `us-gaap/CommonStockSharesOutstanding`); EDGAR full-text search for delisted tickers.
+- **Requires** a contact in the User-Agent: env var `SEC_USER_AGENT` (Joel approved using his email; never
+  hard-code it). Fair-access limit 10 requests/second; scripts throttle to ~8/s.
+- **Used by:** `research/analysis/scripts/premarket_float_test.py` (caches `outputs/premarket/sec_*.pkl`).
+- **Coverage:** 76% of premarket scanner hits got a share count filed before the hit's day.
 
 ### NASDAQ Trader FTP (Symbol Universe)
 - **URL**: `https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqtraded.txt`
@@ -126,18 +147,22 @@
 - **Workflow**: Edit `.env.render` plaintext → `sops -e -i production/.env.render` → commit → deploy. Never touch Render dashboard for secrets.
 - **Last verified working**: 2026-07-01 (local decrypt + Render boot tested)
 
-## DB Coverage (as of 2026-06-09)
+## DB Coverage (as of 2026-10-20)
 
-| Table | Latest Data | Notes |
+| Table | Latest data | Notes |
 |-------|-------------|-------|
-| `stock_candles_1m` | 2026-03-13 | Minute bars 8am-12pm ET |
-| `stock_candles_1h` | 2026-03-13 | Hourly bars 4am-8am ET |
-| `stock_candles_1d` | 2026-03-13 | Daily bars |
-| `stock_news` | ~2026-05-27 | 17K+ articles, backfilled for gapper symbols |
-| `daily_gappers` | 2026-03-13 | 84K rows, precomputed gap% cache |
-| `rel_vol_cum_cache` | 2026-02-18 | 235M rows, cumulative volume by minute |
-
-**Gap to fill**: 2026-03-14 through 2026-06-09 (~60 trading days)
+| `stock_candles_1m` | 2026-06-12 | Minute bars 08:00-12:00 ET only; universe = snapshot $1-$20 list (survivorship: misses many delisted small caps) |
+| `stock_candles_1d` | 2026-06-12 | Daily bars, same universe |
+| `stock_news` | 2026-06-12 | Backfilled for gapper symbols only (~5% of premarket movers have a tier1-3 article) |
+| `daily_gappers` | 2026-03-13 | Precomputed gap% cache (partial 2021); `find_gappers` recomputes on a miss |
+| `rel_vol_cum_cache` | 2026-02-18 | Cumulative volume by minute |
+| `ross_trade_ledger` | — | 5,350 trades parsed from the Ross corpus summaries (2,992 dated, 2,457 matched to bars) |
+| `ross_trade_bars_1m` / `_1d` | 2017-2026 | SIP 04:00-12:00 bars for Ross's trade days (921,870 minute bars) |
+| `ross_scanner_bars_1m` | 2017-2026 | SIP 04:00-12:00 bars for 6,046 premarket scanner hits (1.85M bars) |
+| `ross_gapper_bars_1m` | 2017-2026 | SIP 09:00-12:00 bars for comparison gappers (selection test) |
+| `ross_hit_news` | 2017-2026 | Alpaca/Benzinga articles in the 24h before each scanner flag |
+| `liq_bars_1m` | 2021-01-04 to 2026-10-16 | SIP 09:30-12:00 bars for 74,836 liquid gap-up stock-days (10.8M bars) |
+| `liq_news` | 2021-2026 | 79,066 article-symbol rows for those stock-days (prior 16:00 to 09:29) |
 
 ## Backfill History
 
@@ -147,6 +172,11 @@
 | ~2026-05-27 | 2021-2026 gapper days | Alpaca (key AK42) | backfill_news.py | 16,724 articles for daily_gappers symbols |
 | ~2026-05-27 | 2021-01-04 to 2026-02-18 | DB computation | manual SQL | rel_vol_cum_cache built from stock_candles_1m |
 | 2026-03 | 2026-03-07 to 2026-03-15 | Polygon (Basic) | backfill_polygon.py | Small gap fill, daily bars only |
+| 2026-10-08 | Ross trade days 2017-2026 | Alpaca SIP (free) | research/data_backfill/backfill_ross_ledger.py | 921,870 minute bars + daily bars into separate `ross_*` tables; coverage of his trades 41% → 82% |
+| 2026-10-08 | 524 Ross premarket days | Alpaca SIP (free) | research/analysis/scripts/ross_premarket_test.py | Universe of 30,913 tickers (incl. delisted), prior-day closes, 15-min premarket scan, 1.85M minute bars for 6,046 hits |
+| 2026-10-14 | scanner hits | Alpaca news + SEC XBRL | premarket_news_test.py, premarket_float_test.py | `ross_hit_news`; point-in-time shares outstanding |
+| 2026-10-18/19 | sampled hits | Alpaca SIP quotes + trades | premarket_spread_check.py, tape_feature_test.py | Spread sample (1,304), tape features for 5,301 stock-mornings (cached CSVs, not in DB) |
+| 2026-10-19 | 2021-01-04 to 2026-10-16 | Alpaca SIP + news (free) | research/analysis/scripts/liquid_gap_orb_test.py | 7,758-symbol universe; `liq_bars_1m` (10.8M bars), `liq_news` |
 
 ## Lessons Learned
 
@@ -184,3 +214,11 @@
 14. **yfinance `floatShares` returns None for some tickers.** Very new IPOs, SPACs, and some micro-caps have no float data on Yahoo Finance. `fetch_missing_floats()` silently skips these; the `max_float` filter treats `None` as pass-through (no-op). This is intentional: better to trade without float data than to silently drop a valid candidate.
 
 15. **Some armed scalp candidates legitimately get ZERO Tradier bars for the whole entry window** (investigated 2026-07-02 for Jul 1). GUACU (Berto Acquisition Corp II — Units, a SPAC unit) printed 8 one-minute bars in the ENTIRE day, first at 11:46 ET — so a 9:30-10:00 entry loop waiting on its bars waits forever. This is real illiquidity, not a symbol-format or feed problem: Tradier serves the symbol fine (`/quotes` and `/timesales` both work, no `.U`/`-U` mismatch). Control symbols the same day (TC, EHGO: 91 bars each 9:30-11:00) confirm the feed was healthy. Note: MQ and BACC — initially suspected as zero-bar symbols — were never on the poller watchlist at all (MQ screened out on float 367M > 50M; BACC on rel_vol 0.00, no premarket prints yet at scan time). Conclusion: the wall-clock entry-window fallback (`5a1f0e0`) is the correct and final fix; no scanner symbol-normalization needed. Possible future refinement (needs backtest): require ≥1 premarket Tradier print before arming a candidate.
+
+16. **Our main minute-bar DB is not Ross's universe** (2026-10-08). Only 41% of his dated trades had bars: the backfill universe was a snapshot list of $1-$20 tickers (delisted/renamed names missing) and minute bars cover 08:00-12:00 only. Any small-cap replication must backfill its own symbol-days (Alpaca free SIP serves delisted tickers and 04:00 premarket).
+
+17. **Premarket spreads on small-cap movers are wide** (2026-10-18). Median quoted spread 0.71% after a scanner flag, a third > 1%; liquid names at 09:35: median 0.17%. Use ~0.5%/side premarket, 0.15-0.3%/side for liquid regular-hours tests. Alpaca accepts only limit orders in extended hours.
+
+18. **alpaca-py rejects new exchange codes** (2026-10-19, `TXSE`). Asset-list calls crash with a pydantic `ValidationError`; use raw REST for `/assets`.
+
+19. **Docker Desktop "dockerInference" socket crash recurs** (2026-10-20). Backend log: `initializing Inference manager: listening on unix://...\Docker\run\dockerInference: remove ...`. Fix: stop every docker process, `wsl --shutdown`, rename `%LOCALAPPDATA%\Docker\run`, start Docker Desktop ONCE. Never start it twice concurrently.

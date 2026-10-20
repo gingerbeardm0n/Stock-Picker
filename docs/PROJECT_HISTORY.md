@@ -4,7 +4,7 @@ Living record of what was built, when, why — plus a component index and file-h
 Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pass written manually
 2026-05-31 from git history + session context; incremental passes append from `git log`.
 
-**History watermark (last commit folded in):** `b1d18f8` (2026-07-17)
+**History watermark (last commit folded in):** `c9bb04c` (2026-10-20)
 
 ---
 
@@ -247,6 +247,63 @@ Maintained by the **historian** skill (`.claude/skills/historian`). Bootstrap pa
 - `b1d18f8` — root README added.
 - (worktree `6b881fe`, pending merge) — **issue #23 ablation**: rel-vol fallback exclusion. PF 2.70→3.31 (2025), 3.45→5.04 (2026 YTD), maxDD −64/−77%; removed P&L is phantom (zero-IEX-volume symbols never fill live). Filter implemented in sim + live scalp runner, verification rerun pending.
 
+### Phase 18 — Live hardening, exit-overfit discovery (2026-07-17 → 08-12)
+
+**2026-07-17**
+- `c98766a`, `6b881fe` — issue #23 merged: rel-vol fallback symbols excluded from arming (+ ablation script). Removed P&L was phantom (zero-IEX-volume names never fill live).
+- `034d38e` — session heartbeat UPSERT heals a fail-open claim (double-session guard); ADW warrants filtered from the NASDAQ universe.
+- `67c6897` — historian fold Jul 1-17; STATUS rewrite. Merges `efd6950`, `0795bb9`.
+
+**2026-07-23**
+- `d01a7d5` — VWAP/MP near-zero trailing stops (Optuna overfit that gamed 1-min bars) replaced with a hand-set 2.0% (paper). Merge `b3edcfb`.
+
+**2026-07-27**
+- `6a876ca` — VWAP partial-fill oversell fix (BIYA orphan root cause): trailing-stop fallback now sells only the remaining shares and books a blended exit price.
+
+**2026-08-12**
+- `39b368e` — merge of the above to main.
+
+### Phase 19 — Deep review: the simulator was the edge (2026-09-09 → 09-18)
+
+**2026-09-09**
+- `4dae4a1` — model-routed subagent roster (`.claude/agents`, `defaultSubagentModel=sonnet`) for credit-efficient orchestration.
+
+**2026-09-18**
+- `dd55244` — STATUS refresh + `docs/FABLE_BRIEFING.md` for the deep review.
+- `c3c3748` — opt-in structural trailing stop (issue #24 stage 1): prior-N-bar low (VWAP) / EMA-9 break (MP). Inert unless `trail_mode='structural'`.
+- `472a471` — **deep review** (`docs/DEEP_REVIEW_2026_09.md`): sims filled every stop at par with no gap-through; that assumption was the entire sealed edge (scalp 211 PF 3.31 → 0.58 honest). Retire 211/188/167; Gate 0/1/2 plan; don't fund Tradier.
+- `cd4ad93` — **Gate 0: honest exit fill model** as the sim default (`exit_fill_mode='honest'`, gap-through stops, next-open exits, 0.3% exit slippage); `par` reproduces old numbers. Merge `d2d1962`.
+
+### Phase 20 — Ross Cameron edge research, then two pre-registered tests (2026-10-02 → 10-20)
+
+**2026-10-12**
+- `54ac3f9` — Ross trade ledger backfill (`backfill_ross_ledger.py`: 5,350 corpus trades, SIP 04:00-12:00 bars into separate `ross_*` tables; coverage 41% → 82%) + oracle (his entries one bar late: no reliable edge), selection (after 9:30: no edge) and premarket tests (hindsight-free scanner; his picks beat other flagged movers +1.0%/+1.8% paired). Also the scalp-211 entry-edge test.
+
+**2026-10-14**
+- `e8a7805` — pick model: features predict which stock he picks (AUC 0.79-0.88) but its picks lose out of sample.
+- `5745a2b` — breakout-confirmation entries lose; his news-driven picks carry the selection edge.
+- `ed4579c` — mechanical news test on all scanner hits (Alpaca/Benzinga): catalyst movers beat no-news movers ~1% paired, ~flat absolute.
+- `d07994a` — Haiku rating of 2,523 masked headlines does not sort outcomes.
+- `4c1344b` — point-in-time float from SEC XBRL: his picks are low-float, but low float doesn't beat other movers.
+
+**2026-10-16**
+- `090c16a` — market temperature: his picks ~flat in cold small-cap markets, positive in warm ones; buying every flag loses in all. `community/` added (reading list, Reddit post, replies, learnings).
+
+**2026-10-18**
+- `36f4217` — premarket micro-pullback entry loses like buying the flag (-0.41R).
+- `7f16f0a` — real premarket spreads: median 0.71%, a third > 1% (0.3%/side was optimistic).
+- `4a6abf0` — community: new comments, reply drafts, community-manager hand-off prompt.
+- `f742463` — `docs/DECISION_2026_10_ROSS_EDGE.md`: 14-test summary, options, pre-registered tape-test rule.
+
+**2026-10-19**
+- `cd45da7`, `bbdb209` — tape test data rules frozen and script committed before any tape feature was computed.
+- `2904942` — **`SESSIONS_SUSPENDED` kill switch** in `api/session_job.py` (stops cron, startup auto-trigger, `/trigger`, `--run-now`); pushed to main with everything above (`a3a6a34`).
+- `a3a6a34` — **tape test FAIL** (tape-ranked pick -2.65%/trade, worse than random every year).
+- `9311efb`, `61e9db5`, `64986a0` — pre-registered liquid-stock news-gap ORB test (before any data), script + split-artifact gap cap, Alpaca asset list via raw REST (new TXSE exchange breaks alpaca-py).
+
+**2026-10-20**
+- `c9bb04c` — **liquid news-gap ORB FAIL** (-0.38%/trade over 4,382 trades, negative all 6 years, ~flat before costs). Joel is continuing jTrader as a research project (not pivoting to jSwing).
+
 ---
 
 ## Component Index
@@ -413,6 +470,34 @@ These files belong to the pre-pivot 126-param monolith. None are imported by `li
 | `STATUS.md` (root) | current-state snapshot: deployed / live configs / next actions / blockers | 🟢 | phase 12 |
 | `production/data/live_capture/export_rel_vol_baseline.py` | export rel-vol baseline + floats → `data` branch (`--push`) | 🟢 | phase 11-12 |
 
+### New in Phases 18-20
+| File | Purpose | Status | Since |
+|---|---|---|---|
+| `production/simulator/fill_model.py` (exit section) | honest exit fills: `resolve_honest_exit_fill`, `exit_fill_mode`, `exit_slippage_pct` | 🟢 sim default | cd4ad93 |
+| `production/tests/test_exit_fill_model.py` | 13 tests for the honest exit fill model | 🟢 | cd4ad93 |
+| `production/api/session_job.py` `SESSIONS_SUSPENDED` | kill switch for every live-session entry point (default True) | 🟢 live sessions OFF | 2904942 |
+| `production/tests/test_session_kill_switch.py` | suspended `run_daily_sessions()` starts nothing | 🟢 | 2904942 |
+| `research/data_backfill/backfill_ross_ledger.py` | Ross corpus trade ledger + SIP bars into `ross_trade_ledger` / `ross_trade_bars_1m/1d` | 🟢 research | 54ac3f9 |
+| `research/analysis/scripts/entry_edge_forward_returns.py` | forward returns of a strategy's entries, no exits | 🟢 research | 54ac3f9 |
+| `research/analysis/scripts/ross_oracle_entry_test.py` | Ross's entries one bar late, honest fills | 🟢 research (done) | 54ac3f9 |
+| `research/analysis/scripts/ross_selection_test.py` | his picks vs other gappers after 9:30 | 🟢 research (done) | 54ac3f9 |
+| `research/analysis/scripts/ross_premarket_test.py` | hindsight-free premarket scanner (30,913-ticker universe) + selection test; caches in `outputs/premarket/` | 🟢 research (reused) | 54ac3f9 |
+| `research/analysis/scripts/ross_pick_model_test.py` | walk-forward "which stock would Ross pick" model | 🟢 research (done) | e8a7805 |
+| `research/analysis/scripts/ross_confirmation_news_test.py` | breakout entries + news split of his picks | 🟢 research (done) | 5745a2b |
+| `research/analysis/scripts/premarket_news_test.py` | Alpaca/Benzinga news for scanner hits; `article_type()` classifier (reused) | 🟢 research | ed4579c |
+| `research/analysis/scripts/llm_catalyst_rating.py` | export masked headlines / evaluate LLM ratings | 🟢 research (done) | d07994a |
+| `research/analysis/scripts/premarket_float_test.py` | point-in-time shares outstanding from SEC XBRL (needs `SEC_USER_AGENT`) | 🟢 research (done) | 4c1344b |
+| `research/analysis/scripts/market_temperature_test.py` | results by small-cap market temperature | 🟢 research (done) | 090c16a |
+| `research/analysis/scripts/premarket_pullback_test.py` | micro-pullback entries on premarket movers; `load_bars`/`load_frame` reused | 🟢 research (done) | 36f4217 |
+| `research/analysis/scripts/premarket_spread_check.py` | real quoted spreads at scanner flags | 🟢 research (done) | 7f16f0a |
+| `research/analysis/scripts/tape_feature_test.py` | pre-registered tape test (FAIL) | 🟢 research (closed) | bbdb209 |
+| `research/analysis/scripts/liquid_gap_orb_test.py` | pre-registered liquid news-gap ORB test (FAIL); `liq_*` tables | 🟢 research (closed) | 61e9db5 |
+| `docs/DEEP_REVIEW_2026_09.md` | honest-sim verdict, gates | 🟢 | 472a471 |
+| `docs/DECISION_2026_10_ROSS_EDGE.md` | Ross-edge test summary, options, tape-test pre-registration + result | 🟢 | f742463 |
+| `docs/PREREG_2026_10_LIQUID_NEWS_GAP.md` | liquid news-gap ORB pre-registration + result | 🟢 | 9311efb |
+| `community/` | Reddit outreach: reading list, post, replies, learnings, reply drafts, hand-off prompt | 🟢 | 090c16a |
+| `.claude/agents/*.md` | strategy-architect / quant-runner / trade-logic-reviewer roster | 🟢 | 4dae4a1 |
+
 ---
 
 ## Deprecations (dead — safe to delete, kept for traceability)
@@ -424,6 +509,9 @@ These files belong to the pre-pivot 126-param monolith. None are imported by `li
 - ⚫ `TradierRelVol` class in `rel_vol_live.py` — superseded by `HybridRelVol` (2026-06-30, `9859720`). Both runners now use `HybridRelVol`. `TradierRelVol` still importable but unused.
 - ⚫ `RealtimeRelVolCache` class in `rel_vol_live.py` — dead; was the old Alpaca-feed-only cache. Import removed from both runners.
 - ⚫ `compute_rel_vol()` function in `rel_vol_live.py` — standalone function superseded by `HybridRelVol.compute()`. Import removed from both runners.
+
+- 🟡 Live configs `TRIAL_211_CONFIG` (scalp), Trial 188 (VWAP), Trial 167 (MP) — retired by the deep review (no edge under honest fills); the live runners still import them but `SESSIONS_SUSPENDED=True` stops every session. Keep until a replacement strategy exists; `unknown — verify` before deleting.
+- 🟡 `docs/FABLE_BRIEFING.md` — one-off brief for the Sep deep review; superseded by `DEEP_REVIEW_2026_09.md` and `DECISION_2026_10_ROSS_EDGE.md`.
 
 ---
 
@@ -517,3 +605,14 @@ These files belong to the pre-pivot 126-param monolith. None are imported by `li
   pre-commit parity audit; candidate for .gitignore (regenerable run-state).
 - Root-level `.py`: clean (config.py only). Tracked CSV/db/log/out under research/: clean
   (83 CSVs untracked in `1d960ee`).
+
+## Hygiene flags — custodian pass 2026-10-20 (FLAG ONLY — nothing deleted/moved)
+
+- Root-level `.py`: clean. Tracked CSV/pkl/db/log: none (`research/analysis/outputs/` is ignored; 136 MB locally).
+- `research/maintenance/parity_results.json` — still rewritten by the pre-commit parity audit on every commit and left modified (repeat flag from 07-17): gitignore it or commit it in the hook.
+- `.claude/launch.json` — untracked in the worktree; commit or ignore.
+- `community/` — new top-level folder, not in FILE_PLACEMENT_GUIDE's valid locations. Propose moving to `docs/community/` (or listing it in the guide). Holds public Reddit usernames of commenters; no secrets should go there.
+- **Stale docs:** `STATUS.md` (top still the Sep 18 snapshot plus an Oct 18 note); `docs/PARITY.md` (last audited 07-10; live sessions are now suspended); `docs/FABLE_BRIEFING.md` (see Deprecations).
+- **Duplicate logic:** `dci()` (day-clustered bootstrap) and `net_ret()` are copied across `premarket_pullback_test.py`, `tape_feature_test.py`, `liquid_gap_orb_test.py`; a shared `research/analysis/scripts/_stats.py` would remove the copies if more tests follow.
+- **Cost-model caveat:** tests 2, 4-7 and 9-12 in the decision doc charged 0.3% on exits only (noted in the doc); newer tests charge both sides.
+- **Local DB growth:** research tables `ross_trade_bars_1m` (0.9M rows), `ross_scanner_bars_1m` (1.8M), `liq_bars_1m` (10.8M), `liq_news` (79K) live only in the local TimescaleDB; the scripts that rebuild them are in git, the data is not.

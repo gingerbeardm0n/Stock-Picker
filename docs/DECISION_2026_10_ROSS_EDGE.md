@@ -1,7 +1,7 @@
 # Decision: what to do with jTrader after the Ross Cameron tests
 
 _Written 2026-10-18. Supersedes the Gate 1 plan in `docs/DEEP_REVIEW_2026_09.md` §4, which was
-about re-optimizing the retired strategies. Owner: Joel. Status: **tape test run 2026-10-19: FAIL** (see section 8). Joel approved: run the tape test, switch off the live session, jSwing becomes main if it fails._
+about re-optimizing the retired strategies. Owner: Joel. Status: **tape test run 2026-10-19: FAIL** (see section 8). Joel approved: run the tape test and switch off the live session. He did NOT agree to stop jTrader or make jSwing the main project (correction 2026-10-20)._
 
 ## TL;DR
 
@@ -192,8 +192,8 @@ no truncated pulls. Scored years 2023-2026.
 Report-only: 10-minute hold -1.52% (random -1.11%); 1.0%/side -3.78%; the bar-feature model -0.97%
 (CI -2.12% to +0.28%, random -1.24%). Top picks were Ross picks 11.4% of the time vs 9.1% base rate.
 
-Per section 4, the Ross-replication line ends here: pause jTrader as a live strategy, keep all data
-and tooling, and make jSwing the main project. Any further jTrader idea needs its own pre-registered
+Per section 4, the Ross-replication line ends here: pause jTrader as a live strategy and keep all data
+and tooling. (Correction 2026-10-20: Joel is continuing jTrader as a research project; jSwing is not replacing it.) Any further jTrader idea needs its own pre-registered
 test written before its data is examined. (Post-hoc note, NOT actionable: the tape ranking selecting
 worse-than-random stocks suggests frenzied tape marks exhaustion; that is a new hypothesis on the same
 data and could only be tested on fresh data.)
