@@ -86,3 +86,22 @@ is good but not complete.
   exactly. So daily bars pre-screen gaps of 2% or more (the smallest report-only threshold), and
   minute bars and news are pulled only for those stock-days.
 - Implementation: `research/analysis/scripts/liquid_gap_orb_test.py`, committed with this addendum.
+
+## Result (2026-10-20, one look, rule unchanged)
+
+74,836 liquid gap-up stock-days collected (2021-01-04 to 2026-10-16); 20,556 had a catalyst article.
+Primary rule: **4,382 trades over 1,161 days.**
+
+| Criterion | Result | |
+|---|---|---|
+| (a) >= 300 trades | 4,382 | PASS |
+| (b) mean > 0 at 0.15%/side, CI lower > 0 | **-0.376%** (CI -0.516% to -0.243%); -0.121R | FAIL |
+| (c) positive in >= 4 of 6 years | 0 of 6 (2021 -0.68%, 2022 -0.33%, 2023 -0.14%, 2024 -0.10%, 2025 -0.61%, 2026 -0.27%) | FAIL |
+| (d) > 0 at 0.30%/side | -0.675% | FAIL |
+| (e) > 0 without the best 1% | -0.546% | FAIL |
+
+**VERDICT: FAIL.** Before costs the rule is about flat (-0.08% per trade), so this is not just a cost
+problem: the opening-range breakout on liquid news gap-ups has no edge. Report-only variants (no news
+requirement, 2% and 6% gaps, 15-minute range, 10:30 exit) are all negative. The one consistent pattern
+again: news gap-ups beat no-news gap-ups the same day by +0.40% (CI +0.07% to +0.70%), but both lose in
+absolute terms. Idea closed.
