@@ -87,17 +87,15 @@ def universe():
     if os.path.exists(path):
         return pickle.load(open(path, 'rb'))
     from alpaca.trading.client import TradingClient
-    from alpaca.trading.enums import AssetClass, AssetStatus
-    from alpaca.trading.requests import GetAssetsRequest
     load_dotenv(r'C:/Repositories/Stock-Picker/production/.env.paper')
     tc = TradingClient(os.environ['APCA_PAPER_KEY_ID'], os.environ['APCA_PAPER_SECRET_KEY'], paper=True)
     syms = set()
-    for st in (AssetStatus.ACTIVE, AssetStatus.INACTIVE):
-        for a in tc.get_all_assets(GetAssetsRequest(asset_class=AssetClass.US_EQUITY, status=st)):
-            ex = str(a.exchange).split('.')[-1]
-            if ex in EXCHANGES and a.symbol.isalpha() and len(a.symbol) <= 5 \
-                    and not NAME_EXCLUDE.search(a.name or ''):
-                syms.add(a.symbol)
+    for st in ('active', 'inactive'):
+        # raw REST: alpaca-py's Asset model rejects exchanges it doesn't know yet (e.g. TXSE)
+        for a in tc.get('/assets', {'status': st, 'asset_class': 'us_equity'}):
+            sym, ex, name = a.get('symbol') or '', a.get('exchange') or '', a.get('name') or ''
+            if ex in EXCHANGES and sym.isalpha() and len(sym) <= 5 and not NAME_EXCLUDE.search(name):
+                syms.add(sym)
     syms = sorted(syms)
     os.makedirs(CACHE, exist_ok=True)
     pickle.dump(syms, open(path, 'wb'))
