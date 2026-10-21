@@ -99,7 +99,8 @@ def daily(conn, client, syms):
                     & (gap >= GAP_LO) & (gap <= GAP_HI)
                 strict = loose & (o > MIN_OPEN) & (adv >= MIN_ADV) & (atr > MIN_ATR)
             for k in np.where(loose)[0]:
-                rows.append((sym, d[k], o[k], pc[k], atr[k], adv[k], bool(strict[k])))
+                rows.append((sym, d[k], float(o[k]), float(pc[k]), float(atr[k]), float(adv[k]),
+                             bool(strict[k])))
         with conn.cursor() as cur:
             if rows:
                 psycopg2.extras.execute_values(cur, 'INSERT INTO orb_eligible VALUES %s ON CONFLICT DO NOTHING',
