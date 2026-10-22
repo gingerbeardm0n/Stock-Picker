@@ -124,10 +124,11 @@ def opening_ranges(conn, client):
             syms = sorted(r[0] for r in cur.fetchall())
         s = ET.localize(datetime(d.year, d.month, d.day, 9, 30))
         e = ET.localize(datetime(d.year, d.month, d.day, 9, 35))
-        rows = []
+        rows, failed = [], False
         for j in range(0, len(syms), 400):
             data = _fetch(client, syms[j:j + 400], TimeFrame.Minute, s, e)
             time.sleep(SLEEP)
+            failed |= not data  # _fetch returns {} when it gives up; leave the day unmarked so a rerun retries it
             for sym, bars in data.items():
                 if len(bars) >= 3:
                     bars = sorted(bars, key=lambda b: b.timestamp)
@@ -137,7 +138,8 @@ def opening_ranges(conn, client):
             if rows:
                 psycopg2.extras.execute_values(cur, 'INSERT INTO orb_or5 VALUES %s ON CONFLICT DO NOTHING', rows)
         conn.commit()
-        _mark(conn, 'or5', d.isoformat())
+        if not failed:
+            _mark(conn, 'or5', d.isoformat())
         if i % 100 == 0 or i == len(todo):
             log(f'  or5 {i}/{len(todo)} days ({time.time() - t0:.0f}s)')
 
