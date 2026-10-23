@@ -202,29 +202,40 @@ def cmd_download(a):
         sys.exit(f'refusing: only {len(bud)} stock-mornings fit the budget (< {MIN_FIT}); prereg says do not buy')
     client = hist_client()
     os.makedirs(os.path.join(OUT, 'mbp10'), exist_ok=True)
-    pend, total = [], 0.0
+    from concurrent.futures import ThreadPoolExecutor
+    todo = []
     for r in bud.itertuples():
         day = pd.Timestamp(r.day).date()
-        if os.path.exists(fpath(day, r.symbol)):
-            continue
-        s, e = window(day, r.flag_min)
-        c = float(client.metadata.get_cost(dataset=DATASET, symbols=r.symbol, schema=SCHEMA, start=s, end=e,
-                                           stype_in='raw_symbol'))
-        log(f'  est {day} {r.symbol}: ${c:.4f}')
-        pend.append((day, r.symbol, s, e))
-        total += c
+        if not os.path.exists(fpath(day, r.symbol)):
+            todo.append((day, r.symbol) + window(day, r.flag_min))
+
+    def _price(t):
+        day, sym, s, e = t
+        return float(client.metadata.get_cost(dataset=DATASET, symbols=sym, schema=SCHEMA, start=s, end=e,
+                                              stype_in='raw_symbol'))
+
+    log(f'pricing {len(todo)} files still to buy (free get_cost, 8 threads)')
+    with ThreadPoolExecutor(8) as ex:
+        costs = list(ex.map(_price, todo))
+    pend, total = todo, float(sum(costs))
     full = float(bud.cost.sum())
     log(f'EXACT get_cost total for {len(pend)} files still to buy: ${total:.4f} (full selection ${full:.4f})')
     if total > a.approved_usd:
         sys.exit(f'ABORT: total ${total:.4f} > approved ${a.approved_usd}')
     if total > BUDGET_CAP or full > BUDGET_CAP:
         sys.exit(f'ABORT: exceeds prereg cap ${BUDGET_CAP}')
-    for day, sym, s, e in pend:
+
+    def _get(t):
+        day, sym, s, e = t
         p = fpath(day, sym)
         client.timeseries.get_range(dataset=DATASET, symbols=sym, schema=SCHEMA, start=s, end=e,
                                     stype_in='raw_symbol', path=p + '.part')
         os.replace(p + '.part', p)
-        log(f'  saved {day} {sym}')
+
+    with ThreadPoolExecutor(8) as ex:
+        for i, _ in enumerate(ex.map(_get, pend), 1):
+            if i % 200 == 0 or i == len(pend):
+                log(f'  saved {i}/{len(pend)}')
     log('download done')
 
 
