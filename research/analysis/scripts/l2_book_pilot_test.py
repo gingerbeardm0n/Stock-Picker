@@ -211,11 +211,17 @@ def cmd_download(a):
 
     def _price(t):
         day, sym, s, e = t
-        return float(client.metadata.get_cost(dataset=DATASET, symbols=sym, schema=SCHEMA, start=s, end=e,
-                                              stype_in='raw_symbol'))
+        for attempt in range(5):  # free call; retry gateway timeouts (504) instead of aborting the whole run
+            try:
+                return float(client.metadata.get_cost(dataset=DATASET, symbols=sym, schema=SCHEMA, start=s, end=e,
+                                                      stype_in='raw_symbol'))
+            except Exception:  # noqa: BLE001
+                if attempt == 4:
+                    raise
+                time.sleep(2 ** attempt * 2)
 
     log(f'pricing {len(todo)} files still to buy (free get_cost, 8 threads)')
-    with ThreadPoolExecutor(8) as ex:
+    with ThreadPoolExecutor(4) as ex:
         costs = list(ex.map(_price, todo))
     pend, total = todo, float(sum(costs))
     full = float(bud.cost.sum())
