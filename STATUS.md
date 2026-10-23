@@ -4,7 +4,7 @@
 History goes in `docs/PROJECT_HISTORY.md`; durable facts in `memory/`; this file is
 the "what's true today / what's next / what's blocking" snapshot an agent reads first.
 
-_Updated: 2026-10-21 (Wed) — after the Ross-edge tests_
+_Updated: 2026-10-22 (Thu) — after the Stocks-in-Play ORB replication_
 
 ---
 
@@ -24,7 +24,10 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
 3. **Every mechanical rule tested on minute bars loses after costs**: entries, breakouts,
    pullbacks, news, AI headline ratings, float, market temperature, the tape (pre-registered,
    FAIL 10-19), and liquid news gap-ups with an opening-range breakout (pre-registered, FAIL 10-20:
-   -0.38%/trade over 4,382 trades, negative all 6 years, flat even before costs).
+   -0.38%/trade over 4,382 trades, negative all 6 years, flat even before costs), and the published
+   "Stocks in Play" 5-minute opening-range breakout (pre-registered, FAIL 10-22: -1.01R/trade over 41,815
+   trades 2016-2026, negative every year; about zero even with no costs, so the paper's gross edge did not
+   reproduce; `docs/PREREG_2026_10_STOCKS_IN_PLAY_ORB.md`).
 4. **The one result that keeps repeating:** stocks moving on real news beat stocks moving
    without news, in small caps and liquid stocks alike. It has never been profitable on its own.
 
@@ -40,7 +43,8 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
 
 ## Next actions
 
-1. **Next research idea (Joel's call, in progress):** candidates are a Level 2 order-book pilot
+1. **Next research idea (Joel's call):** queued: SPY/QQQ intraday momentum (first half hour predicts the
+   last half hour), pre-registered. Other candidates: a Level 2 order-book pilot
    (Databento free credit; needs Joel to create the account), Ross's audience effect, futures
    (single order book), or what to add on top of the news effect. Every new idea gets a
    pre-registered test committed before its data is pulled.
