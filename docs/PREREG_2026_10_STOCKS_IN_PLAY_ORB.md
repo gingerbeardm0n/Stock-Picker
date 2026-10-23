@@ -67,3 +67,25 @@ check); top 10 instead of top 20; exits by type.
 
 Rules come from secondary sources. Some delisted tickers are missing from Alpaca's asset list (mild
 survivorship). Short trades assume shares were borrowable at no fee (liquid names, usually true).
+
+## Result (2026-10-22, one look, rule unchanged)
+
+`python research/analysis/scripts/stocks_in_play_orb_test.py evaluate`. 53,760 selected stock-days over 2,688 days,
+41,815 trades (no trigger, a flat opening candle, or missing bars account for the rest; 186 selected stock-days,
+0.35%, had no full-day bars). Exits: stop 72%, close 15%, stop gapped through 13%.
+
+| Criterion | Result | |
+|---|---|---|
+| (a) >= 1,000 trades | 41,815 | PASS |
+| (b) mean net R > 0 at 0.15%/side, CI lower bound > 0 | **-1.01R** (CI -1.06 to -0.97), -0.31% per trade | FAIL |
+| (c) mean net R > 0 post-publication 2024-01..2026-10 | -0.98R (10,822 trades) | FAIL |
+| (d) mean net R > 0 at 0.30%/side | -1.99R | FAIL |
+| (e) mean > 0 without the best 1% of trades | -1.30R | FAIL |
+
+**VERDICT: FAIL.** Negative in every year 2016-2026, long and short alike, top 10 no better.
+
+Report-only: with **no costs at all** the mean is -0.04R (CI -0.08 to +0.01), and with the paper's own cost
+assumption (commission only) -0.10R. So on Alpaca SIP minute bars with honest stop fills, the published gross edge
+does not reproduce; it is not just eaten by costs. Caveat: rules came from secondary summaries, and our stop fills
+are honest (gap-through fills at the bar open) where a backtest filling stops at the stop price would look better.
+This idea is closed.
