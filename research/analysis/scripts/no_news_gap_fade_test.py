@@ -26,6 +26,9 @@ Ambiguities resolved (closest to liquid_gap_orb_test.py unless the prereg is exp
   * The 5% stop (report-only) uses the reference's honest-fill convention mirrored for a short: a bar that
     OPENS at/through the stop fills at its open; an intrabar touch fills at max(stop, next bar open). It is
     checked from the entry bar itself (entry is at that bar's open, so its high already counts).
+  * Alpaca's SIP history starts 2016-01-04 (verified: daily and minute). A stock-day needs >= 15 prior daily
+    bars for the 20-day ADV, so the first candidates are 2016-01-26; 2016-01-04..2016-01-25 cannot qualify
+    (about 15 of ~1,260 market days). Nothing is imputed.
   * Gap for the decision comes from the daily bar's open (the prereg's "official open"), not the 09:30 bar.
 
 Stages (each caches in the DB and resumes; tables prefixed fade_):
