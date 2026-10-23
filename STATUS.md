@@ -29,7 +29,9 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
    trades 2016-2026, negative every year; about zero even with no costs, so the paper's gross edge did not
    reproduce; `docs/PREREG_2026_10_STOCKS_IN_PLAY_ORB.md`), and SPY/QQQ market intraday momentum (pre-registered,
    FAIL 10-23: first half hour does not predict the last half hour on 2016-2026, gross about zero, 0 of 11 years
-   positive after costs; `docs/PREREG_2026_10_MARKET_INTRADAY_MOMENTUM.md`).
+   positive after costs; `docs/PREREG_2026_10_MARKET_INTRADAY_MOMENTUM.md`), and shorting liquid no-news gap-ups
+   on fresh 2016-2020 data (pre-registered, FAIL 10-23: +0.29%/trade but CI -0.92% to +1.61%, negative at
+   0.30%/side; `docs/PREREG_2026_10_NO_NEWS_GAP_FADE.md`).
 4. **The one result that keeps repeating:** stocks moving on real news beat stocks moving
    without news, in small caps and liquid stocks alike. It has never been profitable on its own.
 
@@ -45,7 +47,9 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
 
 ## Next actions
 
-1. **Next research idea (Joel's call):** nothing queued. Candidates: a Level 2 order-book pilot
+1. **In progress:** Level 2 (Nasdaq book) pilot, `docs/PREREG_2026_10_L2_BOOK_PILOT.md`. Databento account
+   live (Oct 23): $125 credit, $100 monthly limit; Joel approved up to $10 for this pilot (estimate ~$4).
+   Any Databento spend needs Joel's explicit OK. Other candidates: a Level 2 order-book pilot
    (Databento free credit; needs Joel to create the account), Ross's audience effect, futures
    (single order book), or what to add on top of the news effect. Every new idea gets a
    pre-registered test committed before its data is pulled.

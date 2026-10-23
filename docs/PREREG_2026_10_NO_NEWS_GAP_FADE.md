@@ -64,3 +64,26 @@ Any failure closes this idea.
 Benzinga coverage in Alpaca news may be thinner in 2016-2018, so some "no news" stock-days may have had news
 elsewhere; the per-year news share is reported so this can be judged. Some delisted tickers are missing from Alpaca's
 asset list (mild survivorship). Shares assumed borrowable at no fee.
+
+## Result (2026-10-23, one look, rule unchanged)
+
+`python research/analysis/scripts/no_news_gap_fade_test.py evaluate` (output saved under
+`research/analysis/outputs/no_news_fade/`). 10,890 qualifying gap-ups on 1,106 days, 7,032 without a catalyst
+article, 7,007 tradable. Data check: 0 look-ahead articles, 100% minute-bar coverage. 2020 dominates the sample
+(5,831 of 7,007 trades) and has low news coverage (22% catalyst share vs 52-75% in 2016-2019).
+
+| Criterion | Result | |
+|---|---|---|
+| (a) >= 1,000 trades | 7,007 | PASS |
+| (b) mean net > 0 at 0.15%/side, CI lower bound > 0 | +0.285%, **CI -0.92% to +1.61%** | FAIL |
+| (c) positive in >= 4 of 5 years | 4 (2016 -0.19%, 2017 +0.01%, 2018 +0.66%, 2019 +0.12%, 2020 +0.31%) | PASS |
+| (d) mean net > 0 at 0.30%/side | -0.015% | FAIL |
+| (e) > 0 without the best 1% of trades | +0.121% | PASS |
+
+**VERDICT: FAIL.** The average is positive but statistically indistinguishable from zero: stocks gapping on the same
+day move together, so the day-clustered CI is wide, and the edge disappears at 0.30%/side. Report-only: news
+gap-ups shorted the same way -0.17%; same-day paired no-news minus news +0.28% (CI -0.03% to +0.59%), the
+news effect again in the same direction but not significant here; gap above 10% +0.97% (CI -0.92% to +3.38%, 480
+trades); cover at 15:59 -0.65%; 2021-2026 in-sample +0.03%. This idea is closed as specified. Post-hoc note,
+NOT actionable: no-news gaps above 10% were positive in both periods (+0.97% here, +1.48% in 2021-2026); that is a
+new hypothesis needing its own pre-registration and fresh data.
