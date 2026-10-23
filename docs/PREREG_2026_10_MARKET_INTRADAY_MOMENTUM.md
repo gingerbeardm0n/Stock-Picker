@@ -52,3 +52,22 @@ Any failure closes this idea.
 
 Rules come from memory of published summaries. Only two instruments, so the sample is about 2,700 days each and
 the effect, if any, is a few hundredths of a percent per day: the CI may be wide. Shorting SPY/QQQ is assumed free.
+
+## Result (2026-10-23, one look, rule unchanged)
+
+`python research/analysis/scripts/market_intraday_momentum_test.py evaluate`. 2,702 SPY days and 2,701 QQQ days,
+2016-01-05 to 2026-10-22.
+
+| Criterion | Result | |
+|---|---|---|
+| (a) SPY >= 2,000 trading days | 2,702 | PASS |
+| (b) SPY mean net > 0 at 0.02%/side, CI lower bound > 0 | **-0.045%** (CI -0.057% to -0.034%) | FAIL |
+| (c) QQQ mean net > 0 at 0.02%/side | -0.039% | FAIL |
+| (d) SPY mean net > 0 at 0.05%/side | -0.105% | FAIL |
+| (e) SPY positive in >= 6 of 11 years | 0 of 11 | FAIL |
+| (f) SPY mean > 0 without the best 1% of days | -0.060% | FAIL |
+
+**VERDICT: FAIL.** Report-only: with no costs at all the signal is worth nothing (SPY -0.005%, CI -0.017% to +0.006%;
+QQQ +0.001%, CI -0.012% to +0.015%). The paper's two-signal version, high-volatility days, the 15:59 exit, excluding
+2020, longs and shorts all show nothing either. On 2016-2026 the first half hour does not predict the last half hour
+of SPY or QQQ. The effect reported for 1993-2013 is not present after it. This idea is closed.
