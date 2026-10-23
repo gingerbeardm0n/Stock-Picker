@@ -234,11 +234,18 @@ def cmd_download(a):
     def _get(t):
         day, sym, s, e = t
         p = fpath(day, sym)
-        client.timeseries.get_range(dataset=DATASET, symbols=sym, schema=SCHEMA, start=s, end=e,
-                                    stype_in='raw_symbol', path=p + '.part')
+        for attempt in range(4):  # retry read timeouts; a file is only kept once fully written
+            try:
+                client.timeseries.get_range(dataset=DATASET, symbols=sym, schema=SCHEMA, start=s, end=e,
+                                            stype_in='raw_symbol', path=p + '.part')
+                break
+            except Exception:  # noqa: BLE001
+                if attempt == 3:
+                    raise
+                time.sleep(2 ** attempt * 3)
         os.replace(p + '.part', p)
 
-    with ThreadPoolExecutor(8) as ex:
+    with ThreadPoolExecutor(4) as ex:
         for i, _ in enumerate(ex.map(_get, pend), 1):
             if i % 200 == 0 or i == len(pend):
                 log(f'  saved {i}/{len(pend)}')
