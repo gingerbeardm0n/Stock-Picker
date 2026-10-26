@@ -265,6 +265,8 @@ def _depth_arrays(df):
 def book_features(df, t0):
     """df: mbp-10 DataFrame (ts_event index, UTC). t0: tz-aware entry time.
     Returns dict(imb, imb30, n_valid, ask_depth, nas_vol) or None if < MIN_VALID valid seconds."""
+    if df.empty:  # no Nasdaq book records in the window: 0 valid seconds, dropped per prereg
+        return None
     df = df.sort_index()
     if 'instrument_id' in df.columns and df.instrument_id.nunique() > 1:
         df = df[df.instrument_id == df.instrument_id.value_counts().idxmax()]
