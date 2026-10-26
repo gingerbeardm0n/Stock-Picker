@@ -60,3 +60,22 @@ One venue's book only (fragmented market); premarket books are thin, so a few or
 small (budget-limited). Outcomes of these stock-mornings have been studied before (flag returns are known in
 aggregate); the depth feature itself is new. Databento rewrites XNAS.ITCH history on 2026-10-31 (new instrument
 ids before 2023-11-28); data is keyed by symbol and date, so this does not matter here.
+
+## Result (2026-10-26, one look, rule unchanged)
+
+`python research/analysis/scripts/l2_book_pilot_test.py evaluate`. Databento XNAS.ITCH mbp-10, 3,256 Nasdaq-listed
+premarket stock-mornings (2018-05 to 2026-03), exact cost $2.87 from the free credit (Joel approved up to $10).
+46 dropped for fewer than 60 valid book seconds (including empty windows); 3,210 valid over 480 days
+(bid-heavy 1,724, ask-heavy 1,486). Nasdaq carried a median 16% of each stock's volume in the window.
+
+| Criterion | Result | |
+|---|---|---|
+| (a) >= 200 stock-mornings | 3,210 | PASS |
+| (b) bid-heavy minus ask-heavy 10-min return > 0, CI lower > 0 | +0.09% (CI -0.38% to +0.62%) | FAIL |
+| (c) bid-heavy mean net > 0 at 0.5%/side | **-1.24%** (CI -1.60% to -0.86%) | FAIL |
+
+**VERDICT: FAIL.** Nasdaq book depth imbalance in the 2 minutes before entry does not separate premarket movers
+that keep running, and buying the bid-heavy ones loses about as much as every other premarket rule. Report-only:
+terciles all negative after costs; last-30-second imbalance +0.25% (CI spans 0); "thin ask" slightly worse, not
+better; Ross picks on the ask-heavy side did better than on the bid-heavy side (small n). This closes Level 2 depth
+for premarket small-cap movers as specified. Limit: one venue's book (16% of volume), not the consolidated book.

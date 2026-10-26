@@ -4,7 +4,7 @@
 History goes in `docs/PROJECT_HISTORY.md`; durable facts in `memory/`; this file is
 the "what's true today / what's next / what's blocking" snapshot an agent reads first.
 
-_Updated: 2026-10-23 (Fri) — after the SPY/QQQ intraday momentum replication_
+_Updated: 2026-10-26 (Mon) — after the Level 2 pilot and no-news fade tests_
 
 ---
 
@@ -31,7 +31,9 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
    FAIL 10-23: first half hour does not predict the last half hour on 2016-2026, gross about zero, 0 of 11 years
    positive after costs; `docs/PREREG_2026_10_MARKET_INTRADAY_MOMENTUM.md`), and shorting liquid no-news gap-ups
    on fresh 2016-2020 data (pre-registered, FAIL 10-23: +0.29%/trade but CI -0.92% to +1.61%, negative at
-   0.30%/side; `docs/PREREG_2026_10_NO_NEWS_GAP_FADE.md`).
+   0.30%/side; `docs/PREREG_2026_10_NO_NEWS_GAP_FADE.md`), and the Level 2 pilot (Nasdaq order-book depth
+   imbalance at the premarket flag, pre-registered, FAIL 10-26: bid-heavy minus ask-heavy +0.09%, CI spans 0;
+   bid-heavy -1.24%/trade net; `docs/PREREG_2026_10_L2_BOOK_PILOT.md`).
 4. **The one result that keeps repeating:** stocks moving on real news beat stocks moving
    without news, in small caps and liquid stocks alike. It has never been profitable on its own.
 
@@ -47,9 +49,8 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
 
 ## Next actions
 
-1. **In progress:** Level 2 (Nasdaq book) pilot, `docs/PREREG_2026_10_L2_BOOK_PILOT.md`. Databento account
-   live (Oct 23): $125 credit, $100 monthly limit; Joel approved up to $10 for this pilot (estimate ~$4).
-   Any Databento spend needs Joel's explicit OK. Other candidates: a Level 2 order-book pilot
+1. **Next research idea (Joel's call):** nothing queued. Databento account live (Oct 23): about $122 credit
+   left, $100 monthly limit; any spend needs Joel's explicit OK. Candidates: a Level 2 order-book pilot
    (Databento free credit; needs Joel to create the account), Ross's audience effect, futures
    (single order book), or what to add on top of the news effect. Every new idea gets a
    pre-registered test committed before its data is pulled.
