@@ -236,6 +236,8 @@ def cmd_download(a):
         p = fpath(day, sym)
         for attempt in range(4):  # retry read timeouts; a file is only kept once fully written
             try:
+                if os.path.exists(p + '.part'):  # leftover from an interrupted request
+                    os.remove(p + '.part')
                 client.timeseries.get_range(dataset=DATASET, symbols=sym, schema=SCHEMA, start=s, end=e,
                                             stype_in='raw_symbol', path=p + '.part')
                 break
