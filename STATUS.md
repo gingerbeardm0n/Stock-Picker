@@ -49,7 +49,7 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
 
 ## Next actions
 
-1. **Next research idea (Joel's call):** nothing queued. Databento account live (Oct 23): about $122 credit
+1. **Next research idea (Joel's call):** nothing queued. Databento account live (Oct 23): about $124 credit
    left, $100 monthly limit; any spend needs Joel's explicit OK. Candidates: a Level 2 order-book pilot
    (Databento free credit; needs Joel to create the account), Ross's audience effect, futures
    (single order book), or what to add on top of the news effect. Every new idea gets a
