@@ -79,3 +79,17 @@ Assumes the closing auction fills at the official close. `created_at` is Benzing
 earlier. Some delisted tickers are missing from Alpaca's asset list (mild survivorship, flatters longs). Exiting a
 delisted stock at its last close can miss a final drop. Split adjustment depends on Alpaca's corporate-action data.
 Dividends ignored (small over 5 days).
+
+## Addendum (implementation, decided 2026-11-11 before any outcome data was pulled)
+
+- Price and dollar-volume filters use **raw** (as-traded) daily bars, which is what a trader saw that morning.
+  Gap and all returns use **split-adjusted** bars, so a split never looks like a gap or a return.
+- News is reused from the intraday test's table `ind_news`: every article created from 16:00 ET the prior trading
+  day to 15:00 ET, for every symbol-day with raw prior close $1-$500 and 20-day dollar volume >= $2M (coverage
+  verified complete in that test). Only articles created before 09:30:00 ET on D are used. This table holds no
+  prices, so no outcome has been seen. Consequence: the report-only Ross-style tier ($1-$20) also needs 20-day
+  dollar volume >= $2M.
+- "Stops trading before D+k" = the symbol's last daily bar is more than 7 calendar days before the end of the fetched
+  data; otherwise a missing D+k bar means the data ends, and that trade is dropped for that hold.
+- Overlap: an event on day index k is skipped if the symbol already has a kept trade entered at index j with
+  k <= j + hold.
