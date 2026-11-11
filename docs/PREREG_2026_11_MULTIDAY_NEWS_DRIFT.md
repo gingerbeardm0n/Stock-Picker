@@ -93,3 +93,27 @@ Dividends ignored (small over 5 days).
   data; otherwise a missing D+k bar means the data ends, and that trade is dropped for that hold.
 - Overlap: an event on day index k is skipped if the symbol already has a kept trade entered at index j with
   k <= j + hold.
+
+## Result (2026-11-11, one look, rule unchanged)
+
+`python research/analysis/scripts/multiday_news_drift_test.py evaluate`. `check` first: 0 candidate days missing news,
+23,070 primary events (997-3,391 per year), every one with a 5-day exit, 5 exits at a last close. After the
+one-position-per-symbol rule: **21,914 trades**. Output saved under `research/analysis/outputs/multiday_news/`.
+
+| Criterion | Result | |
+|---|---|---|
+| (a) >= 1,000 trades | 21,914 | PASS |
+| (b) mean net > 0 at 0.25%/side, CI lower bound > 0 | **-0.474%** (CI -0.914% to -0.027%) | FAIL |
+| (c) market-adjusted mean > 0, CI lower bound > 0 | -0.911% (CI -1.214% to -0.588%) | FAIL |
+| (d) mean > 0 in 2016-2020 and 2021-2026 | -0.231% / -0.603% | FAIL |
+| (e) positive in >= 6 of 11 years | 1 (2016) | FAIL |
+| (f) mean net > 0 at 0.50%/side | -0.971% | FAIL |
+| (g) > 0 without the best 1% of trades | -1.163% | FAIL |
+
+**VERDICT: FAIL.** Stocks that gap up 5%+ on catalyst news do not drift up after the gap day's close: gross +0.03%
+over 5 days, and about -0.4% versus SPY before costs (they lag the market). Report-only: every hold loses net
+(1 day -0.57%, 20 days +0.55% raw but -1.02% market-adjusted); bigger gaps are worse (10%+: -0.87%, 20%+: -2.04%);
+liquid tier -0.51%, Ross-style tier -0.80%; entering at the next open -0.55%; shorting catalyst gap-downs -0.50%,
+shorting no-news gap-ups -0.25% (CI spans 0). The news-vs-no-news difference shows up again (+0.28% over 5 days)
+but both sides lose. The Chan (2003) drift does not exist in this universe in 2016-2026. This closes multi-day
+news drift as specified.

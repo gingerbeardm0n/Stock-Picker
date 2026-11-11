@@ -4,7 +4,7 @@
 History goes in `docs/PROJECT_HISTORY.md`; durable facts in `memory/`; this file is
 the "what's true today / what's next / what's blocking" snapshot an agent reads first.
 
-_Updated: 2026-11-11 (Wed) — after the intraday news drift test and step-back review_
+_Updated: 2026-11-11 (Wed) — after the multi-day news drift test (FAIL)_
 
 ---
 
@@ -52,9 +52,10 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
 ## Next actions
 
 1. **Step-back review done (2026-11-11, `docs/STEP_BACK_2026_11.md`):** stop intraday minute-bar entry tests.
-   Proposed next test: multi-day drift after news days (enter at news-day close, hold 1/5/20 days), free daily
-   data; awaiting Joel's go before writing the prereg.
-   Previous note: nothing queued. Databento account live (Oct 23): about $124 credit
+   Multi-day news drift test (pre-registered, FAIL 11-11: 21,914 trades 2016-2026, buy at gap-day close, hold 5 days,
+   -0.47%/trade net, gross +0.03%, -0.9% vs SPY, 1 of 11 years positive; `docs/PREREG_2026_11_MULTIDAY_NEWS_DRIFT.md`).
+   Per the step-back doc: the news effect looks fully priced at every horizon we can reach. Open question for
+   Joel: does jTrader continue as research at all. Nothing queued. Databento account live (Oct 23): about $124 credit
    left, $100 monthly limit; any spend needs Joel's explicit OK. Candidates: Ross's audience effect, futures
    (single order book), or what to add on top of the news effect. Every new idea gets a
    pre-registered test committed before its data is pulled.
