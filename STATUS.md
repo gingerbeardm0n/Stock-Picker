@@ -4,7 +4,7 @@
 History goes in `docs/PROJECT_HISTORY.md`; durable facts in `memory/`; this file is
 the "what's true today / what's next / what's blocking" snapshot an agent reads first.
 
-_Updated: 2026-10-26 (Mon) — after the Level 2 pilot and no-news fade tests_
+_Updated: 2026-11-11 (Wed) — after the intraday news drift test_
 
 ---
 
@@ -33,7 +33,9 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
    on fresh 2016-2020 data (pre-registered, FAIL 10-23: +0.29%/trade but CI -0.92% to +1.61%, negative at
    0.30%/side; `docs/PREREG_2026_10_NO_NEWS_GAP_FADE.md`), and the Level 2 pilot (Nasdaq order-book depth
    imbalance at the premarket flag, pre-registered, FAIL 10-26: bid-heavy minus ask-heavy +0.09%, CI spans 0;
-   bid-heavy -1.24%/trade net; `docs/PREREG_2026_10_L2_BOOK_PILOT.md`).
+   bid-heavy -1.24%/trade net; `docs/PREREG_2026_10_L2_BOOK_PILOT.md`), and drift after catalyst headlines that break
+   mid-session (pre-registered, FAIL 11-11: 950 trades 2016-2026 entering 1-2 minutes after a 1%+ reaction, -0.17%/trade
+   net, gross only +0.13%, 4 of 11 years positive; `docs/PREREG_2026_10_INTRADAY_NEWS_DRIFT.md`).
 4. **The one result that keeps repeating:** stocks moving on real news beat stocks moving
    without news, in small caps and liquid stocks alike. It has never been profitable on its own.
 
@@ -50,8 +52,7 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
 ## Next actions
 
 1. **Next research idea (Joel's call):** nothing queued. Databento account live (Oct 23): about $124 credit
-   left, $100 monthly limit; any spend needs Joel's explicit OK. Candidates: a Level 2 order-book pilot
-   (Databento free credit; needs Joel to create the account), Ross's audience effect, futures
+   left, $100 monthly limit; any spend needs Joel's explicit OK. Candidates: Ross's audience effect, futures
    (single order book), or what to add on top of the news effect. Every new idea gets a
    pre-registered test committed before its data is pulled.
 2. Reddit follow-up to u/keeganm181 with the tape and liquid results (drafts in `community/`).

@@ -77,3 +77,28 @@ may precede t0. That only makes the test harder (the move is already partly gone
 is thinner in 2016-2018 and in 2020 (see the fade test's per-year news share). A minute with no bar (thin trading)
 can push entry up to 5 minutes later. Some delisted tickers are missing from Alpaca's asset list (mild
 survivorship). Shares assumed borrowable at no fee.
+
+## Result (2026-11-11, one look, rule unchanged)
+
+`python research/analysis/scripts/intraday_news_drift_test.py evaluate --allow-incomplete` (the flag only because the
+daily-bar markers were written per collection segment; `check` confirmed 0 news days and 0 minute days missing, 0
+look-ahead rows, minute-bar coverage 99.9-100% every year). Output saved under
+`research/analysis/outputs/intraday_news/`. 125,809 primary-tier catalyst headlines 10:00-14:59 over 2016-2026;
+only **950** moved the stock 1% or more across the headline minute and the next one.
+
+| Criterion | Result | |
+|---|---|---|
+| (a) >= 1,000 trades | 950 | FAIL |
+| (b) mean net > 0 at 0.15%/side, CI lower bound > 0 | **-0.174%** (CI -0.370% to +0.015%) | FAIL |
+| (c) mean > 0 in 2016-2020 and 2021-2026 | -0.035% / -0.261% | FAIL |
+| (d) positive in >= 6 of 11 years | 4 | FAIL |
+| (e) mean net > 0 at 0.30%/side | -0.474% | FAIL |
+| (f) > 0 without the best 1% of trades | -0.311% | FAIL |
+
+**VERDICT: FAIL.** A liquid stock that reacts 1% or more to a mid-session catalyst headline does drift slightly further
+in the same direction over the next 30 minutes (gross +0.13%), but less than the cost of a round trip. Report-only:
+every hold (10 / 60 minutes, to the close) negative after costs; 2% reactions +0.05% (CI -0.52% to +0.63%, 225
+trades); longs worse (-0.31%) than shorts (-0.01%); entering one minute earlier does not help (gross +0.12%, net
+-0.18%), so the delay is not what kills it; non-catalyst placebo headlines gross +0.07%, so a real catalyst adds only
+about +0.06% of drift; small-cap tier gross +0.05%, net -0.95% at 0.5%/side. This closes intraday catalyst-headline
+drift as specified.
