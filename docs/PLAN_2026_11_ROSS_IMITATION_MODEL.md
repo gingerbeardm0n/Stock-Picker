@@ -143,3 +143,19 @@ short table, then wait. No live or paper session is switched on without his yes.
 
 Same pipeline per trader: transcripts, extraction with the existing prompts, label audit, same columns with a
 different `trader` value. Do not start this before Gate 1 shows the Ross labels are usable.
+
+---
+
+## Progress log
+
+**2026-11-12, Phase 1 + pilot (Opus orchestrating, Sonnet extracting).**
+- Gate 1: the 19 extraction files (1,787 videos, 5,424 trades) have no per-trade timestamps: 0 to the second,
+  72% no time at all, no exit times; 724 videos undated. Raw transcripts do narrate executions in order
+  (shares, price, buy/add/sell) but give no real clock times.
+- Free Alpaca historical tick trades work: millisecond timestamps, premarket, back to at least 2019.
+- Pilot (50 dated transcripts, `research/analysis/scripts/ross_exec_match_pilot.py`): 493 executions extracted,
+  349 priced. Matching the narrated price sequence to tick data found a consistent day for 55 of 81 priced
+  ticker-groups (44 of them on exactly one candidate day), but pinned only **7 executions (2%) to within 5 s**.
+  Median feasible window about 19 minutes; the stated price prints about 11 separate times in that window.
+  Price order alone does not pin the second. Next candidates: share-size fingerprints in the tick data, or the
+  screen in the recap videos. Joel decides (Gate 1b).
