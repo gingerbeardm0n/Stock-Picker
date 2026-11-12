@@ -164,3 +164,10 @@ different `trader` value. Do not start this before Gate 1 shows the Ross labels 
   On the days he trades, his order sizes are ordinary for the tape, and some stated sizes never print at that price
   at all. The tape cannot pick him out. Remaining route to second-level labels: the 240 videos tagged
   `TYPE: Live Trading` in the extractions (screen shows clock, chart, Level 2 and order entry as it happens).
+- Live-video screen check (3 of the 144 `Live Trading` videos with a YouTube id: 2022 BSFC, 2023 HPX, 2024 TBIO; 15-26 min
+  edited uploads at 1080p, frames every 2 min, videos deleted after). Readable on screen: a **market clock to the
+  second** in every live layout (eSignal `09:27:59 GMT-5`, Warrior/TradingView `10:32:27 (UTC-4)`); 10-second charts;
+  scanners with timestamps; the 2022 layout shows a **Positions window** (symbol, price, P&L per share, day realized)
+  whose changes mark fills; he also opens Tradervue (trade pages list executions with times). The 2023 video is
+  a recap with an interview, not live. Route to second-level labels: sample frames at ~1 fps, read the clock and the
+  Positions window, detect fills from changes. Downloads need a current yt-dlp (fresh venv) with `--js-runtimes node`.
