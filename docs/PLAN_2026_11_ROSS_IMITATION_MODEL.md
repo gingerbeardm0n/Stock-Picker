@@ -171,3 +171,12 @@ different `trader` value. Do not start this before Gate 1 shows the Ross labels 
   whose changes mark fills; he also opens Tradervue (trade pages list executions with times). The 2023 video is
   a recap with an interview, not live. Route to second-level labels: sample frames at ~1 fps, read the clock and the
   Positions window, detect fills from changes. Downloads need a current yt-dlp (fresh venv) with `--js-runtimes node`.
+- One-video proof (`research/analysis/scripts/ross_live_video_fills.py`, local rapidocr, free). Video 0717 (2022-01-21) had no
+  fills on camera (morning show after max loss). Video 0721 (`fjgkiAs_-3E`, 2022-02-11, +$7,900, 49 min): 1-fps frames,
+  pixel-diff on the Positions window's Price and day-Realized columns, OCR only changed seconds (609 of 2,925). Result:
+  every fill visible to the second across BRCC, KAVL, MODD, ORPH: entries (cost basis appears or changes), adds (cost
+  basis moves), and each partial sell (day Realized steps up; shares ~ step / P&L per share). Clock read on most
+  frames; misses can be filled from video seconds inside a continuous segment. **Tick check: 7 of 7 entries from flat
+  printed at the exact on-screen cost basis inside the 3-4 s clock window** (chance per window 1-7%). The screen gives
+  true second-level labels. Fills CSV: `outputs/ross_imitation/screen_fills_20220211_fjgkiAs_-3E.csv`.
+  Next (Gate 1c, Joel): scale to the ~100 other 2022 `Live Trading` videos (same layout; ~10 min OCR each, free).
