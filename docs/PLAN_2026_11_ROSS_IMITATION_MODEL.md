@@ -159,3 +159,8 @@ different `trader` value. Do not start this before Gate 1 shows the Ross labels 
   Median feasible window about 19 minutes; the stated price prints about 11 separate times in that window.
   Price order alone does not pin the second. Next candidates: share-size fingerprints in the tick data, or the
   screen in the recap videos. Joel decides (Gate 1b).
+- Size fingerprint (`ross_exec_size_pilot.py`): 47 executions with a stated size >= 1,000 shares. Seconds at his
+  price with summed size >= half his order: median about 14 per execution; **2 of 47 (4%) pinned to one second**.
+  On the days he trades, his order sizes are ordinary for the tape, and some stated sizes never print at that price
+  at all. The tape cannot pick him out. Remaining route to second-level labels: the 240 videos tagged
+  `TYPE: Live Trading` in the extractions (screen shows clock, chart, Level 2 and order entry as it happens).
