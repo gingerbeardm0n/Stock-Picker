@@ -83,18 +83,71 @@ def read_clk(ocr, c):
     return None
 
 
+# A = Jan-Sep 2022 eSignal "Positions" (narrow); B = late-2022 "Positions 2" (Strategy, Symbol, Cost Basis,
+# P&L per Share, Realized P&L), clock usually hidden by a banner -> times fitted from ticks later.
+LAYOUTS = {
+    'A': dict(crop=(slice(0, 235), slice(0, 285)), rows=(28, 215), cols=[(55, 115), (185, 285)]),
+    'B': dict(crop=(slice(0, 205), slice(0, 530)), rows=(28, 180), cols=[(190, 290), (400, 530)]),
+}
+
+
+def detect_layout(ocr, im):
+    import cv2
+    r, _ = ocr(cv2.resize(im[0:30, 0:560], None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC), use_cls=False)
+    toks = [(x[1].replace(' ', ''), x[0][0][0] / 2) for x in (r or [])]
+    if not any('osition' in s and x < 120 for s, x in toks):
+        return None
+    if any('ositions2' in s for s, _ in toks) or any(x > 380 for _, x in toks):
+        return 'B'
+    return 'A'
+
+
+def read_positions_b(ocr, crop):
+    import cv2
+    r, _ = ocr(cv2.resize(crop, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC), use_cls=False)
+    rows = {}
+    for box, txt, _ in r or []:
+        x, y = box[0][0] / 3, box[0][1] / 3
+        if y < 28 or y > 178:
+            continue
+        col = 'status' if x < 80 else 'sym' if x < 180 else 'cost' if x < 300 else 'pps' if x < 380 else 'realized'
+        rows.setdefault(int(round(y / 14.0)), {})[col] = txt
+    out = {}
+    for d in rows.values():
+        s = d.get('sym', '')
+        if re.fullmatch(r'[A-Z]{1,5}', s) and s != 'All':
+            out[s] = (d.get('cost'), d.get('pps'), d.get('realized'))
+    return out
+
+
 def scan(path, ocr):
     import cv2
-    from ross_live_video_fills import POS, col_diff, PIX
+    import numpy as np
+    from collections import Counter
+    from ross_live_video_fills import PIX
     cap = cv2.VideoCapture(path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     secs = int(n / fps)
     want = {int(round(s * fps)) for s in range(secs)}
+    votes = Counter()
+    for q in (0.1, 0.3, 0.5, 0.7, 0.9):  # quick layout check by seeking, before the full decode
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(n * q))
+        ok, im = cap.read()
+        if ok:
+            im = cv2.resize(im, (1920, 1080)) if im.shape[:2] != (1080, 1920) else im
+            lay = detect_layout(ocr, im)
+            if lay:
+                votes[lay] += 1
+    if not votes or votes.most_common(1)[0][1] < 2:
+        cap.release()
+        return secs, None, sum(votes.values()), [], None
+    lay = votes.most_common(1)[0][0]
+    L = LAYOUTS[lay]
+    y0, y1 = L['rows']
     box = find_clock(cap, ocr, n)
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-    checks = {int(round(secs * q)) for q in (0.1, 0.3, 0.5, 0.7, 0.9)}
-    prev, prev_full, kept, title_hits, i, sec = None, None, [], 0, 0, -1
+    prev, prev_small, kept, i, sec = None, None, [], 0, -1
     while True:
         if not cap.grab():
             break
@@ -105,17 +158,14 @@ def scan(path, ocr):
                 break
             if im.shape[:2] != (1080, 1920):
                 im = cv2.resize(im, (1920, 1080))
-            small = {'pos': im[0:235, 0:285].copy(), 'clk': im[box].copy() if box else None}
-            if sec in checks:
-                r, _ = ocr(cv2.resize(im[0:16, 0:110], None, fx=3, fy=3), use_cls=False)
-                title_hits += any('osition' in x[1] for x in (r or []))
-            g = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)[POS]
-            if prev is not None and col_diff(g, prev) >= PIX:
-                kept.append((sec, prev_full, small))
-            prev, prev_full = g, small
+            small = {'pos': im[L['crop']].copy(), 'clk': im[box].copy() if box else None}
+            g = cv2.cvtColor(small['pos'], cv2.COLOR_BGR2GRAY)[y0:y1].astype(int)
+            if prev is not None and max(int((np.abs(g[:, a:b] - prev[:, a:b]) > 40).sum()) for a, b in L['cols']) >= PIX:
+                kept.append((sec, prev_small, small))
+            prev, prev_small = g, small
         i += 1
     cap.release()
-    return secs, title_hits, kept, box
+    return secs, lay, votes[lay], kept, box
 
 
 def process(vid, dl, ocr):
@@ -130,24 +180,24 @@ def process(vid, dl, ocr):
         if not os.path.exists(mp4):
             return 'download failed: ' + (r.stderr or '')[-200:].replace('\n', ' ')
     try:
-        secs, hits, kept, box = scan(mp4, ocr)
-        if hits < 2:
+        secs, lay, hits, kept, box = scan(mp4, ocr)
+        if lay is None:
             return f'no Positions window ({hits}/5 sample frames), {secs}s'
 
-        def full(c):  # pad crops back into a 1080p canvas so the readers' coordinates hold
+        def full(c):  # pad crops back into a 1080p canvas so the layout-A reader's coordinates hold
             im = np.zeros((1080, 1920, 3), np.uint8)
             im[0:235, 0:285] = c['pos']
             return im
+        rd = (lambda c: read_positions(ocr, full(c))) if lay == 'A' else (lambda c: read_positions_b(ocr, c['pos']))
         ev = []
         for sec, a, b in kept:
-            fa, fb = full(a), full(b)
-            pa, pb = read_positions(ocr, fa), read_positions(ocr, fb)
+            pa, pb = rd(a), rd(b)
             if pa != pb:
                 ev.append(dict(video_sec=sec, clock_before=read_clk(ocr, a['clk']), clock_after=read_clk(ocr, b['clk']),
-                               before=json.dumps(pa), after=json.dumps(pb)))
-        pd.DataFrame(ev, columns=['video_sec', 'clock_before', 'clock_after', 'before', 'after']).to_csv(
+                               before=json.dumps(pa), after=json.dumps(pb), layout=lay))
+        pd.DataFrame(ev, columns=['video_sec', 'clock_before', 'clock_after', 'before', 'after', 'layout']).to_csv(
             os.path.join(OUT, f'{vid}.csv'), index=False)
-        print(f'  {vid}: {secs}s, clock box {box and (box[0].start, box[1].start)}, changed {len(kept)}, events {len(ev)}', flush=True)
+        print(f'  {vid}: layout {lay}, {secs}s, clock box {box and (box[0].start, box[1].start)}, changed {len(kept)}, events {len(ev)}', flush=True)
         return None
     finally:
         if os.path.exists(mp4):
