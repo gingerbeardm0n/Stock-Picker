@@ -180,3 +180,12 @@ different `trader` value. Do not start this before Gate 1 shows the Ross labels 
   printed at the exact on-screen cost basis inside the 3-4 s clock window** (chance per window 1-7%). The screen gives
   true second-level labels. Fills CSV: `outputs/ross_imitation/screen_fills_20220211_fjgkiAs_-3E.csv`.
   Next (Gate 1c, Joel): scale to the ~100 other 2022 `Live Trading` videos (same layout; ~10 min OCR each, free).
+- 2026-11-16. Sources beyond 2022: Ross channel @DaytradeWarrior has 2,849 uploads (480 live streams); we have ~1,040.
+  2017-2019 Lightspeed recaps show an "Executed or Cancelled Orders" log (time to the second, symbol, price,
+  filled/ordered, side) that stays on screen after trading. Reader `ross_lightspeed_log_reader.py` + consolidation
+  in `ross_lightspeed_log_check.py` (OCR misreads snapped/deduped). Test 2018-07-02 (GBR, BASI): **42 of 49 fills on
+  a print at that price within -1..+2 s (86%; chance 1.4%)**. 2022 live videos so far: 34 of 41 clocked entries (83%,
+  chance 6%). Late-2022 "Positions 2" layout read; no clock -> tick-fit offset (self-test 19/19 within 1 s; needs
+  enough entries per video). Alpaca free SIP quotes (bid/ask, microsecond, premarket from 04:00, back to 2018) are
+  available for the labelled days: no paid data needed for Phase 3. YouTube bot-blocked us after ~500 requests in a
+  few hours; all video work now runs through `ross_video_queue.py` (one request per 90 s, 1 h backoff).

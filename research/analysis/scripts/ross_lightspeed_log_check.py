@@ -25,6 +25,50 @@ MAP = r'C:\Repositories\Stock-Picker\Ross Cameron Day Trading Videos\extractions
 TOL = 0.005
 
 
+def lev1(a, b):
+    """True if a and b differ by at most one substitution/insertion/deletion."""
+    if abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b)) <= 1
+    s, l = sorted((a, b), key=len)
+    return any(l[:i] + l[i + 1:] == s for i in range(len(l)))
+
+
+def consolidate(f):
+    """OCR reads each log row many times with small errors. Snap symbols to the video's common symbols (>= 5 rows,
+    edit distance 1), then keep (time, symbol, price, filled) keys read at least twice, or the only key read for
+    that (time, symbol)."""
+    cnt = f.symbol.value_counts()
+    real = []
+    for s in cnt.index:  # most common first; a symbol one edit away from a more common one is a misread
+        if cnt[s] >= 5 and not any(lev1(s, r) for r in real):
+            real.append(s)
+    f = f.copy()
+    f['symbol'] = f.symbol.map(lambda s: s if s in real else next((r for r in real if lev1(s, r)), s))
+    # same time, price and quantity under different symbols = one fill misread; keep the video's commoner symbol
+    f['w'] = f.symbol.map(cnt)
+    win = f.sort_values('w', ascending=False).groupby(['time', 'price', 'filled']).symbol.first()
+    f = f.merge(win.rename('win').reset_index(), on=['time', 'price', 'filled'])
+    f = f[(f.symbol == f.win) & f.symbol.isin(real)].drop(columns=['w', 'win'])
+    # same second, price within 3%, different symbol = misread ghost of the commoner symbol's row
+    f['w'] = f.symbol.map(cnt)
+    ghost = []
+    for _, g in f.groupby('time'):
+        if g.symbol.nunique() < 2:
+            continue
+        top = g.loc[g.w.idxmax(), 'symbol']
+        for i, r in g[g.symbol != top].iterrows():
+            if (abs(g[g.symbol == top].price - r.price) <= 0.03 * r.price).any():
+                ghost.append(i)
+    f = f.drop(index=ghost).drop(columns=['w'])
+    k = f.groupby(['time', 'symbol', 'price', 'filled']).size().rename('n').reset_index()
+    best = k.groupby(['time', 'symbol']).n.transform('max')
+    keep = k[(k.n >= 2) | ((k.n == best) & (k.groupby(['time', 'symbol']).n.transform('size') == 1))]
+    side = f.groupby(['time', 'symbol', 'price', 'filled']).side.agg(lambda s: s.dropna().mode().iat[0] if s.dropna().size else '')
+    return keep.merge(side.reset_index(), on=['time', 'symbol', 'price', 'filled'])
+
+
 def score(client, fills, d):
     base = ET.localize(datetime(d.year, d.month, d.day)).timestamp()
     hits, chances = [], []
@@ -52,6 +96,9 @@ def main():
             continue
         f = pd.read_csv(p)
         f = f[f.filled > 0]
+        raw = len(f)
+        f = consolidate(f) if len(f) else f
+        print(f'{vid}: {raw} raw rows -> {len(f)} consolidated fills', flush=True)
         if f.empty:
             continue
         d0 = datetime.strptime(str(up[vid]), '%Y%m%d').date()
