@@ -63,7 +63,6 @@ Flow per card:
 Standing constraints that apply to all agents:
 - Never edit sim/engine logic without user-approved backtest validation.
 - Never place/modify/cancel broker orders.
-- No pushes to main before 12:00 ET on trading days.
 - File placement per `FILE_PLACEMENT_GUIDE.md`.
 
 ## Enabling the real Projects board (optional)

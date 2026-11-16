@@ -42,7 +42,7 @@ write the short decisions. You do **not** do bulk reading yourself.
 - No spending without Joel's explicit yes naming a dollar amount (Databento credit about $124, any paid feed).
 - Never place, change or cancel broker orders. Never create or handle API keys or passwords. Never print secrets.
 - Live sessions stay off (`SESSIONS_SUSPENDED = True`) until Joel says otherwise.
-- Never push to `main` before 12:00 ET on a trading day. Check ET with Python `zoneinfo`, not Git Bash `TZ=`.
+- Check ET with Python `zoneinfo`, not Git Bash `TZ=`. (The no-push-before-noon rule was removed Nov 16: no live session runs.)
 - File placement per `.claude/CLAUDE.md`: scripts in `research/analysis/scripts/`, outputs in
   `research/analysis/outputs/` (gitignored), docs in `docs/`.
 - Before any model is scored on held-out data, a pre-registration doc with the pass bar is committed. One look.

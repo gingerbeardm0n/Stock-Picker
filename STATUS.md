@@ -85,7 +85,7 @@ What we know (details: `docs/DECISION_2026_10_ROSS_EDGE.md`, `docs/PREREG_2026_1
 
 ## Operational runbook notes
 
-- **Never push to main before 12:00 ET on trading days.**
+- Push window rule (no pushes before 12:00 ET) removed Nov 16 2026: no live/paper session runs. Revisit if trading resumes.
 - Local backtest DB is Docker (`stockdata-timescale`). If Docker Desktop shows an error on start,
   check the backend log for `dockerInference`: stop all docker processes, `wsl --shutdown`, rename
   `%LOCALAPPDATA%\Docker\run`, start Docker Desktop ONCE.
