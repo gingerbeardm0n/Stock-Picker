@@ -83,6 +83,7 @@ def process(ocr, vid, dl):
         n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         (xy, hits) = find_window(ocr, cap, n)
         if not xy or hits < 2:
+            cap.release()  # else Windows keeps the mp4 locked and the cleanup below raises PermissionError
             return f'no order log window ({hits}/12 frames)'
         x0, y0 = xy
         box = (slice(y0 + 12, min(1080, y0 + 12 + H)), slice(max(0, x0 - 10), min(1920, x0 - 10 + W)))
