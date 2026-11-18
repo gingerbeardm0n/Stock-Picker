@@ -135,9 +135,22 @@ def main(work):
             for q in (0.4, 0.7):
                 sec = int(dur * q) if dur > 60 else 30
                 path = os.path.join(fdir, f"{r['video_id']}_{sec}.jpg")
-                subprocess.run(['ffmpeg', '-v', 'error', '-ss', str(sec), '-i', url, '-frames:v', '1', '-y', path],
-                               capture_output=True, timeout=300)
+                g = subprocess.run(['ffmpeg', '-v', 'error', '-ss', str(sec), '-i', url, '-frames:v', '1', '-y', path],
+                                   capture_output=True, text=True, timeout=300)
                 im = cv2.imread(path) if os.path.exists(path) else None
+                if im is None:
+                    # raw stream URL refused (seen on ~60% of videos 2026-11-18): let yt-dlp fetch a 2 s clip instead,
+                    # it sends the headers the URL wants
+                    log('  ffmpeg grab failed:', (g.stderr or '').strip()[-160:])
+                    clip = os.path.join(fdir, f"{r['video_id']}_{sec}.mp4")
+                    yt(['-f', 'bv*[height<=1080][ext=mp4]/bv*[height<=1080]', '--download-sections', f'*{sec}-{sec + 2}',
+                        '-o', clip, f"https://www.youtube.com/watch?v={r['video_id']}"], timeout=300)
+                    if os.path.exists(clip):
+                        c = cv2.VideoCapture(clip)
+                        ok, im = c.read()
+                        c.release()
+                        os.remove(clip)
+                        im = im if ok else None
                 if im is None:
                     res['layout'] = 'grab failed'
                     continue
