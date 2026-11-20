@@ -38,8 +38,13 @@ def yt(args, timeout=1800):
         if wait > 0:
             time.sleep(wait)
         _last[0] = time.time()
-        r = subprocess.run([sys.executable, '-m', 'yt_dlp', '--js-runtimes', 'node', '--no-progress', '-q',
-                            '--no-warnings'] + args, capture_output=True, text=True, timeout=timeout)
+        try:
+            r = subprocess.run([sys.executable, '-m', 'yt_dlp', '--js-runtimes', 'node', '--no-progress', '-q',
+                                '--no-warnings'] + args, capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:  # internet dropped mid-request (crashed the queue 2026-11-19)
+            log(f'  yt-dlp timed out after {timeout}s, waiting 5 min')
+            time.sleep(300)
+            continue
         err = (r.stderr or '') + (r.stdout or '')
         if 'not a bot' in err or 'HTTP Error 429' in err:
             log(f'  YouTube bot check, backing off {BACKOFF // 60} min')
