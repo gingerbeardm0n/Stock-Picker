@@ -53,7 +53,6 @@ Context (not part of the test): from the same order logs, his own avg sell / avg
 ~4.6% within 10 minutes, yet he exits ahead. In this sample his edge is execution (get in on the first move, get out
 within minutes), not which stock.
 
-Decision per prereg: the October "selection edge" does not survive exact pick times -> no pick model that copies his
-choices. Effort goes to model B (entry/exit timing), with his real exits as labels.
+Decision per prereg said "stop this line". Revised with Joel (Nov 20): the test design was wrong for his style (entry a full minute late, 10-30 min hold; his median first sell is 25 s, fully out 91 s). It only shows that buying his stock a minute late and holding loses. Selection is NOT ruled out and the pick model (model A) stays open; re-test selection at second-level horizons from his exact second.
 Caveats: mostly 2017-18 recap days after the open (his premarket-heavy 2022+ style is n=8/11 here); 43 events lack
 bars at some horizon; entry one minute after his buy at bar open.

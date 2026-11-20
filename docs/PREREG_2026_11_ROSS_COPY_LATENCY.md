@@ -46,3 +46,32 @@ For each delay: n episodes, mean and median net return, % green, mean with 95% b
 - Limits: 2017-18 only, mostly after the open; some fills missed by OCR; sells after 11:30 not in tick cache.
 
 No parameter changes after results are seen; extra cuts are labelled exploratory.
+
+## Results (run Nov 20 2026, `research/analysis/scripts/ross_copy_latency_test.py`) — PASS
+241 episodes on 72 days, all had ticks. His own logged prices, no cost: mean +2.71%, median +1.91%, 76% green.
+
+Copy at SIP prints, share-weighted, 0.2%/side:
+
+| late by | mean | median | green | 95% CI |
+|---|---|---|---|---|
+| **0 s (primary)** | **+3.15%** | +2.20% | 76% | **[+2.26, +4.08]** |
+| 1 s | +2.17% | +1.50% | 69% | [+1.23, +3.16] |
+| 2 s | +1.01% | +0.58% | 58% | [+0.11, +1.93] |
+| 5 s | -0.07% | -0.35% | 44% | [-0.95, +0.79] |
+| 10 s | -0.44% | -0.82% | 41% | [-1.19, +0.34] |
+| 30 s | -1.12% | -0.88% | 39% | [-1.91, -0.29] |
+
+Speed budget (largest delay with CI lower bound > 0): **2 s**. Same shape with no cost, 0.1%/side, and unweighted.
+Split: trades fully out <= 60 s lose the edge by 2 s (+0.27%, CI spans 0) and go negative at 5 s; longer trades hold
++1.6% at 2 s.
+
+Possible explanations / cautions (none tested yet):
+- 0 s copy beats his own prices: "first print at or after his second" can be a print earlier in that same second than
+  his own fill (cheaper on a breakout buy, higher on a spike sell) -> 0 s is optimistic. 1 s is the cleaner
+  "perfect copy" number and still pays (+2.17%).
+- His own orders are in the tape (2017 microcaps, ~2,000 shares); a copier would compete with him for the same
+  liquidity. Fill realism at these sizes untested (needs quotes / L1 sizes).
+- Only tick-confirmed fills used; 2017-18 only, mostly after the open.
+
+Meaning: his timing carries real money, and nearly all of it is gone within ~5 s. Model B must decide within
+~1-2 s of the moment he would. Does NOT show that moment is predictable from the tape (Step 1).
