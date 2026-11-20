@@ -94,3 +94,19 @@ Mean model score climbs into his buy: t-30 s 0.44, t-5 s 0.49, t-4 s 0.53, his s
   may sit just before t and feed the 5-s inputs; the score jump t-4 s -> t (0.53 -> 0.60) could partly be that.
   Fix to test: build inputs from prints before t-2 s.
 - Not tested: quotes / L2 (he reads them), second-level setups, more labels (212 videos pending).
+
+### Leak check (Nov 20, `--lag 2`: inputs only from prints before t-2 s; same model, same split)
+| | lag 0 (above) | lag 2 |
+|---|---|---|
+| sealed holdout, all seconds that day | 0.885 | 0.872 [0.819, 0.916] (still PASS) |
+| "no" within 2 min | 0.74 | 0.63 [0.56, 0.70] |
+| "no" within 60 s | 0.69 | 0.58 [0.50, 0.65] |
+| "no" within 15 s | 0.58 | **0.50 [0.41, 0.58] = coin flip** |
+| money check, model fires | +1.29% mean | +0.16% mean, median -1.21%, 38% green |
+| 5-s price change share of model | 13% | 3% |
+
+Reading: the second-level skill at lag 0 came mostly from the last 2 s before his buy. Two explanations, not
+separable with this data: (a) his own print leaking in (tick-confirm window t-2), (b) he really reacts to prints in the
+last 1-2 s, which a 2-s gap also hides. Either way, from prints >= 2 s old the model finds his stretch of minutes, not
+his second. Next checks: remove his own print by price + size match and rerun at lag 0 (separates a from b); add
+quotes (bid/ask, sizes) which he watches.

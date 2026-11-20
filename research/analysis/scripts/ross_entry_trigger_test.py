@@ -47,6 +47,9 @@ class Model:
 FEATS = ['hod_dist', 'since_high', 'gap', 'round_dist', 'half_dist', 'ret5', 'ret15', 'ret60',
          'n5', 'n15', 'n60', 'v5', 'v15', 'v60', 'upt15', 'avg_sz60', 'vwap_dist', 'tod']
 RNG = np.random.default_rng(20261120)
+# Leak check: build inputs only from prints strictly before (t - LAG). His first-buy times are tick-confirmed within
+# [t-2, t+1], so LAG=2 keeps his own print out of the inputs.  python ... ross_entry_trigger_test.py --lag 2
+LAG = int(sys.argv[sys.argv.index('--lag') + 1]) if '--lag' in sys.argv else 0
 
 
 def log(*a):
@@ -79,21 +82,22 @@ def features(tick, base, pc, extra_secs):
     hod = np.maximum.accumulate(p)
     is_new = np.concatenate([[True], p[1:] > hod[:-1]])
     last_new_t = np.maximum.accumulate(np.where(is_new, rel, -np.inf))
-    i = np.searchsorted(rel, cand, side='left')  # prints strictly before second
+    cut = cand - LAG
+    i = np.searchsorted(rel, cut, side='left')  # prints strictly before second - LAG
     ok = i > 0
-    cand, i = cand[ok], i[ok]
+    cand, cut, i = cand[ok], cut[ok], i[ok]
     k = i - 1
     last = p[k]
 
     def idx(w):
-        return np.searchsorted(rel, cand - w, side='left')
+        return np.searchsorted(rel, cut - w, side='left')
 
     def px_at(w):
         j = idx(w) - 1
         return np.where(j >= 0, p[np.maximum(j, 0)], np.nan)
     f = {}
     f['hod_dist'] = last / hod[k] - 1
-    f['since_high'] = cand - last_new_t[k]
+    f['since_high'] = cut - last_new_t[k]
     f['gap'] = last / pc - 1 if pc and np.isfinite(pc) else np.full(len(cand), np.nan)
     f['round_dist'] = np.ceil(last + 1e-9) - last
     f['half_dist'] = np.ceil(last * 2 + 1e-9) / 2 - last
@@ -118,7 +122,7 @@ def features(tick, base, pc, extra_secs):
 
 
 def build(client):
-    p = os.path.join(CACHE, 'rows.pkl')
+    p = os.path.join(CACHE, f'rows{"_lag%d" % LAG if LAG else ""}.pkl')
     if os.path.exists(p):
         return pickle.load(open(p, 'rb'))
     c = pd.read_csv(os.path.join(OUT, 'ross_imitation', 'lightspeed_logs', 'check.csv'))
@@ -215,6 +219,7 @@ def trade_ret(tick, base, s):
 def main():
     client = _client()
     rows = build(client)
+    log(f'inputs from prints before t - {LAG} s')
     rows = rows.sort_values(['day', 'symbol', 'sec']).reset_index(drop=True)
     rec, live = rows[rows.src == 'recap'], rows[rows.src == 'live']
     days = sorted(rec.day.unique())
