@@ -34,3 +34,26 @@ Return at h minutes = close of the h-th bar / entry open - 1, less round-trip co
 - FAIL: the October "selection edge" was estimation artefact; a pick model that copies him has nothing to copy.
   Report and stop this line.
 No parameter of this test changes after results are seen.
+
+## Results (run Nov 20 2026, `research/analysis/scripts/ross_exact_pick_test.py`) — FAIL
+154 events on 83 days (139 recap 2017-18, 15 live 2022); 146 with peers (median 3 peers); only 77 of his stocks were
+flagged by the >=10% scanner at all. 93% of events are after 09:30 (his 2017-18 style).
+
+| h | Ross minus peers (paired) | Ross stock | peers |
+|---|---|---|---|
+| 5 min | -2.58% [-4.30, -0.78] | -3.31% | -0.92% |
+| **10 min (primary)** | **-3.43% [-5.32, -1.43]** | -4.62% | -1.29% |
+| 30 min | -3.58% [-6.65, -0.27] | -5.18% | -1.85% |
+
+Same sign in every split (premarket n=8, after open, recap, live 2022 n=11). Bought the minute after Ross and held,
+his stock does WORSE than the other movers.
+
+Context (not part of the test): from the same order logs, his own avg sell / avg buy per stock-day = **+1.31% mean,
++1.48% median, 60% green** (131 stock-days), median 5.5 min from first buy to last sell. The stock he bought falls
+~4.6% within 10 minutes, yet he exits ahead. In this sample his edge is execution (get in on the first move, get out
+within minutes), not which stock.
+
+Decision per prereg: the October "selection edge" does not survive exact pick times -> no pick model that copies his
+choices. Effort goes to model B (entry/exit timing), with his real exits as labels.
+Caveats: mostly 2017-18 recap days after the open (his premarket-heavy 2022+ style is n=8/11 here); 43 events lack
+bars at some horizon; entry one minute after his buy at bar open.
