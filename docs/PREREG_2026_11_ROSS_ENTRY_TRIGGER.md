@@ -60,3 +60,37 @@ LightGBM with fixed small settings (depth 3, 200 trees, learning rate 0.05, clas
 - Limits: 2017-18 only, mostly after the open; ~240 yes-examples; small holdout (~50 buys) -> wide CI.
 
 No parameter changes after results are seen; extra cuts are labelled exploratory.
+
+## Results (run Nov 20 2026, `research/analysis/scripts/ross_entry_trigger_test.py`) — PASS (primary), with big caveat
+Note: LightGBM native API used (sklearn wrapper not installed); same settings, "balanced" = positives weighted n_no/n_yes.
+130 stock-days 2017-18, 241 yes / 382,514 no seconds. Dev 57 days (175 yes), holdout 15 days from 2018-05-03 (66 yes).
+
+| | model rank skill | baseline rule |
+|---|---|---|
+| dev (cross-validated) | 0.928 [0.914, 0.942] | 0.535 |
+| **sealed holdout (primary)** | **0.885 [0.842, 0.928]** | 0.510 |
+| 2022 live, out of era (93 buys) | 0.625 [0.404, 0.763] | 0.504 |
+
+Inputs it leans on: 60-s price change 23%, 5-s change 13%, distance from VWAP 13%, time of day 12%, 5-s volume 10%.
+
+Money check (holdout; buy +1 s, sell half +25 s, rest +90 s, 0.2%/side):
+model fires n=67 mean +1.29% / median -1.00% / 46% green, CI [-0.30, +3.18]; Ross's own buy seconds with the same
+fixed exit n=59 mean +0.55% / median -0.02%, CI [-0.56, +1.97]; random seconds n=1,259 mean -0.18%.
+
+### Exploratory (not pre-registered, `ross_entry_trigger_explore.py`)
+Holdout rank skill when "no" seconds are only those near his buy:
+within 10 min 0.80 · 5 min 0.78 · 2 min 0.74 · 60 s 0.69 [0.62, 0.76] · 30 s 0.64 [0.57, 0.71] · 15 s 0.58 [0.50, 0.66].
+Mean model score climbs into his buy: t-30 s 0.44, t-5 s 0.49, t-4 s 0.53, his second 0.60 (quiet seconds median 0.01).
+
+### What it means (and doesn't)
+- The model clearly finds **the minute** he gets in (stock running in the last 60 s, near/above VWAP, his hours) far
+  better than the rule. Pinning **the exact second** is much weaker: 0.58 vs seconds within 15 s, CI touching 0.5.
+  Step 0 says the money lives in a 1-2 s window, so second-level precision is what is missing.
+- Most of the 0.885 comes from telling "his kind of moment" from quiet seconds, which is real but easier.
+- Money check is inconclusive: the fixed 25 s / 90 s exit turns even HIS entries into ~+0.5% (vs +2.2% with his real
+  exits at 1 s late) -> his exits carry much of the edge; model fires +1.3% mean but median -1.0%, CI spans 0.
+- 2022 out-of-era is weak and uncertain (different, premarket-heavy style; 23% of those times are tick-fitted).
+- Possible leak to check: his first-buy times are tick-confirmed within [t-2 s, t+1 s], so for some buys his own print
+  may sit just before t and feed the 5-s inputs; the score jump t-4 s -> t (0.53 -> 0.60) could partly be that.
+  Fix to test: build inputs from prints before t-2 s.
+- Not tested: quotes / L2 (he reads them), second-level setups, more labels (212 videos pending).
