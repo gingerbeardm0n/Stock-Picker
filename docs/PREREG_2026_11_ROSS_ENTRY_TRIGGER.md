@@ -110,3 +110,14 @@ separable with this data: (a) his own print leaking in (tick-confirm window t-2)
 last 1-2 s, which a 2-s gap also hides. Either way, from prints >= 2 s old the model finds his stretch of minutes, not
 his second. Next checks: remove his own print by price + size match and rerun at lag 0 (separates a from b); add
 quotes (bid/ask, sizes) which he watches.
+
+### Own-print strip check — design (written before running, Nov 23; Joel OK'd)
+Question: is the last-2-s signal his own print (leak) or a real fast reaction to the tape?
+Rule, applied the same way to EVERY second s (yes and no, no Ross knowledge): build inputs from prints before s, but
+drop prints in [s-2, s) whose price is within $0.01 of the first print at/after s (the price a buyer at s pays —
+where his own fill would sit). Prints at other prices in those 2 s are kept. Same model, settings, split, scoring.
+Also reported: at his buy seconds vs no-seconds, how often anything was dropped and how many shares.
+- Skill near his buy (within 15 / 60 s) comes back toward lag-0 levels -> real reaction to other prices in the last
+  2 s; learnable (bot needs sub-second speed).
+- Stays ~0.5 like lag 2 -> the signal was prints at his price in the last 2 s: his own print, OR others printing at
+  his price right before him (this check cannot tell those two apart; size matching would be next).
