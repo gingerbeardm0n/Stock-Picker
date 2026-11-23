@@ -47,3 +47,32 @@ Scored on the sealed holdout, at the hard level that matters: his buy second vs 
 ## Cost / time
 Free data, no DB, no paid feed. ~158 stock-days of quotes, ~1 h download + run.
 No parameter changes after results are seen; extra cuts labelled exploratory.
+
+## Results (run Nov 23 2026, `research/analysis/scripts/ross_entry_quotes_test.py`) — PASS by the written rule, weak
+Deviation: Alpaca SIP quotes are already national best bid/offer, so no rebuild; "exchanges at best ask" dropped.
+Quote coverage 100% of rows.
+
+Sealed holdout rank skill, his buy second vs "no" seconds within w:
+
+| w | prints only (strip) | A: + quotes before s | B: + quotes before s-2 |
+|---|---|---|---|
+| 15 s | 0.567 | 0.625 [0.53, 0.70] | 0.583 |
+| 30 s | 0.610 | 0.677 | 0.623 |
+| **60 s** | **0.644** | **0.713** [0.64, 0.77] | **0.660** |
+| 2 min | 0.678 | 0.745 | 0.691 |
+| all day | 0.876 | 0.897 | 0.882 |
+
+Primary (within 60 s, paired): A gain **+0.069 [+0.021, +0.101]**; B gain +0.016 [-0.031, +0.051].
+A CI low > 0 and B point > 0 -> PASS per rule. But B's gain is small and its CI spans 0: most of what quotes add
+sits in the last 2 s, the same window as the print signal.
+Version A leans on: mid-price change last 5 s 26%, seconds since the ask last moved up 14% (quote inputs 47% total).
+2022 out-of-era within 60 s: prints 0.525 -> with quotes 0.557 (both near coin flip).
+Money check (A fires, +1 s / half +25 s / rest +90 s): mean +0.23%, median -0.72%, 43% green, CI [-1.09, +1.17]
+-> nothing; Ross's own seconds with the same exit +0.55%; random -0.16%.
+
+Possible explanations:
+- Real: he buys right as the ask starts lifting / mid ticks up (fast reaction, ~1-2 s) -> learnable, needs sub-second feed.
+- Leak: his own buy lifts the ask; with time-stamps confirmed only within [t-2, t+1] some of that is in "before s".
+- Both, as with prints. Version B (no last-2-s quotes) barely helps -> cannot separate with this data.
+What holds either way: quotes older than 2 s add little; the minute is findable, the second is not yet; fixed exits
+make no money even on his own entries -> exits (Step 2) matter.
