@@ -50,6 +50,10 @@ RNG = np.random.default_rng(20261120)
 # Leak check: build inputs only from prints strictly before (t - LAG). His first-buy times are tick-confirmed within
 # [t-2, t+1], so LAG=2 keeps his own print out of the inputs.  python ... ross_entry_trigger_test.py --lag 2
 LAG = int(sys.argv[sys.argv.index('--lag') + 1]) if '--lag' in sys.argv else 0
+# Own-print strip check: for every second s, drop prints in [s-2, s) priced within $0.01 of the first print at/after s
+# (where his own fill would sit); other prices kept.  python ... ross_entry_trigger_test.py --strip
+STRIP = '--strip' in sys.argv
+TAG = ('_lag%d' % LAG if LAG else '') + ('_strip' if STRIP else '')
 
 
 def log(*a):
@@ -118,11 +122,64 @@ def features(tick, base, pc, extra_secs):
     f['tod'] = cand / 3600.0
     df = pd.DataFrame(f)
     df['sec'] = cand
+    if STRIP:
+        strip(df, rel, p, z, cum_v, cum_pv, cum_up, hod, last_new_t, j_open)
     return df
 
 
+def strip(df, rel, p, z, cum_v, cum_pv, cum_up, hod, last_new_t, j_open):
+    """Recompute inputs for seconds where prints in [s-2, s) sit at the next print's price (+-$0.01)."""
+    sec = df.sec.values
+    j2 = np.searchsorted(rel, sec - 2, side='left')
+    i = np.searchsorted(rel, sec, side='left')
+    dn, dz = np.zeros(len(sec)), np.zeros(len(sec))
+    for r in np.nonzero(i > j2)[0]:
+        s, a, b = sec[r], j2[r], i[r]
+        if b >= len(p) or rel[b] > s + 60:
+            continue
+        drop = np.abs(p[a:b] - p[b]) <= 0.01 + 1e-9
+        if not drop.any():
+            continue
+        dn[r], dz[r] = drop.sum(), z[a:b][drop].sum()
+        seg = np.arange(a, b)[~drop]
+        L = seg[-1] if len(seg) else a - 1
+        if L < 0:
+            continue
+        last = p[L]
+        h, tnew = (hod[a - 1], last_new_t[a - 1]) if a > 0 else (-np.inf, -np.inf)
+        prev, ups = (p[a - 1] if a > 0 else np.nan), 0
+        for q in seg:
+            if p[q] > h:
+                h, tnew = p[q], rel[q]
+            ups += p[q] > prev
+            prev = p[q]
+        zs, pvs = z[seg].sum(), (z[seg] * p[seg]).sum()
+
+        def jw(w):
+            return np.searchsorted(rel, s - w, side='left')
+        cnt = lambda w: (a - jw(w)) + len(seg)  # noqa: E731
+        vol = lambda w: (cum_v[a] - cum_v[jw(w)]) + zs  # noqa: E731
+        bn, bv = cnt(300) / 300.0, vol(300) / 300.0
+        row = {'hod_dist': last / h - 1, 'since_high': s - tnew,
+               'round_dist': np.ceil(last + 1e-9) - last, 'half_dist': np.ceil(last * 2 + 1e-9) / 2 - last}
+        for w in (5, 15, 60):
+            j = jw(w) - 1
+            row[f'ret{w}'] = last / p[j] - 1 if j >= 0 else np.nan
+            row[f'n{w}'] = (cnt(w) / w) / max(bn, 1e-6)
+            row[f'v{w}'] = (vol(w) / w) / max(bv, 1e-6)
+        row['upt15'] = ((cum_up[a] - cum_up[jw(15)]) + ups) / max(cnt(15), 1)
+        row['avg_sz60'] = vol(60) / max(cnt(60), 1)
+        row['vwap_dist'] = last / ((cum_pv[a] - cum_pv[j_open] + pvs) / max(cum_v[a] - cum_v[j_open] + zs, 1)) - 1
+        g = df['gap'].iat[r]
+        if np.isfinite(g):  # gap = last / prior close - 1; rescale to the new last price
+            row['gap'] = (g + 1) * last / ((df['hod_dist'].iat[r] + 1) * hod[i[r] - 1]) - 1
+        for c, v in row.items():
+            df.iat[r, df.columns.get_loc(c)] = v
+    df['drop_n'], df['drop_sz'] = dn, dz
+
+
 def build(client):
-    p = os.path.join(CACHE, f'rows{"_lag%d" % LAG if LAG else ""}.pkl')
+    p = os.path.join(CACHE, f'rows{TAG}.pkl')
     if os.path.exists(p):
         return pickle.load(open(p, 'rb'))
     c = pd.read_csv(os.path.join(OUT, 'ross_imitation', 'lightspeed_logs', 'check.csv'))
@@ -219,7 +276,13 @@ def trade_ret(tick, base, s):
 def main():
     client = _client()
     rows = build(client)
-    log(f'inputs from prints before t - {LAG} s')
+    log(f'inputs from prints before t - {LAG} s' + (' | own-price prints in last 2 s stripped' if STRIP else ''))
+    if STRIP:
+        r0 = rows[rows.src == 'recap']
+        for y, nm in ((1, 'his buy seconds'), (0, 'other seconds')):
+            g = r0[r0.y == y]
+            log(f'  {nm}: something dropped {(g.drop_n > 0).mean():.0%}, median shares dropped when any '
+                f'{g.drop_sz[g.drop_n > 0].median():.0f}')
     rows = rows.sort_values(['day', 'symbol', 'sec']).reset_index(drop=True)
     rec, live = rows[rows.src == 'recap'], rows[rows.src == 'live']
     days = sorted(rec.day.unique())

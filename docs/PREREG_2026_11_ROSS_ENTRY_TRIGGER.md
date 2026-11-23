@@ -121,3 +121,22 @@ Also reported: at his buy seconds vs no-seconds, how often anything was dropped 
   2 s; learnable (bot needs sub-second speed).
 - Stays ~0.5 like lag 2 -> the signal was prints at his price in the last 2 s: his own print, OR others printing at
   his price right before him (this check cannot tell those two apart; size matching would be next).
+
+### Own-print strip check — results (Nov 23, `--strip`)
+Prints dropped (same rule everywhere): at his buy seconds something dropped 92% of the time, median 2,592 shares
+(his median fill ~2,000); at other seconds 67%, median 1,250 shares -> his own print very likely sat in that window.
+
+| holdout score | lag 0 | strip own-price prints | lag 2 (hide all) |
+|---|---|---|---|
+| all seconds that day | 0.885 | 0.876 | 0.872 |
+| within 2 min | 0.74 | 0.68 | 0.63 |
+| within 60 s | 0.69 | 0.64 [0.56, 0.71] | 0.58 |
+| within 30 s | 0.64 | 0.60 [0.52, 0.67] | 0.54 |
+| within 15 s | 0.58 | 0.55 [0.47, 0.64] | 0.50 |
+| money check, model fires (mean / median) | +1.29% / -1.00% | +0.75% / -0.75% | +0.16% / -1.21% |
+
+Reading: the result lands in between, not at either pre-written outcome. About half the near-buy skill lost at lag 2
+comes back when only his-price prints are removed -> other prints in the last 2 s carry real signal (a fast-reaction
+component is real). The other half was prints at his price in the last 2 s (his own fill, or others trading at his
+price just before him; not separable here). Exact-second pinpointing from prints stays weak (15 s: 0.55, CI spans 0.5);
+money check still inconclusive. Next: add quotes (bid/ask + sizes), which he watches.

@@ -3,7 +3,7 @@ restricted to near his buy, and model score in the seconds leading up to his buy
 import sys, os, pickle, numpy as np, pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ross_entry_trigger_test as m
-rows = pickle.load(open(os.path.join(m.CACHE, f'rows{"_lag%d" % m.LAG if m.LAG else ""}.pkl'), 'rb')).sort_values(['day','symbol','sec']).reset_index(drop=True)
+rows = pickle.load(open(os.path.join(m.CACHE, f'rows{m.TAG}.pkl'), 'rb')).sort_values(['day','symbol','sec']).reset_index(drop=True)
 rec = rows[rows.src=='recap']; days = sorted(rec.day.unique()); cut = days[int(len(days)*0.8)]
 dev, hold = rec[rec.day<cut].copy(), rec[rec.day>=cut].copy()
 mod = m.Model().fit(dev[m.FEATS], dev.y)
