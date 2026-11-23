@@ -61,7 +61,13 @@ def download(vid, dl):
     mp4 = os.path.join(dl, f'{vid}.mp4')
     if os.path.exists(mp4):
         return mp4
-    ok, _ = yt(['-f', 'bv*[height<=1080][ext=mp4]', '-o', mp4, f'https://www.youtube.com/watch?v={vid}'])
+    ok, out = yt(['-f', 'bv*[height<=1080][ext=mp4]', '--print', 'after_move:UPLOAD %(upload_date)s', '-o', mp4,
+                  f'https://www.youtube.com/watch?v={vid}'])
+    # census-added videos have no reliable date in the list (channel listing dates are approximate): keep the real one
+    m = re.search(r'UPLOAD (\d{8})', out or '')
+    if m:
+        with open(os.path.join(OUTD, 'screen_fills', 'upload_dates.csv'), 'a') as fh:
+            fh.write(f'{vid},{m.group(1)}\n')
     return mp4 if os.path.exists(mp4) else None
 
 
@@ -102,11 +108,22 @@ def main(work):
         d = LB.OUT if kind == 'live' else LS.OUT
         if done(d, vid):
             continue
+        # A video the watchdog killed mid-run gets retried forever (YuNvqwJftVY, 1.2 GB, looped Nov 21-23):
+        # count attempts and skip after 2.
+        att = os.path.join(work, 'attempts', f'{vid}.n')
+        os.makedirs(os.path.dirname(att), exist_ok=True)
+        n = int(open(att).read() or 0) if os.path.exists(att) else 0
+        if n >= 2:
+            log(kind, vid, f'- skipped, {n} earlier attempts never finished')
+            open(os.path.join(d, f'{vid}.skip'), 'w').write(f'never finished in {n} attempts (killed by watchdog)\n')
+            continue
+        open(att, 'w').write(str(n + 1))
         log(kind, vid)
         mp4 = download(vid, dl)
         if not mp4:
             log('  download failed (not a block), skipping for now')
             continue
+        log(f'  downloaded {os.path.getsize(mp4) / 1e6:.0f} MB, processing')
         try:
             err = LB.process(vid, dl, ocr) if kind == 'live' else LS.process(ocr, vid, dl)
         except Exception as ex:  # noqa: BLE001
