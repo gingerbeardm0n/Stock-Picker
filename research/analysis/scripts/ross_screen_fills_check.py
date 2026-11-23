@@ -114,6 +114,11 @@ def main():
     client = _client()
     rows = []
     vids = pd.read_csv(os.path.join(D, 'videos_2022_live.csv'), dtype=str)
+    up = os.path.join(D, 'upload_dates.csv')  # real dates recorded at download (census-added rows have none)
+    if os.path.exists(up):
+        real = dict(l.strip().split(',') for l in open(up) if l.strip())
+        vids['upload_date'] = vids.upload_date.fillna(vids.video_id.map(real))
+    vids = vids[vids.upload_date.notna()]
     for _, v in vids.iterrows():
         p = os.path.join(D, f'{v.video_id}.csv')
         if not os.path.exists(p):
