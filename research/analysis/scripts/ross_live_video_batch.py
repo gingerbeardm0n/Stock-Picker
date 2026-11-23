@@ -131,7 +131,7 @@ def scan(path, ocr):
     secs = int(n / fps)
     want = {int(round(s * fps)) for s in range(secs)}
     votes = Counter()
-    for q in (0.1, 0.3, 0.5, 0.7, 0.9):  # quick layout check by seeking, before the full decode
+    for q in np.linspace(0.025, 0.975, 20):  # layout check by seeking (20 frames so a window shown for part of the video is not missed)
         cap.set(cv2.CAP_PROP_POS_FRAMES, int(n * q))
         ok, im = cap.read()
         if ok:
@@ -168,7 +168,7 @@ def scan(path, ocr):
     return secs, lay, votes[lay], kept, box
 
 
-def process(vid, dl, ocr):
+def process(vid, dl, ocr, keep=False):
     import pandas as pd
     from ross_live_video_fills import read_positions
     import numpy as np
@@ -200,7 +200,7 @@ def process(vid, dl, ocr):
         print(f'  {vid}: layout {lay}, {secs}s, clock box {box and (box[0].start, box[1].start)}, changed {len(kept)}, events {len(ev)}', flush=True)
         return None
     finally:
-        if os.path.exists(mp4):
+        if os.path.exists(mp4) and not keep:  # keep=True: caller still needs it (media extras) and deletes it
             os.remove(mp4)
 
 

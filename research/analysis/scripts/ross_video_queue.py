@@ -71,6 +71,51 @@ def download(vid, dl):
     return mp4 if os.path.exists(mp4) else None
 
 
+MEDIA_PAD, MEDIA_FPS, WATCH_EVERY, MIN_FREE_GB = 20, 2, 10, 15
+
+
+def media_extras(vid, mp4, work):
+    """While the mp4 is on disk (live videos), keep what a re-download would otherwise be needed for:
+    - clips/<a>_<b>.mp4: full-res clip at 2 fps from 20 s before to 20 s after every positions-window change
+      (overlapping windows merged; a, b = video seconds) -> his L2, time & sales and chart around each fill
+    - watch_10s.mp4: whole screen every 10 s (scanner / watchlist / which chart he is on)
+    Stored outside the repo in <work>/../media/<vid>/. Skipped when the disk has < MIN_FREE_GB free."""
+    import shutil
+    if shutil.disk_usage(work).free / 1e9 < MIN_FREE_GB:
+        log(f'  media extras skipped: < {MIN_FREE_GB} GB free')
+        return
+    out = os.path.join(os.path.dirname(work), 'media', vid)
+    os.makedirs(os.path.join(out, 'clips'), exist_ok=True)
+    enc = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p', '-an', '-y']
+    fills = os.path.join(OUTD, 'screen_fills', f'{vid}.csv')
+    wins = []
+    if os.path.exists(fills):
+        for r in csv.DictReader(open(fills)):
+            s = int(float(r['video_sec']))
+            a, b = max(0, s - MEDIA_PAD), s + MEDIA_PAD
+            if wins and a <= wins[-1][1]:
+                wins[-1][1] = max(wins[-1][1], b)
+            else:
+                wins.append([a, b])
+    for a, b in wins:
+        subprocess.run(['ffmpeg', '-v', 'error', '-ss', str(a), '-i', mp4, '-t', str(b - a), '-vf', f'fps={MEDIA_FPS}']
+                       + enc + [os.path.join(out, 'clips', f'{a}_{b}.mp4')], capture_output=True, timeout=600)
+    subprocess.run(['ffmpeg', '-v', 'error', '-i', mp4, '-vf', f'fps=1/{WATCH_EVERY}'] + enc
+                   + [os.path.join(out, 'watch_10s.mp4')], capture_output=True, timeout=7200)
+    mb = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(out) for f in fs) / 1e6
+    log(f'  media extras: {len(wins)} clips + watchlist time-lapse, {mb:.0f} MB')
+
+
+def captions(vid, work):
+    """Timed auto-captions (what he says, with timestamps). One small extra request, throttled like the rest."""
+    out = os.path.join(os.path.dirname(work), 'media', vid)
+    os.makedirs(out, exist_ok=True)
+    ok, _ = yt(['--skip-download', '--write-auto-subs', '--write-subs', '--sub-langs', 'en.*,en', '--sub-format', 'vtt',
+                '-o', os.path.join(out, 'captions'), f'https://www.youtube.com/watch?v={vid}'], timeout=300)
+    got = glob.glob(os.path.join(out, 'captions*.vtt'))
+    log(f'  captions: {"saved" if got else "none"}')
+
+
 def lightspeed_list():
     m = json.load(open(os.path.join(EXTR, 'file_video_id_map.json')))
     typ = {}
@@ -125,7 +170,10 @@ def main(work):
             continue
         log(f'  downloaded {os.path.getsize(mp4) / 1e6:.0f} MB, processing')
         try:
-            err = LB.process(vid, dl, ocr) if kind == 'live' else LS.process(ocr, vid, dl)
+            err = LB.process(vid, dl, ocr, keep=True) if kind == 'live' else LS.process(ocr, vid, dl)
+            if kind == 'live' and not err:
+                media_extras(vid, mp4, work)
+                captions(vid, work)
         except Exception as ex:  # noqa: BLE001
             err = f'error: {ex!r}'[:300]
         if err:
